@@ -33,6 +33,7 @@ public class DbHelper extends SQLiteOpenHelper {
             if(c.moveToFirst()) return c.isNull(0)?null:c.getString(0); return null;
         }
     }
+    public void clearAll() { getWritableDatabase().delete("recs",null,null); }
     public Recommendation getByBase(String base) {
         try(Cursor c=getReadableDatabase().query("recs",null,"base_id=?",new String[]{base},null,null,null)) {
             if(c.moveToFirst()) return fromCursor(c); return null;
