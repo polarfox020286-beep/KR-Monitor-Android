@@ -20,6 +20,8 @@ public final class CatalogFetcher {
             String id=o.optString("id","").trim();
             String title=o.optString("title","").trim();
             if(!id.matches("\\d+_\\d+") || title.length()<3) continue;
+            // Historical bad seed contained this non-clinical-recommendation document.
+            if(id.equals("439_1") && (title.equalsIgnoreCase("RFR и iFR") || title.toLowerCase(Locale.ROOT).contains("rfr"))) continue;
             String base=id.split("_",2)[0];
             Recommendation prev=result.get(base);
             Recommendation cur=new Recommendation(base,id,title,"KR"+id+".pdf");
@@ -36,11 +38,11 @@ public final class CatalogFetcher {
 
     private static String get(String u) throws Exception {
         HttpURLConnection c=(HttpURLConnection)new java.net.URL(u).openConnection();
-        c.setConnectTimeout(15000);
-        c.setReadTimeout(30000);
+        c.setConnectTimeout(10000);
+        c.setReadTimeout(20000);
         c.setInstanceFollowRedirects(true);
         c.setUseCaches(false);
-        c.setRequestProperty("User-Agent","KR-Monitor-Android/1.1");
+        c.setRequestProperty("User-Agent","KR-Monitor-Android/1.2");
         c.setRequestProperty("Accept","application/json,text/plain,*/*");
         int code=c.getResponseCode();
         if(code!=200) throw new IOException("Не удалось получить каталог обновлений: HTTP "+code);
