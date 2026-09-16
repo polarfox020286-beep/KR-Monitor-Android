@@ -17,6 +17,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Bundle normalized catalog
+        run: |
+          test -s data/catalog.json
+          cp data/catalog.json app/src/main/assets/seed_catalog.json
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace
       - uses: actions/upload-artifact@v4
