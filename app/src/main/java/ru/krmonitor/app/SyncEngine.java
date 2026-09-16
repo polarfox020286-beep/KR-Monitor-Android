@@ -9,10 +9,10 @@ import java.util.*;
 
 public final class SyncEngine {
     public static final class Result {
-        public final int added,updated,titleFixed;
+        public final int added,updated,titleFixed,downloaded,downloadFailed;
         public final String message;
         public final List<Recommendation> newRecommendations;
-        Result(int a,int u,int t,String m,List<Recommendation> n){added=a;updated=u;titleFixed=t;message=m;newRecommendations=n;}
+        Result(int a,int u,int t,int d,int f,String m,List<Recommendation> n){added=a;updated=u;titleFixed=t;downloaded=d;downloadFailed=f;message=m;newRecommendations=n;}
     }
     private SyncEngine() {}
 
@@ -21,16 +21,18 @@ public final class SyncEngine {
             SeedImporter.ensureSeeded(context);
             Map<String,Recommendation> online=CatalogFetcher.fetch();
             DbHelper db=new DbHelper(context);
-            int added=0,updated=0,titleFixed=0;
+            int added=0,updated=0,titleFixed=0,downloaded=0,downloadFailed=0;
             ArrayList<Recommendation> newlyAdded=new ArrayList<>();
+            LinkedHashMap<String,Recommendation> toDownload=new LinkedHashMap<>();
             String date=new SimpleDateFormat("yyyy-MM-dd HH:mm",Locale.US).format(new Date());
+
             for(Recommendation cur:online.values()) {
                 Recommendation old=db.getByBase(cur.baseId);
                 if(old==null) {
                     db.upsert(cur,date,date);
                     added++;
                     newlyAdded.add(cur);
-                    PdfManager.download(context,cur);
+                    toDownload.put(cur.id,cur);
                 } else if(!old.id.equals(cur.id)) {
                     File oldFile=PdfManager.file(context,old);
                     if(PdfManager.isPdf(oldFile)) {
@@ -40,20 +42,37 @@ public final class SyncEngine {
                     }
                     db.upsert(cur,date);
                     updated++;
-                    PdfManager.download(context,cur);
+                    toDownload.put(cur.id,cur);
                 } else if(!old.title.equals(cur.title)) {
                     db.upsert(cur,date);
                     titleFixed++;
                 }
             }
-            context.getSharedPreferences("prefs",Context.MODE_PRIVATE).edit().putString("last_sync",date).apply();
+
+            SharedPreferences prefs=context.getSharedPreferences("prefs",Context.MODE_PRIVATE);
+            Set<String> pending=new LinkedHashSet<>(prefs.getStringSet("pending_pdf_ids",Collections.emptySet()));
+            for(String id:pending) {
+                Recommendation r=db.getById(id);
+                if(r!=null && !PdfManager.isPdf(PdfManager.file(context,r))) toDownload.put(r.id,r);
+            }
+
+            LinkedHashSet<String> stillPending=new LinkedHashSet<>();
+            for(Recommendation r:toDownload.values()) {
+                if(PdfManager.download(context,r)) downloaded++;
+                else { downloadFailed++; stillPending.add(r.id); }
+            }
+            prefs.edit().putStringSet("pending_pdf_ids",stillPending).putString("last_sync",date).apply();
+
             if(added+updated>0) notifyUpdates(context,added,updated,newlyAdded);
+
             String msg;
             if(added==0 && updated==0) msg="Новых клинических рекомендаций не найдено.";
             else msg="Проверка завершена. Новых КР: "+added+", обновлено: "+updated+".";
-            return new Result(added,updated,titleFixed,msg,newlyAdded);
+            if(downloaded>0) msg += "\nPDF скачано: "+downloaded+".";
+            if(downloadFailed>0) msg += "\nНе удалось скачать PDF: "+downloadFailed+". Повтор будет при следующей проверке.";
+            return new Result(added,updated,titleFixed,downloaded,downloadFailed,msg,newlyAdded);
         } catch(Exception e) {
-            return new Result(0,0,0,"Не удалось проверить обновления. Локальный реестр сохранён.\n"+e.getMessage(),Collections.emptyList());
+            return new Result(0,0,0,0,0,"Не удалось проверить обновления. Локальный реестр сохранён.\n"+(e.getMessage()==null?e.getClass().getSimpleName():e.getMessage()),Collections.emptyList());
         }
     }
 
