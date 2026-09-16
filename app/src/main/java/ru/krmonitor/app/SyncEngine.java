@@ -40,9 +40,9 @@ public final class SyncEngine {
             }
             context.getSharedPreferences("prefs",Context.MODE_PRIVATE).edit().putString("last_sync",date).apply();
             if(added+updated>0) notifyUpdates(context,added,updated);
-            return new Result(added,updated,titleFixed,"Готово. Новых: "+added+", обновлено: "+updated);
+            return new Result(added,updated,titleFixed,"Проверка завершена. Новых: "+added+", обновлено: "+updated);
         } catch(Exception e) {
-            return new Result(0,0,0,"Ошибка проверки: "+e.getMessage());
+            return new Result(0,0,0,"Не удалось проверить обновления: "+e.getMessage()+". Локальный каталог и поиск сохранены.");
         }
     }
     private static void notifyUpdates(Context c,int a,int u) {
