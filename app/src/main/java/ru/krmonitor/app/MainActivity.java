@@ -144,11 +144,26 @@ public class MainActivity extends Activity {
     private void runSync(Button b) {
         b.setEnabled(false);
         status.setText("Проверяю обновления…");
+        final ProgressDialog progress=new ProgressDialog(this);
+        progress.setTitle("Проверка клинических рекомендаций");
+        progress.setMessage("Получаю актуальный каталог и проверяю новые КР…");
+        progress.setIndeterminate(true);
+        progress.setCancelable(false);
+        progress.show();
+
         executor.submit(() -> {
-            SyncEngine.Result r=SyncEngine.sync(getApplicationContext());
+            SyncEngine.Result result;
+            try {
+                result=SyncEngine.sync(getApplicationContext());
+            } catch(Throwable t) {
+                String m=t.getMessage()==null?t.getClass().getSimpleName():t.getMessage();
+                result=new SyncEngine.Result(0,0,0,0,0,"Ошибка проверки: "+m,Collections.emptyList());
+            }
+            final SyncEngine.Result r=result;
             runOnUiThread(() -> {
+                try { if(progress.isShowing()) progress.dismiss(); } catch(Exception ignored) {}
                 b.setEnabled(true);
-                reload();
+                try { reload(); } catch(Exception ignored) {}
                 showSyncResult(r);
             });
         });
@@ -174,12 +189,17 @@ public class MainActivity extends Activity {
 
     private void downloadOrOpen(Recommendation r) {
         if(PdfManager.isPdf(PdfManager.file(this,r))) { PdfManager.open(this,r); return; }
-        Toast.makeText(this,"Скачиваю PDF…",Toast.LENGTH_SHORT).show();
+        final ProgressDialog progress=new ProgressDialog(this);
+        progress.setMessage("Скачиваю PDF…");
+        progress.setIndeterminate(true);
+        progress.setCancelable(false);
+        progress.show();
         executor.submit(() -> {
             boolean ok=PdfManager.download(getApplicationContext(),r);
             runOnUiThread(() -> {
+                try { if(progress.isShowing()) progress.dismiss(); } catch(Exception ignored) {}
                 if(ok){ reload(); PdfManager.open(this,r); }
-                else Toast.makeText(this,"Не удалось скачать PDF",Toast.LENGTH_LONG).show();
+                else new AlertDialog.Builder(this).setTitle("PDF не скачан").setMessage("Не удалось получить PDF для КР «"+r.title+"» (ID: "+r.id+"). Попробуйте повторить позже.").setPositiveButton("ОК",null).show();
             });
         });
     }
