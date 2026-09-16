@@ -19,7 +19,6 @@ public final class AlarmScheduler {
         int dow=next.get(Calendar.DAY_OF_WEEK);
         boolean weekday=dow>=Calendar.MONDAY && dow<=Calendar.FRIDAY;
         if(!weekday || !next.after(now)) next.add(Calendar.DAY_OF_MONTH,1);
-
         while(next.get(Calendar.DAY_OF_WEEK)==Calendar.SATURDAY || next.get(Calendar.DAY_OF_WEEK)==Calendar.SUNDAY) {
             next.add(Calendar.DAY_OF_MONTH,1);
         }
@@ -32,6 +31,12 @@ public final class AlarmScheduler {
 
     public static void scheduleNext(Context c) {
         AlarmManager am=(AlarmManager)c.getSystemService(Context.ALARM_SERVICE);
+
+        // Cancel alarm used by older versions (Monday 19:00).
+        Intent legacyIntent=new Intent(c,AlarmReceiver.class);
+        PendingIntent legacy=PendingIntent.getBroadcast(c,1900,legacyIntent,PendingIntent.FLAG_NO_CREATE|PendingIntent.FLAG_IMMUTABLE);
+        if(legacy!=null) { am.cancel(legacy); legacy.cancel(); }
+
         Intent i=new Intent(c,AlarmReceiver.class);
         PendingIntent pi=PendingIntent.getBroadcast(c,700,i,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
         long when=nextWeekday7();
