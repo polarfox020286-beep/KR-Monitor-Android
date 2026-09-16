@@ -29,17 +29,35 @@ public final class PdfManager {
         File dest=file(c,r); if(isPdf(dest)) return true;
         File tmp=new File(dest.getAbsolutePath()+".part"); if(tmp.exists()) tmp.delete();
         String u="https://apicr.minzdrav.gov.ru/API.ashx?op=GetClinrecPdf&id="+Uri.encode(r.id);
+        HttpURLConnection conn=null;
         try {
-            HttpURLConnection conn=(HttpURLConnection)new URL(u).openConnection();
-            conn.setConnectTimeout(15000); conn.setReadTimeout(180000); conn.setInstanceFollowRedirects(true);
-            conn.setRequestProperty("User-Agent","Mozilla/5.0 (Linux; Android 15) KR-Monitor/1.0");
+            conn=(HttpURLConnection)new URL(u).openConnection();
+            conn.setConnectTimeout(10000);
+            conn.setReadTimeout(30000);
+            conn.setInstanceFollowRedirects(true);
+            conn.setUseCaches(false);
+            conn.setRequestProperty("User-Agent","Mozilla/5.0 (Linux; Android) KR-Monitor/1.2");
+            conn.setRequestProperty("Accept","application/pdf,*/*");
             if(conn.getResponseCode()!=200) return false;
             try(InputStream in=conn.getInputStream(); FileOutputStream out=new FileOutputStream(tmp)) {
-                byte[] b=new byte[65536]; int n; while((n=in.read(b))>0) out.write(b,0,n);
-            } finally { conn.disconnect(); }
+                byte[] b=new byte[65536]; int n;
+                while((n=in.read(b))>0) out.write(b,0,n);
+            }
             if(!isPdf(tmp)) { tmp.delete(); return false; }
-            if(dest.exists()) dest.delete(); return tmp.renameTo(dest);
-        } catch(Exception e) { tmp.delete(); return false; }
+            if(dest.exists() && !dest.delete()) { tmp.delete(); return false; }
+            if(!tmp.renameTo(dest)) {
+                try(FileInputStream in=new FileInputStream(tmp); FileOutputStream out=new FileOutputStream(dest)) {
+                    byte[] b=new byte[65536]; int n; while((n=in.read(b))>0) out.write(b,0,n);
+                }
+                tmp.delete();
+            }
+            return isPdf(dest);
+        } catch(Exception e) {
+            tmp.delete();
+            return false;
+        } finally {
+            if(conn!=null) conn.disconnect();
+        }
     }
     public static void open(Context c,Recommendation r) {
         File f=file(c,r); if(!isPdf(f)) { Toast.makeText(c,"PDF ещё не скачан",Toast.LENGTH_SHORT).show(); return; }
