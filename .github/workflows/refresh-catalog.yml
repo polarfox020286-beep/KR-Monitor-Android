@@ -28,7 +28,7 @@ jobs:
           cp app/src/main/assets/seed_catalog.json data/catalog.json
       - name: Publish catalog only when changed
         run: |
-          if git diff --quiet -- data/catalog.json; then
+          if [ -z "$(git status --porcelain -- data/catalog.json)" ]; then
             echo 'Catalog unchanged'
             exit 0
           fi
