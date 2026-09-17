@@ -7,22 +7,23 @@ import java.util.*;
 
 public class DbHelper extends SQLiteOpenHelper {
     private static final String DB = "kr.db";
-    private static final int VER = 3;
+    private static final int VER = 4;
     public DbHelper(Context c) { super(c, DB, null, VER); }
     @Override public void onCreate(SQLiteDatabase db) {
-        db.execSQL("CREATE TABLE recs(base_id TEXT PRIMARY KEY,current_id TEXT NOT NULL,title TEXT NOT NULL,filename TEXT NOT NULL,last_seen TEXT,added_at TEXT)");
+        db.execSQL("CREATE TABLE recs(base_id TEXT PRIMARY KEY,current_id TEXT NOT NULL,title TEXT NOT NULL,filename TEXT NOT NULL,mkb_codes TEXT NOT NULL DEFAULT '',last_seen TEXT,added_at TEXT)");
         db.execSQL("CREATE TABLE history(base_id TEXT PRIMARY KEY,viewed_at INTEGER NOT NULL)");
     }
     @Override public void onUpgrade(SQLiteDatabase db,int oldV,int newV) {
         if(oldV<2) db.execSQL("ALTER TABLE recs ADD COLUMN added_at TEXT");
         if(oldV<3) db.execSQL("CREATE TABLE IF NOT EXISTS history(base_id TEXT PRIMARY KEY,viewed_at INTEGER NOT NULL)");
+        if(oldV<4) db.execSQL("ALTER TABLE recs ADD COLUMN mkb_codes TEXT NOT NULL DEFAULT ''");
     }
 
     public void upsert(Recommendation r, String lastSeen) { upsert(r,lastSeen,null); }
     public void upsert(Recommendation r, String lastSeen, String addedAt) {
         ContentValues v=new ContentValues();
         v.put("base_id",r.baseId); v.put("current_id",r.id); v.put("title",r.title);
-        v.put("filename",r.filename); v.put("last_seen",lastSeen);
+        v.put("filename",r.filename); v.put("mkb_codes",r.mkbCodes); v.put("last_seen",lastSeen);
         if(addedAt!=null) v.put("added_at",addedAt);
         else {
             String old=getAddedAt(r.baseId);
@@ -83,6 +84,8 @@ public class DbHelper extends SQLiteOpenHelper {
     public void clearHistory() { getWritableDatabase().delete("history",null,null); }
 
     private Recommendation fromCursor(Cursor c) {
-        return new Recommendation(c.getString(c.getColumnIndexOrThrow("base_id")),c.getString(c.getColumnIndexOrThrow("current_id")),c.getString(c.getColumnIndexOrThrow("title")),c.getString(c.getColumnIndexOrThrow("filename")));
+        int mkbIndex=c.getColumnIndex("mkb_codes");
+        String mkb=mkbIndex>=0 && !c.isNull(mkbIndex)?c.getString(mkbIndex):"";
+        return new Recommendation(c.getString(c.getColumnIndexOrThrow("base_id")),c.getString(c.getColumnIndexOrThrow("current_id")),c.getString(c.getColumnIndexOrThrow("title")),c.getString(c.getColumnIndexOrThrow("filename")),mkb);
     }
 }
