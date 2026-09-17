@@ -11,25 +11,45 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Inspect official catalog modules
+      - name: Test official clinical recommendations API
         run: |
           python - <<'PY'
-          import re, requests
-          base='https://cr.minzdrav.gov.ru/assets/'
-          H={'User-Agent':'Mozilla/5.0','Referer':'https://cr.minzdrav.gov.ru/clin-rec','Accept':'*/*'}
-          files=['api-8h5DlUEm.js','index-CrZYZ3QB.js','ClinrecProcessor-BazFULQ1.js']
-          for f in files:
-              r=requests.get(base+f,headers=H,timeout=45)
-              print('\n##### FILE',f,'HTTP',r.status_code,'LEN',len(r.text),'#####')
-              txt=r.text
-              if f.startswith('api-'):
-                  print('FULL_API_MODULE_START')
-                  print(txt[:50000])
-                  print('FULL_API_MODULE_END')
-              for key in ['getClin','clinrec','clin-rec','recommend','axios','baseURL','fetch(','/api/','api.','pageSize','page_size','limit','offset','filter']:
-                  for m in list(re.finditer(re.escape(key),txt,re.I))[:20]:
-                      s=max(0,m.start()-350); e=min(len(txt),m.end()+650)
-                      print('CONTEXT',key,' '.join(txt[s:e].split())[:1400])
-              imports=sorted(set(re.findall(r'from["\']\./([^"\']+\.js)["\']',txt)))
-              print('IMPORTS',imports)
+          import json, requests
+          url='https://apicr.minzdrav.gov.ru/api.ashx?op=GetJsonClinrecsFilterV2'
+          headers={
+              'User-Agent':'Mozilla/5.0 (Linux; Android) KR-Monitor/1.3',
+              'Referer':'https://cr.minzdrav.gov.ru/clin-rec',
+              'Origin':'https://cr.minzdrav.gov.ru',
+              'Accept':'application/json, text/plain, */*',
+              'Content-Type':'application/json;charset=UTF-8'
+          }
+          for size in (2000,500):
+              body={
+                  'filters':[{'fieldName':'status','filterType':1,'filterValueType':2,'value1':0,'value2':'','values':[]}],
+                  'sortOption':{'fieldName':'publishdate','sortType':2},
+                  'pageSize':size,
+                  'currentPage':1,
+                  'useANDoperator':True,
+                  'columns':[]
+              }
+              r=requests.post(url,headers=headers,json=body,timeout=60)
+              print('SIZE',size,'HTTP',r.status_code,'TYPE',r.headers.get('content-type'),'LEN',len(r.content))
+              print('TEXT_PREFIX',r.text[:1000])
+              if r.ok:
+                  try:
+                      obj=r.json()
+                      print('ROOT_TYPE',type(obj).__name__)
+                      if isinstance(obj,dict):
+                          print('ROOT_KEYS',list(obj.keys()))
+                          data=obj.get('Data') or obj.get('data') or []
+                          total=obj.get('TotalRecords',obj.get('totalRecords'))
+                          print('TOTAL',total,'DATA_LEN',len(data) if isinstance(data,list) else type(data).__name__)
+                          if isinstance(data,list) and data:
+                              print('FIRST_KEYS',list(data[0].keys()))
+                              print('FIRST',json.dumps(data[0],ensure_ascii=False)[:5000])
+                              print('LAST',json.dumps(data[-1],ensure_ascii=False)[:2500])
+                      if size==2000 and isinstance(obj,dict) and isinstance(obj.get('Data'),list) and len(obj['Data'])>=500:
+                          break
+                  except Exception as e:
+                      print('JSON_ERROR',repr(e))
           PY
