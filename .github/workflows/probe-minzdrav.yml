@@ -11,49 +11,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Inspect official clin-rec API modules
-        shell: bash
+      - name: Inspect official catalog modules
         run: |
-          set -euxo pipefail
           python - <<'PY'
-          import re, requests, urllib.parse
-          base='https://cr.minzdrav.gov.ru'
-          H={'User-Agent':'Mozilla/5.0','Accept-Language':'ru-RU,ru;q=0.9'}
-          page=requests.get(base+'/clin-rec',timeout=60,headers=H)
-          page.raise_for_status()
-          main=re.search(r'<script[^>]+src=["\']([^"\']+)',page.text,re.I).group(1)
-          main_url=urllib.parse.urljoin(base,main)
-          main_js=requests.get(main_url,timeout=60,headers=H).text
-          print('MAIN',main_url,len(main_js))
-          # Discover lazy modules used by the clinical recommendations route.
-          assets=sorted(set(re.findall(r'assets/[A-Za-z0-9_.-]+\.js',main_js)))
-          interesting=[a for a in assets if any(k in a.lower() for k in ['api','clinrec','index-'])]
-          print('DISCOVERED',interesting)
-          # Explicitly include modules seen in the previous run.
-          wanted=set(interesting)
-          wanted.update(['assets/api-8h5DlUEm.js','assets/index-CrZYZ3QB.js','assets/ClinrecProcessor-BazFULQ1.js'])
-          for a in sorted(wanted):
-              u=urllib.parse.urljoin(base+'/',a)
-              try:
-                  r=requests.get(u,timeout=60,headers=H)
-                  print('\n===',u,r.status_code,len(r.text),'===')
-                  if r.status_code != 200: continue
-                  txt=r.text
-                  # Print compact contexts around likely network calls and KR list methods.
-                  for pattern in [r'axios',r'fetch\(',r'baseURL',r'/api',r'clin.?rec',r'clinical',r'recommend',r'list',r'filter',r'pageSize',r'GetClin']:
-                      hits=0
-                      for m in re.finditer(r'.{0,180}'+pattern+r'.{0,350}',txt,re.I|re.S):
-                          q=' '.join(m.group(0).split())
-                          if q:
-                              print('CTX',pattern,q[:900])
-                              hits+=1
-                              if hits>=12: break
-                  # Also print all quoted URL-like strings.
-                  qs=set(re.findall(r'["\']([^"\']{1,300})["\']',txt))
-                  for q in sorted(qs):
-                      low=q.lower()
-                      if ('/' in q or 'http' in low) and any(k in low for k in ['api','clin','recommend','rubric','search','list']):
-                          print('STR',q[:600])
-              except Exception as e:
-                  print('ERR',u,repr(e))
+          import re, requests
+          base='https://cr.minzdrav.gov.ru/assets/'
+          H={'User-Agent':'Mozilla/5.0','Referer':'https://cr.minzdrav.gov.ru/clin-rec','Accept':'*/*'}
+          files=['api-8h5DlUEm.js','index-CrZYZ3QB.js','ClinrecProcessor-BazFULQ1.js']
+          for f in files:
+              r=requests.get(base+f,headers=H,timeout=45)
+              print('\n##### FILE',f,'HTTP',r.status_code,'LEN',len(r.text),'#####')
+              txt=r.text
+              if f.startswith('api-'):
+                  print('FULL_API_MODULE_START')
+                  print(txt[:50000])
+                  print('FULL_API_MODULE_END')
+              for key in ['getClin','clinrec','clin-rec','recommend','axios','baseURL','fetch(','/api/','api.','pageSize','page_size','limit','offset','filter']:
+                  for m in list(re.finditer(re.escape(key),txt,re.I))[:20]:
+                      s=max(0,m.start()-350); e=min(len(txt),m.end()+650)
+                      print('CONTEXT',key,' '.join(txt[s:e].split())[:1400])
+              imports=sorted(set(re.findall(r'from["\']\./([^"\']+\.js)["\']',txt)))
+              print('IMPORTS',imports)
           PY
