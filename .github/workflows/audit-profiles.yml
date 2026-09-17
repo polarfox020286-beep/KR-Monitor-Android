@@ -18,11 +18,10 @@ jobs:
           from pathlib import Path
           items=json.loads(Path('data/catalog.json').read_text(encoding='utf-8'))
           src=Path('app/src/main/java/ru/krmonitor/app/ProfileClassifier.java').read_text(encoding='utf-8')
-          blocks=re.findall(r'addIf\(g,t,"([^"]+)",(.*?));',src,re.S)
+          blocks=re.findall(r'addIf\(g,t,"([^"]+)",(.*?)\);',src,re.S)
           rules={}
           for profile, body in blocks:
-              keys=re.findall(r'"([^"]+)"',body)
-              rules[profile]=keys
+              rules[profile]=re.findall(r'"([^"]+)"',body)
           counts={p:0 for p in rules}
           general=[]
           cardiac_misses=[]
