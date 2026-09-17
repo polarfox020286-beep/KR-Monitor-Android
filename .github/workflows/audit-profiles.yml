@@ -1,0 +1,48 @@
+name: Audit KR profile classification
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/audit-profiles.yml'
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit profile rules against official catalog snapshot
+        run: |
+          python - <<'PY'
+          import json,re
+          from pathlib import Path
+          items=json.loads(Path('data/catalog.json').read_text(encoding='utf-8'))
+          src=Path('app/src/main/java/ru/krmonitor/app/ProfileClassifier.java').read_text(encoding='utf-8')
+          blocks=re.findall(r'addIf\(g,t,"([^"]+)",(.*?));',src,re.S)
+          rules={}
+          for profile, body in blocks:
+              keys=re.findall(r'"([^"]+)"',body)
+              rules[profile]=keys
+          counts={p:0 for p in rules}
+          general=[]
+          cardiac_misses=[]
+          cardiac_probe=('коронар','сердц','сердеч','миокард','стенокард','кардио','аритм','фибрилляц','гипертенз','дислипид','атеросклер')
+          for x in items:
+              t=x['title'].lower().replace('ё','е')
+              matched=[]
+              for p,keys in rules.items():
+                  if any(k in t for k in keys):
+                      matched.append(p); counts[p]+=1
+              if not matched:
+                  general.append((x['id'],x['title']))
+              if any(k in t for k in cardiac_probe) and 'Кардиология' not in matched:
+                  cardiac_misses.append((x['id'],x['title'],matched))
+          print('TOTAL',len(items))
+          print('COUNTS')
+          for p,n in counts.items(): print(f'{p}: {n}')
+          print('GENERAL_COUNT',len(general))
+          print('--- GENERAL ---')
+          for row in general: print(row[0],'|',row[1])
+          print('--- CARDIAC_MISSES ---')
+          for row in cardiac_misses: print(row[0],'|',row[1],'|',','.join(row[2]))
+          PY
