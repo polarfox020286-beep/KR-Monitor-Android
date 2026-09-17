@@ -5,6 +5,7 @@ on:
   push:
     paths:
       - '.github/workflows/audit-profiles.yml'
+      - 'app/src/main/java/ru/krmonitor/app/ProfileClassifier.java'
 
 jobs:
   audit:
