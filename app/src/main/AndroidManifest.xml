@@ -8,8 +8,8 @@
 
     <application
         android:allowBackup="false"
-        android:icon="@drawable/ic_launcher_app"
-        android:roundIcon="@drawable/ic_launcher_app"
+        android:icon="@mipmap/kr_launcher"
+        android:roundIcon="@mipmap/kr_launcher"
         android:label="Монитор КР"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:usesCleartextTraffic="false">
