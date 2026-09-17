@@ -11,34 +11,49 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch official clin-rec page and inspect frontend
+      - name: Inspect official clin-rec API modules
         shell: bash
         run: |
           set -euxo pipefail
           python - <<'PY'
           import re, requests, urllib.parse
           base='https://cr.minzdrav.gov.ru'
-          u=base+'/clin-rec'
-          r=requests.get(u,timeout=60,headers={'User-Agent':'Mozilla/5.0','Accept-Language':'ru-RU,ru;q=0.9'})
-          print('PAGE',r.status_code,r.url,r.headers.get('content-type'),len(r.text))
-          print(r.text[:5000])
-          srcs=re.findall(r'<script[^>]+src=[\"\']([^\"\']+)',r.text,re.I)
-          print('SCRIPTS',srcs)
-          for s in srcs:
-              su=urllib.parse.urljoin(base,s)
+          H={'User-Agent':'Mozilla/5.0','Accept-Language':'ru-RU,ru;q=0.9'}
+          page=requests.get(base+'/clin-rec',timeout=60,headers=H)
+          page.raise_for_status()
+          main=re.search(r'<script[^>]+src=["\']([^"\']+)',page.text,re.I).group(1)
+          main_url=urllib.parse.urljoin(base,main)
+          main_js=requests.get(main_url,timeout=60,headers=H).text
+          print('MAIN',main_url,len(main_js))
+          # Discover lazy modules used by the clinical recommendations route.
+          assets=sorted(set(re.findall(r'assets/[A-Za-z0-9_.-]+\.js',main_js)))
+          interesting=[a for a in assets if any(k in a.lower() for k in ['api','clinrec','index-'])]
+          print('DISCOVERED',interesting)
+          # Explicitly include modules seen in the previous run.
+          wanted=set(interesting)
+          wanted.update(['assets/api-8h5DlUEm.js','assets/index-CrZYZ3QB.js','assets/ClinrecProcessor-BazFULQ1.js'])
+          for a in sorted(wanted):
+              u=urllib.parse.urljoin(base+'/',a)
               try:
-                  jr=requests.get(su,timeout=60,headers={'User-Agent':'Mozilla/5.0'})
-                  print('\n=== SCRIPT',su,jr.status_code,len(jr.text),'===')
-                  txt=jr.text
-                  pats=set(re.findall(r'https?://[^\"\'\\\s)]+|/[A-Za-z0-9_.~!$&()*+,;=:@%/?#-]{3,}',txt))
-                  for p in sorted(pats):
-                      low=p.lower()
-                      if any(k in low for k in ['api','clin','recommend','rubric','cr/','search']):
-                          print('URL',p[:500])
-                  for m in re.finditer(r'.{0,120}(?:api|clin-rec|clinical|recommend).{0,220}',txt,re.I|re.S):
-                      q=' '.join(m.group(0).split())
-                      if q:
-                          print('CTX',q[:500])
+                  r=requests.get(u,timeout=60,headers=H)
+                  print('\n===',u,r.status_code,len(r.text),'===')
+                  if r.status_code != 200: continue
+                  txt=r.text
+                  # Print compact contexts around likely network calls and KR list methods.
+                  for pattern in [r'axios',r'fetch\(',r'baseURL',r'/api',r'clin.?rec',r'clinical',r'recommend',r'list',r'filter',r'pageSize',r'GetClin']:
+                      hits=0
+                      for m in re.finditer(r'.{0,180}'+pattern+r'.{0,350}',txt,re.I|re.S):
+                          q=' '.join(m.group(0).split())
+                          if q:
+                              print('CTX',pattern,q[:900])
+                              hits+=1
+                              if hits>=12: break
+                  # Also print all quoted URL-like strings.
+                  qs=set(re.findall(r'["\']([^"\']{1,300})["\']',txt))
+                  for q in sorted(qs):
+                      low=q.lower()
+                      if ('/' in q or 'http' in low) and any(k in low for k in ['api','clin','recommend','rubric','search','list']):
+                          print('STR',q[:600])
               except Exception as e:
-                  print('SCRIPT_ERR',su,repr(e))
+                  print('ERR',u,repr(e))
           PY
