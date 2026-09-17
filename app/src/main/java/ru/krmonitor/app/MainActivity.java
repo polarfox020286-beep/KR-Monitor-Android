@@ -275,11 +275,8 @@ public class MainActivity extends Activity {
         card.setClickable(true);
         card.setFocusable(true);
 
-        TextView icon=text(profileIcon(profile),18,BLUE,true);
-        icon.setGravity(Gravity.CENTER);
-        icon.setIncludeFontPadding(false);
-        icon.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,17));
-        LinearLayout.LayoutParams iconLp=new LinearLayout.LayoutParams(dp(34),dp(34));
+        ProfileIconView icon=new ProfileIconView(this,profile);
+        LinearLayout.LayoutParams iconLp=new LinearLayout.LayoutParams(dp(44),dp(44));
         iconLp.setMargins(0,0,0,dp(6));
         card.addView(icon,iconLp);
 
