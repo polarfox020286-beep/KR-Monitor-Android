@@ -248,7 +248,7 @@ public class MainActivity extends Activity {
             LinearLayout row=new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
             for(int j=0;j<2;j++) {
-                LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(86),1);
+                LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(118),1);
                 if(j==0) lp.setMargins(0,dp(4),dp(4),dp(4));
                 else lp.setMargins(dp(4),dp(4),0,dp(4));
                 if(i+j<visible.size()) {
@@ -267,37 +267,61 @@ public class MainActivity extends Activity {
 
     private View profileCard(String profile,int count) {
         LinearLayout card=new LinearLayout(this);
-        card.setOrientation(LinearLayout.HORIZONTAL);
-        card.setGravity(Gravity.CENTER_VERTICAL);
-        card.setPadding(dp(11),dp(10),dp(9),dp(10));
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setGravity(Gravity.CENTER);
+        card.setPadding(dp(9),dp(9),dp(9),dp(8));
         card.setBackground(rounded(CARD,LINE,16));
         if(Build.VERSION.SDK_INT>=21) card.setElevation(dp(1));
         card.setClickable(true);
         card.setFocusable(true);
 
-        TextView icon=text(profileIcon(profile),20,BLUE,true);
+        TextView icon=text(profileIcon(profile),18,BLUE,true);
         icon.setGravity(Gravity.CENTER);
-        icon.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,18));
-        card.addView(icon,new LinearLayout.LayoutParams(dp(38),dp(38)));
+        icon.setIncludeFontPadding(false);
+        icon.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,17));
+        LinearLayout.LayoutParams iconLp=new LinearLayout.LayoutParams(dp(34),dp(34));
+        iconLp.setMargins(0,0,0,dp(6));
+        card.addView(icon,iconLp);
 
-        LinearLayout labels=new LinearLayout(this);
-        labels.setOrientation(LinearLayout.VERTICAL);
-        labels.setPadding(dp(9),0,0,0);
-        TextView name=text(profile,13,TEXT,true);
-        name.setMaxLines(2);
-        name.setEllipsize(TextUtils.TruncateAt.END);
+        String displayProfile=profile.replace("-","\u2011");
+        TextView name=text(displayProfile,13,TEXT,true);
+        name.setGravity(Gravity.CENTER);
+        name.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
+        name.setIncludeFontPadding(false);
+        name.setMaxLines(4);
+        name.setEllipsize(null);
+        name.setHorizontallyScrolling(false);
+        name.setLineSpacing(dp(1),1.0f);
+        if(Build.VERSION.SDK_INT>=23) {
+            name.setBreakStrategy(Layout.BREAK_STRATEGY_SIMPLE);
+            name.setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_NONE);
+        }
+        card.addView(name,new LinearLayout.LayoutParams(-1,0,1));
+
         TextView number=text(count+" КР",11,MUTED,false);
-        number.setPadding(0,dp(3),0,0);
-        labels.addView(name);
-        labels.addView(number);
-        card.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
+        number.setGravity(Gravity.CENTER);
+        number.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
+        number.setPadding(0,dp(5),0,0);
+        card.addView(number,new LinearLayout.LayoutParams(-1,-2));
 
-        TextView arrow=text("›",22,Color.rgb(170,179,192),false);
-        arrow.setGravity(Gravity.CENTER);
-        card.addView(arrow,new LinearLayout.LayoutParams(dp(18),-1));
-
+        name.post(() -> fitProfileName(name,displayProfile));
         card.setOnClickListener(v -> { selectedProfile=profile; renderCurrentPage(0); });
         return card;
+    }
+
+    private void fitProfileName(TextView view,String value) {
+        int available=view.getWidth()-dp(2);
+        if(available<=0) return;
+        float size=13f;
+        String[] words=value.split("\\s+");
+        while(size>9.5f) {
+            view.setTextSize(size);
+            float widest=0f;
+            for(String word:words) widest=Math.max(widest,view.getPaint().measureText(word));
+            if(widest<=available) break;
+            size-=0.5f;
+        }
+        view.setTextSize(size);
     }
 
     private String profileIcon(String p) {
