@@ -30,8 +30,8 @@ jobs:
           cat .github/icon-parts-valid/01.txt .github/icon-parts-valid/02.txt .github/icon-parts-valid/03.txt .github/icon-parts-valid/04.txt | tr -d '\n\r ' | base64 -d > app/src/main/res/mipmap-xxxhdpi/kr_launcher.png
       - name: Build unsigned release APK
         env:
-          KR_VERSION_CODE: '2001'
-          KR_VERSION_NAME: '1.1.1'
+          KR_VERSION_CODE: '2002'
+          KR_VERSION_NAME: '1.1.2'
         run: gradle :app:assembleRelease --stacktrace
       - name: Collect Android signing tools
         run: |
