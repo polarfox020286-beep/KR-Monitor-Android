@@ -39,9 +39,10 @@ public final class SeedImporter {
             JSONObject o=a.getJSONObject(i);
             String id=o.getString("id").trim();
             String title=o.getString("title").trim();
+            String mkb=o.optString("mkb","").trim();
             if(!id.matches("\\d+_\\d+") || title.length()<3) continue;
             String base=id.split("_",2)[0];
-            db.upsert(new Recommendation(base,id,title,"KR"+id+".pdf"),"");
+            db.upsert(new Recommendation(base,id,title,"KR"+id+".pdf",mkb),"");
         }
     }
 

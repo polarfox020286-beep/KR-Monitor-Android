@@ -89,7 +89,7 @@ public final class CatalogFetcher {
             if(code>0 && ver>0) id=code+"_"+ver;
         }
         String title=o.optString("Name",o.optString("name","")).trim();
-        add(result,id,title);
+        add(result,id,title,MkbUtils.extract(o.opt("Mkbs")));
     }
 
     private static Map<String,Recommendation> fetchFallback() throws Exception {
@@ -97,18 +97,18 @@ public final class CatalogFetcher {
         LinkedHashMap<String,Recommendation> result=new LinkedHashMap<>();
         for(int i=0;i<a.length();i++) {
             JSONObject o=a.getJSONObject(i);
-            add(result,o.optString("id","").trim(),o.optString("title","").trim());
+            add(result,o.optString("id","").trim(),o.optString("title","").trim(),o.optString("mkb","").trim());
         }
         return result;
     }
 
-    private static void add(Map<String,Recommendation> result,String id,String title) {
+    private static void add(Map<String,Recommendation> result,String id,String title,String mkb) {
         if(!id.matches("\\d+_\\d+") || title.length()<3) return;
         // Defense against an old synthetic seed that once contained a non-KR record.
         if(id.equals("439_1") && (title.equalsIgnoreCase("RFR и iFR") || title.toLowerCase(Locale.ROOT).contains("rfr"))) return;
         String base=id.split("_",2)[0];
         Recommendation prev=result.get(base);
-        Recommendation cur=new Recommendation(base,id,title,"KR"+id+".pdf");
+        Recommendation cur=new Recommendation(base,id,title,"KR"+id+".pdf",mkb);
         if(prev==null || version(id)>version(prev.id)) result.put(base,cur);
     }
 

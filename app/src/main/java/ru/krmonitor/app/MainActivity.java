@@ -34,6 +34,7 @@ public class MainActivity extends Activity {
     private String selectedProfile=null;
     private float swipeX,swipeY;
     private boolean swipeTracking=false;
+    private boolean searchShowsMkb=false;
 
     private static final int BG=Color.rgb(247,249,252);
     private static final int CARD=Color.WHITE;
@@ -124,7 +125,7 @@ public class MainActivity extends Activity {
         root.addView(recentList,recentLp);
 
         search=new EditText(this);
-        search.setHint("Найти клиническую рекомендацию или ID");
+        search.setHint("Название, номер КР или код МКБ-10");
         search.setHintTextColor(Color.rgb(145,153,165));
         search.setTextColor(TEXT);
         search.setTextSize(15);
@@ -215,6 +216,7 @@ public class MainActivity extends Activity {
 
     private void renderCurrentPage(int direction) {
         if(contentHost==null) return;
+        searchShowsMkb=false;
         if(currentPage==PAGE_ALL) showContent(makeListPage("Все КР",all),direction);
         else if(currentPage==PAGE_HISTORY) showContent(makeHistoryPage(),direction);
         else if(selectedProfile!=null) showContent(makeProfileListPage(selectedProfile),direction);
@@ -418,11 +420,14 @@ public class MainActivity extends Activity {
 
     private void renderSearch(String q) {
         String needle=norm(q);
+        boolean mkbQuery=MkbUtils.looksLikeCode(q);
+        searchShowsMkb=mkbQuery;
         ArrayList<Recommendation> results=new ArrayList<>();
         for(Recommendation r:all) {
-            if(norm(r.title).contains(needle)||norm(r.id).contains(needle)) results.add(r);
+            if(norm(r.title).contains(needle)||norm(r.id).contains(needle)||MkbUtils.matches(r.mkbCodes,q)) results.add(r);
         }
-        showContent(makeListPage("Результаты поиска",results),0);
+        String heading=mkbQuery ? "МКБ-10: "+q.toUpperCase(Locale.ROOT) : "Результаты поиска";
+        showContent(makeListPage(heading,results),0);
     }
 
     private void addRecommendationList(LinearLayout outer,List<Recommendation> recs) {
@@ -451,7 +456,9 @@ public class MainActivity extends Activity {
                 labels.setOrientation(LinearLayout.VERTICAL);
                 TextView name=text(r.title,14,TEXT,false);
                 name.setMaxLines(3);
-                TextView meta=text("КР "+r.id+(PdfManager.isPdf(PdfManager.file(MainActivity.this,r))?"  •  PDF скачан":""),11,MUTED,false);
+                String metaText="КР "+r.id+(PdfManager.isPdf(PdfManager.file(MainActivity.this,r))?"  •  PDF скачан":"");
+                if(searchShowsMkb && r.mkbCodes!=null && !r.mkbCodes.isEmpty()) metaText += "  •  МКБ-10: "+r.mkbCodes;
+                TextView meta=text(metaText,11,MUTED,false);
                 meta.setPadding(0,dp(4),0,0);
                 labels.addView(name);
                 labels.addView(meta);

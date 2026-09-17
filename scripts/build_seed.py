@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import re
 from pathlib import Path
 import requests
 
@@ -7,6 +8,22 @@ URL = "https://apicr.minzdrav.gov.ru/api.ashx?op=GetJsonClinrecsFilterV2"
 OUT = Path("app/src/main/assets/seed_catalog.json")
 MIN_COUNT = 500
 PAGE_SIZE = 2000
+
+
+ICD_RE = re.compile(r"(?<![A-Z0-9])([A-Z][0-9]{2}(?:\.[0-9A-Z]{1,2})?)(?![A-Z0-9])", re.I)
+
+
+def extract_mkb(value) -> str:
+    if value is None:
+        return ""
+    text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
+    found = []
+    seen = set()
+    for code in ICD_RE.findall(text.upper()):
+        if code not in seen:
+            seen.add(code)
+            found.append(code)
+    return ", ".join(found)
 
 
 def version(cid: str) -> int:
@@ -71,12 +88,13 @@ def main():
                 if code and ver:
                     cid = f"{code}_{ver}"
             title = str(row.get("Name") or row.get("name") or "").strip()
+            mkb = extract_mkb(row.get("Mkbs") or row.get("mkbs"))
             if not cid or "_" not in cid or len(title) < 3:
                 continue
             base = cid.split("_", 1)[0]
             prev = records.get(base)
             if prev is None or version(cid) > version(prev["id"]):
-                records[base] = {"id": cid, "title": title}
+                records[base] = {"id": cid, "title": title, "mkb": mkb}
         loaded += len(data)
         if not data or loaded >= total:
             break
