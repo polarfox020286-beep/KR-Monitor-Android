@@ -7,13 +7,15 @@ import java.util.*;
 
 public class DbHelper extends SQLiteOpenHelper {
     private static final String DB = "kr.db";
-    private static final int VER = 2;
+    private static final int VER = 3;
     public DbHelper(Context c) { super(c, DB, null, VER); }
     @Override public void onCreate(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE recs(base_id TEXT PRIMARY KEY,current_id TEXT NOT NULL,title TEXT NOT NULL,filename TEXT NOT NULL,last_seen TEXT,added_at TEXT)");
+        db.execSQL("CREATE TABLE history(base_id TEXT PRIMARY KEY,viewed_at INTEGER NOT NULL)");
     }
     @Override public void onUpgrade(SQLiteDatabase db,int oldV,int newV) {
         if(oldV<2) db.execSQL("ALTER TABLE recs ADD COLUMN added_at TEXT");
+        if(oldV<3) db.execSQL("CREATE TABLE IF NOT EXISTS history(base_id TEXT PRIMARY KEY,viewed_at INTEGER NOT NULL)");
     }
 
     public void upsert(Recommendation r, String lastSeen) { upsert(r,lastSeen,null); }
@@ -61,6 +63,25 @@ public class DbHelper extends SQLiteOpenHelper {
         }
         return out;
     }
+
+    public void markViewed(String baseId) {
+        ContentValues v=new ContentValues();
+        v.put("base_id",baseId);
+        v.put("viewed_at",System.currentTimeMillis());
+        getWritableDatabase().insertWithOnConflict("history",null,v,SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    public List<Recommendation> history(int limit) {
+        ArrayList<Recommendation> out=new ArrayList<>();
+        String sql="SELECT r.* FROM history h JOIN recs r ON r.base_id=h.base_id ORDER BY h.viewed_at DESC LIMIT ?";
+        try(Cursor c=getReadableDatabase().rawQuery(sql,new String[]{Integer.toString(limit)})) {
+            while(c.moveToNext()) out.add(fromCursor(c));
+        }
+        return out;
+    }
+
+    public void clearHistory() { getWritableDatabase().delete("history",null,null); }
+
     private Recommendation fromCursor(Cursor c) {
         return new Recommendation(c.getString(c.getColumnIndexOrThrow("base_id")),c.getString(c.getColumnIndexOrThrow("current_id")),c.getString(c.getColumnIndexOrThrow("title")),c.getString(c.getColumnIndexOrThrow("filename")));
     }
