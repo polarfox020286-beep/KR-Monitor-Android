@@ -88,7 +88,7 @@ public class MainActivity extends Activity {
         LinearLayout heading=new LinearLayout(this);
         heading.setOrientation(LinearLayout.VERTICAL);
         TextView title=text("КР Навигатор",23,TEXT,true);
-        TextView subtitle=text("Официальный рубрикатор Минздрава • будни 07:00",12,MUTED,false);
+        TextView subtitle=text("Автоматическая проверка новых и обновлённых КР в 07:00",12,MUTED,false);
         subtitle.setPadding(0,dp(2),0,0);
         heading.addView(title);
         heading.addView(subtitle);
