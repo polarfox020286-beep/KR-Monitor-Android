@@ -1,0 +1,36 @@
+name: Apply profile redistribution
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-profile-redistribution.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Add explicit clinical mappings
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('app/src/main/java/ru/krmonitor/app/ProfileClassifier.java')
+          s=p.read_text(encoding='utf-8')
+          marker='''        if(g.isEmpty()) g.add("Общие и междисциплинарные");'''
+          block='''        // Explicit redistribution for official recommendations that need clinical context beyond generic keywords.\n        if(t.contains("атрезия легочной артерии")) { g.add("Кардиология"); g.add("Сердечно-сосудистая хирургия"); }\n        if(t.contains("вибрационн") && t.contains("болезн")) g.add("Неврология");\n        if(t.contains("воспалительные поражения позвоночника")) { g.add("Травматология и ортопедия"); g.add("Нейрохирургия"); }\n        if(t.contains("врожденный стеноз клапана легочной артерии")) { g.add("Кардиология"); g.add("Сердечно-сосудистая хирургия"); }\n        if(t.contains("гемангиома инфантильная")) { g.add("Дерматология"); g.add("Педиатрия и неонатология"); }\n        if(t.contains("дегенеративные заболевания позвоночника")) { g.add("Неврология"); g.add("Нейрохирургия"); g.add("Травматология и ортопедия"); }\n        if(t.contains("дефицит 3-гидрокси-3-метилглутарил-коа лиазы")) g.add("Эндокринология");\n        if(t.contains("доброкачественные образования головы и шеи")) { g.add("Оториноларингология"); g.add("Стоматология и ЧЛХ"); }\n        if(t.contains("истмико-цервикальная недостаточность")) g.add("Акушерство и гинекология");\n        if(t.equals("красная волчанка")) { g.add("Ревматология"); g.add("Дерматология"); }\n        if(t.contains("нарушения липидного обмена")) { g.add("Кардиология"); g.add("Эндокринология"); }\n        if(t.contains("нарушения обмена галактозы") || t.contains("галактоземия")) g.add("Эндокринология");\n        if(t.contains("нарушения обмена меди") || t.contains("болезнь вильсона")) { g.add("Гастроэнтерология"); g.add("Неврология"); }\n        if(t.contains("недостаточность анального сфинктера")) g.add("Хирургия");\n        if(t.contains("острые и хронические тиреоидиты")) g.add("Эндокринология");\n        if(t.contains("преждевременное половое развитие")) { g.add("Эндокринология"); g.add("Педиатрия и неонатология"); }\n        if(t.contains("чистая красноклеточная аплазия") || t.contains("эритробластопения")) g.add("Гематология");\n        if(t.contains("приобретенные деформации нижних конечностей") || t.contains("приобретенные деформации стопы")) g.add("Травматология и ортопедия");\n        if(t.contains("рассеянный склероз")) g.add("Неврология");\n        if(t.contains("ректовагинальный свищ")) { g.add("Акушерство и гинекология"); g.add("Хирургия"); }\n        if(t.contains("ректоцеле")) { g.add("Акушерство и гинекология"); g.add("Хирургия"); }\n        if(t.contains("синдром дефицита glut1")) { g.add("Неврология"); g.add("Эндокринология"); }\n        if(t.contains("токсические и метаболические поражения нервной системы")) g.add("Неврология");\n        if(t.contains("трансплантация легкого") || t.contains("трансплантация  легочно - сердечного комплекса") || t.contains("трансплантированного легкого")) { g.add("Пульмонология"); g.add("Сердечно-сосудистая хирургия"); }\n        if(t.contains("урогенитальные заболевания, вызванные mycoplasma genitalium")) { g.add("Инфекционные болезни"); g.add("Урология"); g.add("Акушерство и гинекология"); }\n        if(t.contains("урогенитальные свищи")) { g.add("Урология"); g.add("Акушерство и гинекология"); }\n        if(t.contains("хроническая ишемия нижних конечностей") || t.contains("перемежающейся хромоты")) g.add("Сердечно-сосудистая хирургия");\n        if(t.contains("хроническая сердечная недостаточность")) g.add("Кардиология");\n\n'''
+          if 'Explicit redistribution for official recommendations' in s:
+              raise SystemExit('Mappings already applied')
+          if marker not in s:
+              raise SystemExit('Insertion marker not found')
+          p.write_text(s.replace(marker, block+marker),encoding='utf-8')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/ru/krmonitor/app/ProfileClassifier.java
+          git commit -m "Redistribute all previously unclassified clinical recommendations"
+          git push
