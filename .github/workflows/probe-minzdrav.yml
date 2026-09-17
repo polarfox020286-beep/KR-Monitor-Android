@@ -1,0 +1,44 @@
+name: Probe Minzdrav CR source
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/probe-minzdrav.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch official clin-rec page and inspect frontend
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python - <<'PY'
+          import re, requests, urllib.parse
+          base='https://cr.minzdrav.gov.ru'
+          u=base+'/clin-rec'
+          r=requests.get(u,timeout=60,headers={'User-Agent':'Mozilla/5.0','Accept-Language':'ru-RU,ru;q=0.9'})
+          print('PAGE',r.status_code,r.url,r.headers.get('content-type'),len(r.text))
+          print(r.text[:5000])
+          srcs=re.findall(r'<script[^>]+src=[\"\']([^\"\']+)',r.text,re.I)
+          print('SCRIPTS',srcs)
+          for s in srcs:
+              su=urllib.parse.urljoin(base,s)
+              try:
+                  jr=requests.get(su,timeout=60,headers={'User-Agent':'Mozilla/5.0'})
+                  print('\n=== SCRIPT',su,jr.status_code,len(jr.text),'===')
+                  txt=jr.text
+                  pats=set(re.findall(r'https?://[^\"\'\\\s)]+|/[A-Za-z0-9_.~!$&()*+,;=:@%/?#-]{3,}',txt))
+                  for p in sorted(pats):
+                      low=p.lower()
+                      if any(k in low for k in ['api','clin','recommend','rubric','cr/','search']):
+                          print('URL',p[:500])
+                  for m in re.finditer(r'.{0,120}(?:api|clin-rec|clinical|recommend).{0,220}',txt,re.I|re.S):
+                      q=' '.join(m.group(0).split())
+                      if q:
+                          print('CTX',q[:500])
+              except Exception as e:
+                  print('SCRIPT_ERR',su,repr(e))
+          PY
