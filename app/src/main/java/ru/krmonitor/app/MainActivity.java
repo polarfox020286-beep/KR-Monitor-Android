@@ -419,14 +419,30 @@ public class MainActivity extends Activity {
     }
 
     private void renderSearch(String q) {
-        String needle=norm(q);
-        boolean mkbQuery=MkbUtils.looksLikeCode(q);
+        String raw=q==null?"":q.trim();
+        String needle=norm(raw);
+        boolean idQuery=raw.matches("\\d+(?:_\\d+)?");
+        boolean mkbQuery=!idQuery && MkbUtils.looksLikeCode(raw);
         searchShowsMkb=mkbQuery;
         ArrayList<Recommendation> results=new ArrayList<>();
-        for(Recommendation r:all) {
-            if(norm(r.title).contains(needle)||norm(r.id).contains(needle)||MkbUtils.matches(r.mkbCodes,q)) results.add(r);
+
+        if(idQuery) {
+            for(Recommendation r:all) {
+                if(raw.equalsIgnoreCase(r.id) || raw.equalsIgnoreCase(r.baseId)) results.add(r);
+            }
+            // Only when there is no exact ID, allow prefix suggestions for an unfinished number.
+            if(results.isEmpty()) {
+                for(Recommendation r:all) {
+                    if(r.baseId!=null && r.baseId.startsWith(raw)) results.add(r);
+                }
+            }
+        } else {
+            for(Recommendation r:all) {
+                if(norm(r.title).contains(needle) || MkbUtils.matches(r.mkbCodes,raw)) results.add(r);
+            }
         }
-        String heading=mkbQuery ? "МКБ-10: "+q.toUpperCase(Locale.ROOT) : "Результаты поиска";
+
+        String heading=idQuery ? "КР "+raw : (mkbQuery ? "МКБ-10: "+raw.toUpperCase(Locale.ROOT) : "Результаты поиска");
         showContent(makeListPage(heading,results),0);
     }
 
