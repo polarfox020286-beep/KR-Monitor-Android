@@ -6,43 +6,32 @@ on:
     paths:
       - '.github/workflows/audit-profiles.yml'
       - 'app/src/main/java/ru/krmonitor/app/ProfileClassifier.java'
+      - 'data/catalog.json'
 
 jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Audit profile rules against official catalog snapshot
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Compile classifier and audit official catalog
+        shell: bash
         run: |
+          mkdir -p audit/ru/krmonitor/app
+          cp app/src/main/java/ru/krmonitor/app/ProfileClassifier.java audit/ru/krmonitor/app/
+          cp app/src/main/java/ru/krmonitor/app/Recommendation.java audit/ru/krmonitor/app/
           python - <<'PY'
-          import json,re
+          import json
           from pathlib import Path
           items=json.loads(Path('data/catalog.json').read_text(encoding='utf-8'))
-          src=Path('app/src/main/java/ru/krmonitor/app/ProfileClassifier.java').read_text(encoding='utf-8')
-          blocks=re.findall(r'addIf\(g,t,"([^"]+)",(.*?)\);',src,re.S)
-          rules={}
-          for profile, body in blocks:
-              rules[profile]=re.findall(r'"([^"]+)"',body)
-          counts={p:0 for p in rules}
-          general=[]
-          cardiac_misses=[]
-          cardiac_probe=('коронар','сердц','сердеч','миокард','стенокард','кардио','аритм','фибрилляц','гипертенз','дислипид','атеросклер')
-          for x in items:
-              t=x['title'].lower().replace('ё','е')
-              matched=[]
-              for p,keys in rules.items():
-                  if any(k in t for k in keys):
-                      matched.append(p); counts[p]+=1
-              if not matched:
-                  general.append((x['id'],x['title']))
-              if any(k in t for k in cardiac_probe) and 'Кардиология' not in matched:
-                  cardiac_misses.append((x['id'],x['title'],matched))
-          print('TOTAL',len(items))
-          print('COUNTS')
-          for p,n in counts.items(): print(f'{p}: {n}')
-          print('GENERAL_COUNT',len(general))
-          print('--- GENERAL ---')
-          for row in general: print(row[0],'|',row[1])
-          print('--- CARDIAC_MISSES ---')
-          for row in cardiac_misses: print(row[0],'|',row[1],'|',','.join(row[2]))
+          titles=[x['title'] for x in items]
+          arr=',\n'.join(json.dumps(x,ensure_ascii=False) for x in titles)
+          src=f'''import java.util.*;\nimport ru.krmonitor.app.ProfileClassifier;\npublic class ProfileCatalogAudit {{\n  static void require(boolean v,String m) {{ if(!v) throw new RuntimeException(m); }}\n  public static void main(String[] args) {{\n    String[] titles=new String[]{{{arr}}};\n    int general=0;\n    for(String title:titles) {{\n      Set<String> g=ProfileClassifier.groupsFor(title);\n      String t=title.toLowerCase(Locale.ROOT).replace('ё','е');\n      if(g.contains("Общие и междисциплинарные")) general++;\n      if(t.contains("острый коронарный синдром")) require(g.contains("Кардиология"),"ОКС вне кардиологии: "+title);\n      if(t.contains("преэкламп") || t.contains("экламп")) {{\n        require(g.contains("Акушерство и гинекология"),"Преэклампсия/эклампсия вне акушерства: "+title);\n        require(!g.contains("Кардиология"),"Преэклампсия/эклампсия ошибочно в кардиологии: "+title);\n      }}\n      if(t.contains("внутрижелудочков") && t.contains("кровоизлияни"))\n        require(!g.contains("Кардиология"),"Неонатальное ВЖК ошибочно в кардиологии: "+title);\n      if(t.contains("портальн") && t.contains("гипертенз"))\n        require(!g.contains("Кардиология"),"Портальная гипертензия ошибочно в кардиологии: "+title);\n      if(t.contains("артериальная гипертензия")) require(g.contains("Кардиология"),"АГ вне кардиологии: "+title);\n      if(t.contains("легочн") && t.contains("гипертенз")) {{\n        require(g.contains("Кардиология"),"Легочная гипертензия вне кардиологии: "+title);\n        require(g.contains("Пульмонология"),"Легочная гипертензия вне пульмонологии: "+title);\n      }}\n      if(t.contains("рецептора фактора некроза опухоли"))\n        require(!g.contains("Онкология"),"TRAPS ошибочно в онкологии: "+title);\n    }}\n    System.out.println("TOTAL="+titles.length+" GENERAL="+general);\n    System.out.println("Clinical profile regression checks: OK");\n  }}\n}}'''
+          Path('audit/ProfileCatalogAudit.java').write_text(src,encoding='utf-8')
           PY
+          cd audit
+          javac -encoding UTF-8 ru/krmonitor/app/Recommendation.java ru/krmonitor/app/ProfileClassifier.java ProfileCatalogAudit.java
+          java -Dfile.encoding=UTF-8 ProfileCatalogAudit
