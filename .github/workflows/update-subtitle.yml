@@ -1,0 +1,43 @@
+name: Update home subtitle
+
+on:
+  push:
+    paths:
+      - '.github/workflows/update-subtitle.yml'
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Replace subtitle
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('app/src/main/java/ru/krmonitor/app/MainActivity.java')
+          s=p.read_text(encoding='utf-8')
+          old='Официальный рубрикатор Минздрава • будни 07:00'
+          new='Автоматическая проверка новых и обновлённых КР в 07:00'
+          if old not in s:
+              raise SystemExit('Old subtitle not found')
+          p.write_text(s.replace(old,new,1),encoding='utf-8')
+          PY
+      - name: Compile change
+        run: gradle :app:compileDebugJavaWithJavac --stacktrace
+      - name: Commit change and remove one-time workflow
+        run: |
+          rm .github/workflows/update-subtitle.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/src/main/java/ru/krmonitor/app/MainActivity.java .github/workflows/update-subtitle.yml
+          git commit -m 'Update automatic check subtitle'
+          git push
