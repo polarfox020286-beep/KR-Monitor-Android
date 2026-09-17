@@ -39,9 +39,19 @@ public final class ProfileClassifier {
         LinkedHashMap<String,List<Recommendation>> out=new LinkedHashMap<>();
         for(String p:PROFILES) out.put(p,new ArrayList<>());
         for(Recommendation r:recs) {
-            for(String p:groupsFor(r.title)) out.get(p).add(r);
+            for(String p:groupsFor(r)) out.get(p).add(r);
         }
         return out;
+    }
+
+    /** Classifies using both the recommendation title and official ICD-10 codes. */
+    public static Set<String> groupsFor(Recommendation r) {
+        LinkedHashSet<String> g=new LinkedHashSet<>(groupsFor(r==null ? "" : r.title));
+        // groupsFor(String) uses this as a fallback; remove it before ICD enrichment.
+        g.remove("Общие и междисциплинарные");
+        if(r!=null) addByMkb(g,r.mkbCodes);
+        if(g.isEmpty()) g.add("Общие и междисциплинарные");
+        return g;
     }
 
     public static Set<String> groupsFor(String title) {
@@ -281,6 +291,104 @@ public final class ProfileClassifier {
 
         if(g.isEmpty()) g.add("Общие и междисциплинарные");
         return g;
+    }
+
+    /** Adds strong profile hints from official ICD-10 codes. Title rules remain the primary clinical context. */
+    private static void addByMkb(Set<String> g,String rawCodes) {
+        if(rawCodes==null || rawCodes.trim().isEmpty()) return;
+        java.util.regex.Matcher m=Pattern.compile("(?i)([A-Z][0-9]{2})").matcher(rawCodes);
+        while(m.find()) {
+            String code=m.group(1).toUpperCase(Locale.ROOT);
+            char letter=code.charAt(0);
+            int n;
+            try { n=Integer.parseInt(code.substring(1,3)); } catch(Exception e) { continue; }
+
+            switch(letter) {
+                case 'A':
+                case 'B':
+                    g.add("Инфекционные болезни");
+                    if((letter=='A' && (n==40 || n==41))) g.add("Анестезиология и реаниматология");
+                    break;
+                case 'C':
+                    g.add("Онкология");
+                    break;
+                case 'D':
+                    if(n<=48) g.add("Онкология");
+                    else if(n<=77) g.add("Гематология");
+                    else if(n<=89) g.add("Аллергология и иммунология");
+                    break;
+                case 'E':
+                    g.add("Эндокринология");
+                    break;
+                case 'F':
+                    g.add("Психиатрия и наркология");
+                    break;
+                case 'G':
+                    g.add("Неврология");
+                    break;
+                case 'H':
+                    if(n<=59) g.add("Офтальмология");
+                    else g.add("Оториноларингология");
+                    break;
+                case 'I':
+                    if(n<=15 || (n>=20 && n<=52) || n>=95) g.add("Кардиология");
+                    if(n>=60 && n<=69) g.add("Неврология");
+                    if(n>=70 && n<=89) g.add("Сердечно-сосудистая хирургия");
+                    if(n==26) { g.add("Кардиология"); g.add("Пульмонология"); g.add("Сердечно-сосудистая хирургия"); }
+                    if(n==27) { g.add("Кардиология"); g.add("Пульмонология"); }
+                    if(n==46) g.add("Анестезиология и реаниматология");
+                    break;
+                case 'J':
+                    if(n<=6) { g.add("Оториноларингология"); g.add("Инфекционные болезни"); }
+                    else if(n>=9 && n<=22) { g.add("Пульмонология"); g.add("Инфекционные болезни"); }
+                    else if(n>=30 && n<=39) { g.add("Оториноларингология"); if(n==30) g.add("Аллергология и иммунология"); }
+                    else if(n>=40) g.add("Пульмонология");
+                    if(n==80) g.add("Анестезиология и реаниматология");
+                    break;
+                case 'K':
+                    if(n<=14) g.add("Стоматология и ЧЛХ");
+                    else g.add("Гастроэнтерология");
+                    if((n>=35 && n<=46) || (n>=55 && n<=57) || (n>=60 && n<=67) || (n>=80 && n<=86)) g.add("Хирургия");
+                    break;
+                case 'L':
+                    g.add("Дерматология");
+                    break;
+                case 'M':
+                    if(n<=14 || (n>=30 && n<=36)) g.add("Ревматология");
+                    if((n>=15 && n<=29) || n>=40) g.add("Травматология и ортопедия");
+                    break;
+                case 'N':
+                    if(n<=29) g.add("Нефрология");
+                    else if(n<=53) g.add("Урология");
+                    else if(n>=60 && n<=98) g.add("Акушерство и гинекология");
+                    break;
+                case 'O':
+                    g.add("Акушерство и гинекология");
+                    if(n==14 || n==15) g.add("Анестезиология и реаниматология");
+                    break;
+                case 'P':
+                    g.add("Педиатрия и неонатология");
+                    break;
+                case 'S':
+                    g.add("Травматология и ортопедия");
+                    break;
+                case 'T':
+                    if(n>=20 && n<=32) { g.add("Травматология и ортопедия"); g.add("Хирургия"); }
+                    if(n>=36 && n<=78) g.add("Анестезиология и реаниматология");
+                    break;
+                case 'U':
+                    if(n==7 || n==9) { g.add("Инфекционные болезни"); g.add("Пульмонология"); }
+                    break;
+                case 'Z':
+                    if(n==50) g.add("Медицинская реабилитация");
+                    break;
+                case 'R':
+                    if(n==57) g.add("Анестезиология и реаниматология");
+                    break;
+                default:
+                    break;
+            }
+        }
     }
 
     private static void addIf(Set<String> out,String text,String profile,String...keys) {
