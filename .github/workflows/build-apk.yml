@@ -21,6 +21,11 @@ jobs:
         run: |
           test -s data/catalog.json
           cp data/catalog.json app/src/main/assets/seed_catalog.json
+      - name: Prepare launcher icon
+        run: |
+          cat .github/icon-parts/01.txt .github/icon-parts/02.txt | base64 -d > app/src/main/res/drawable/launcher_art.png
+          test -s app/src/main/res/drawable/launcher_art.png
+          file app/src/main/res/drawable/launcher_art.png
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace
       - uses: actions/upload-artifact@v4
