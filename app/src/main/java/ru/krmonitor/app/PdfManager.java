@@ -63,6 +63,13 @@ public final class PdfManager {
         File f=file(c,r); if(!isPdf(f)) { Toast.makeText(c,"PDF ещё не скачан",Toast.LENGTH_SHORT).show(); return; }
         Uri uri=Uri.parse("content://ru.krmonitor.app.pdf/pdf/"+Uri.encode(f.getName()));
         Intent i=new Intent(Intent.ACTION_VIEW).setDataAndType(uri,"application/pdf").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_ACTIVITY_NEW_TASK);
-        try { c.startActivity(i); } catch(Exception e) { Toast.makeText(c,"На устройстве нет приложения для просмотра PDF",Toast.LENGTH_LONG).show(); }
+        try {
+            c.startActivity(i);
+            DbHelper historyDb=new DbHelper(c.getApplicationContext());
+            historyDb.markViewed(r.baseId);
+            historyDb.close();
+        } catch(Exception e) {
+            Toast.makeText(c,"На устройстве нет приложения для просмотра PDF",Toast.LENGTH_LONG).show();
+        }
     }
 }
