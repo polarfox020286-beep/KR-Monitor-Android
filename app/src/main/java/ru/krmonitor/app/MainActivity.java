@@ -5,6 +5,8 @@ import android.app.*;
 import android.content.*;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.os.*;
 import android.provider.Settings;
 import android.net.Uri;
@@ -33,6 +35,15 @@ public class MainActivity extends Activity {
     private float swipeX,swipeY;
     private boolean swipeTracking=false;
 
+    private static final int BG=Color.rgb(247,249,252);
+    private static final int CARD=Color.WHITE;
+    private static final int BLUE=Color.rgb(37,99,199);
+    private static final int BLUE_DARK=Color.rgb(25,70,145);
+    private static final int BLUE_SOFT=Color.rgb(235,243,255);
+    private static final int TEXT=Color.rgb(29,38,52);
+    private static final int MUTED=Color.rgb(104,115,132);
+    private static final int LINE=Color.rgb(228,233,240);
+
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
         db=new DbHelper(this);
@@ -46,55 +57,86 @@ public class MainActivity extends Activity {
 
     private int dp(int v){ return (int)(v*getResources().getDisplayMetrics().density+0.5f); }
 
+    private GradientDrawable rounded(int fill,int stroke,int radius) {
+        GradientDrawable d=new GradientDrawable();
+        d.setColor(fill);
+        d.setCornerRadius(dp(radius));
+        if(stroke!=Color.TRANSPARENT) d.setStroke(dp(1),stroke);
+        return d;
+    }
+
+    private TextView text(String value,float size,int color,boolean bold) {
+        TextView t=new TextView(this);
+        t.setText(value);
+        t.setTextSize(size);
+        t.setTextColor(color);
+        if(bold) t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+        return t;
+    }
+
     private void buildUi() {
         LinearLayout root=new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(14),dp(14),dp(14),dp(10));
-        root.setBackgroundColor(Color.WHITE);
+        root.setPadding(dp(16),dp(14),dp(16),dp(10));
+        root.setBackgroundColor(BG);
 
-        TextView title=new TextView(this);
-        title.setText("Монитор клинических рекомендаций");
-        title.setTextSize(22);
-        title.setTextColor(Color.rgb(31,78,120));
-        title.setTypeface(null,1);
-        root.addView(title);
+        LinearLayout header=new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
 
-        TextView subtitle=new TextView(this);
-        subtitle.setText("Автоматическая проверка: каждый будний день в 07:00");
-        subtitle.setTextSize(14);
-        subtitle.setPadding(0,dp(4),0,dp(8));
-        root.addView(subtitle);
+        LinearLayout heading=new LinearLayout(this);
+        heading.setOrientation(LinearLayout.VERTICAL);
+        TextView title=text("Монитор КР",23,TEXT,true);
+        TextView subtitle=text("Официальный рубрикатор Минздрава • будни 07:00",12,MUTED,false);
+        subtitle.setPadding(0,dp(2),0,0);
+        heading.addView(title);
+        heading.addView(subtitle);
+        header.addView(heading,new LinearLayout.LayoutParams(0,-2,1));
 
-        status=new TextView(this);
-        status.setTextSize(14);
-        status.setPadding(0,0,0,dp(8));
+        TextView sync=text("↻  Проверить",13,BLUE,true);
+        sync.setGravity(Gravity.CENTER);
+        sync.setPadding(dp(12),dp(9),dp(12),dp(9));
+        sync.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,14));
+        sync.setClickable(true);
+        sync.setFocusable(true);
+        header.addView(sync,new LinearLayout.LayoutParams(-2,-2));
+        root.addView(header);
+
+        status=text("",12,MUTED,false);
+        status.setPadding(0,dp(9),0,dp(9));
         root.addView(status);
 
-        Button sync=new Button(this);
-        sync.setText("Проверить сейчас");
-        sync.setAllCaps(false);
-        root.addView(sync,new LinearLayout.LayoutParams(-1,-2));
+        LinearLayout recentHeader=new LinearLayout(this);
+        recentHeader.setOrientation(LinearLayout.HORIZONTAL);
+        recentHeader.setGravity(Gravity.CENTER_VERTICAL);
+        TextView recentTitle=text("Новое",15,TEXT,true);
+        recentHeader.addView(recentTitle,new LinearLayout.LayoutParams(0,-2,1));
+        TextView recentCaption=text("последние добавления",11,MUTED,false);
+        recentHeader.addView(recentCaption);
+        root.addView(recentHeader);
 
-        TextView recentTitle=new TextView(this);
-        recentTitle.setText("Недавно добавленные КР");
-        recentTitle.setTextSize(17);
-        recentTitle.setTypeface(null,1);
-        recentTitle.setTextColor(Color.rgb(31,78,120));
-        recentTitle.setPadding(0,dp(10),0,dp(4));
-        root.addView(recentTitle);
-
-        recentList=new TextView(this);
-        recentList.setTextSize(14);
-        recentList.setPadding(dp(6),0,dp(6),dp(8));
-        root.addView(recentList);
+        recentList=text("",13,TEXT,false);
+        recentList.setLineSpacing(dp(2),1f);
+        recentList.setPadding(dp(11),dp(9),dp(11),dp(9));
+        recentList.setBackground(rounded(CARD,LINE,14));
+        LinearLayout.LayoutParams recentLp=new LinearLayout.LayoutParams(-1,-2);
+        recentLp.setMargins(0,dp(5),0,dp(10));
+        root.addView(recentList,recentLp);
 
         search=new EditText(this);
-        search.setHint("Поиск по названию или ID");
+        search.setHint("Найти клиническую рекомендацию или ID");
+        search.setHintTextColor(Color.rgb(145,153,165));
+        search.setTextColor(TEXT);
+        search.setTextSize(15);
         search.setSingleLine(true);
-        root.addView(search,new LinearLayout.LayoutParams(-1,-2));
+        search.setPadding(dp(14),0,dp(14),0);
+        search.setBackground(rounded(CARD,LINE,15));
+        root.addView(search,new LinearLayout.LayoutParams(-1,dp(48)));
 
         contentHost=new FrameLayout(this);
-        root.addView(contentHost,new LinearLayout.LayoutParams(-1,0,1));
+        LinearLayout.LayoutParams contentLp=new LinearLayout.LayoutParams(-1,0,1);
+        contentLp.setMargins(0,dp(6),0,0);
+        root.addView(contentHost,contentLp);
         setContentView(root);
 
         sync.setOnClickListener(v -> runSync(sync));
@@ -146,7 +188,7 @@ public class MainActivity extends Activity {
         all=db.all();
         String last=getSharedPreferences("prefs",MODE_PRIVATE).getString("last_sync","ещё не выполнялась");
         long next=getSharedPreferences("prefs",MODE_PRIVATE).getLong("next_alarm",AlarmScheduler.nextWeekday7());
-        status.setText("КР в реестре: "+all.size()+"   •   Последняя проверка: "+last+"\nСледующая: "+DateFormat.getDateTimeInstance(DateFormat.MEDIUM,DateFormat.SHORT).format(new Date(next)));
+        status.setText(all.size()+" КР  •  Последняя проверка: "+last+"\nСледующая: "+DateFormat.getDateTimeInstance(DateFormat.MEDIUM,DateFormat.SHORT).format(new Date(next)));
         renderRecent();
         String q=search==null?"":search.getText().toString().trim();
         if(q.isEmpty()) renderCurrentPage(0); else renderSearch(q);
@@ -156,20 +198,24 @@ public class MainActivity extends Activity {
         List<Recommendation> recent=db.recentAdded(5);
         if(recent.isEmpty()) {
             recentList.setText("Новых КР после установки приложения пока не обнаружено.");
+            recentList.setTextColor(MUTED);
             return;
         }
+        recentList.setTextColor(TEXT);
         StringBuilder sb=new StringBuilder();
-        for(int i=0;i<recent.size();i++) {
+        int max=Math.min(3,recent.size());
+        for(int i=0;i<max;i++) {
             Recommendation r=recent.get(i);
             if(i>0) sb.append("\n");
-            sb.append("• ").append(r.title).append("  (ID: ").append(r.id).append(")");
+            sb.append("НОВАЯ  ").append(r.title).append("  ·  ").append(r.id);
         }
+        if(recent.size()>max) sb.append("\nЕщё ").append(recent.size()-max).append("…");
         recentList.setText(sb.toString());
     }
 
     private void renderCurrentPage(int direction) {
         if(contentHost==null) return;
-        if(currentPage==PAGE_ALL) showContent(makeListPage("Все клинические рекомендации",all,false),direction);
+        if(currentPage==PAGE_ALL) showContent(makeListPage("Все КР",all),direction);
         else if(currentPage==PAGE_HISTORY) showContent(makeHistoryPage(),direction);
         else if(selectedProfile!=null) showContent(makeProfileListPage(selectedProfile),direction);
         else showContent(makeProfilesPage(),direction);
@@ -178,18 +224,22 @@ public class MainActivity extends Activity {
     private View makeProfilesPage() {
         LinearLayout outer=new LinearLayout(this);
         outer.setOrientation(LinearLayout.VERTICAL);
-        outer.addView(pageTitle("Профили клинических рекомендаций"));
-        TextView hint=new TextView(this);
-        hint.setText("Свайп вправо — все КР   •   свайп влево — история");
-        hint.setTextSize(12);
-        hint.setTextColor(Color.DKGRAY);
-        hint.setPadding(0,0,0,dp(5));
-        outer.addView(hint);
+
+        LinearLayout pageHead=new LinearLayout(this);
+        pageHead.setOrientation(LinearLayout.HORIZONTAL);
+        pageHead.setGravity(Gravity.CENTER_VERTICAL);
+        pageHead.addView(pageTitle("Профили"),new LinearLayout.LayoutParams(0,-2,1));
+        TextView hint=text("← Все КР     История →",11,MUTED,false);
+        pageHead.addView(hint);
+        outer.addView(pageHead);
 
         LinkedHashMap<String,List<Recommendation>> groups=ProfileClassifier.group(all);
         ScrollView scroll=new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setVerticalScrollBarEnabled(false);
         LinearLayout rows=new LinearLayout(this);
         rows.setOrientation(LinearLayout.VERTICAL);
+        rows.setPadding(0,dp(2),0,dp(10));
         scroll.addView(rows,new ScrollView.LayoutParams(-1,-2));
 
         ArrayList<String> visible=new ArrayList<>();
@@ -197,15 +247,16 @@ public class MainActivity extends Activity {
         for(int i=0;i<visible.size();i+=2) {
             LinearLayout row=new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setPadding(0,dp(2),0,dp(2));
             for(int j=0;j<2;j++) {
+                LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(86),1);
+                if(j==0) lp.setMargins(0,dp(4),dp(4),dp(4));
+                else lp.setMargins(dp(4),dp(4),0,dp(4));
                 if(i+j<visible.size()) {
                     String p=visible.get(i+j);
-                    Button b=profileButton(p,groups.get(p).size());
-                    row.addView(b,new LinearLayout.LayoutParams(0,-2,1));
+                    row.addView(profileCard(p,groups.get(p).size()),lp);
                 } else {
                     Space s=new Space(this);
-                    row.addView(s,new LinearLayout.LayoutParams(0,1,1));
+                    row.addView(s,lp);
                 }
             }
             rows.addView(row,new LinearLayout.LayoutParams(-1,-2));
@@ -214,33 +265,94 @@ public class MainActivity extends Activity {
         return outer;
     }
 
-    private Button profileButton(String profile,int count) {
-        Button b=new Button(this);
-        b.setAllCaps(false);
-        b.setText(profile+"\n"+count+" КР");
-        b.setTextSize(12);
-        b.setMinHeight(0);
-        b.setMinimumHeight(0);
-        b.setPadding(dp(5),dp(5),dp(5),dp(5));
-        b.setOnClickListener(v -> { selectedProfile=profile; renderCurrentPage(0); });
-        return b;
+    private View profileCard(String profile,int count) {
+        LinearLayout card=new LinearLayout(this);
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(11),dp(10),dp(9),dp(10));
+        card.setBackground(rounded(CARD,LINE,16));
+        if(Build.VERSION.SDK_INT>=21) card.setElevation(dp(1));
+        card.setClickable(true);
+        card.setFocusable(true);
+
+        TextView icon=text(profileIcon(profile),20,BLUE,true);
+        icon.setGravity(Gravity.CENTER);
+        icon.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,18));
+        card.addView(icon,new LinearLayout.LayoutParams(dp(38),dp(38)));
+
+        LinearLayout labels=new LinearLayout(this);
+        labels.setOrientation(LinearLayout.VERTICAL);
+        labels.setPadding(dp(9),0,0,0);
+        TextView name=text(profile,13,TEXT,true);
+        name.setMaxLines(2);
+        name.setEllipsize(TextUtils.TruncateAt.END);
+        TextView number=text(count+" КР",11,MUTED,false);
+        number.setPadding(0,dp(3),0,0);
+        labels.addView(name);
+        labels.addView(number);
+        card.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
+
+        TextView arrow=text("›",22,Color.rgb(170,179,192),false);
+        arrow.setGravity(Gravity.CENTER);
+        card.addView(arrow,new LinearLayout.LayoutParams(dp(18),-1));
+
+        card.setOnClickListener(v -> { selectedProfile=profile; renderCurrentPage(0); });
+        return card;
+    }
+
+    private String profileIcon(String p) {
+        if(p.equals("Кардиология")) return "♥";
+        if(p.equals("Сердечно-сосудистая хирургия")) return "↔";
+        if(p.equals("Неврология")) return "≋";
+        if(p.equals("Нейрохирургия")) return "✦";
+        if(p.equals("Травматология и ортопедия")) return "⌁";
+        if(p.equals("Хирургия")) return "✚";
+        if(p.equals("Гастроэнтерология")) return "◒";
+        if(p.equals("Пульмонология")) return "≈";
+        if(p.equals("Эндокринология")) return "◈";
+        if(p.equals("Инфекционные болезни")) return "✣";
+        if(p.equals("Гематология")) return "●";
+        if(p.equals("Ревматология")) return "◇";
+        if(p.equals("Нефрология")) return "◉";
+        if(p.equals("Урология")) return "∪";
+        if(p.equals("Акушерство и гинекология")) return "♀";
+        if(p.equals("Педиатрия и неонатология")) return "★";
+        if(p.equals("Онкология")) return "✦";
+        if(p.equals("Офтальмология")) return "◉";
+        if(p.equals("Оториноларингология")) return "♪";
+        if(p.equals("Дерматология")) return "✧";
+        if(p.equals("Психиатрия и наркология")) return "Ψ";
+        if(p.equals("Аллергология и иммунология")) return "✤";
+        if(p.equals("Стоматология и ЧЛХ")) return "◆";
+        if(p.equals("Анестезиология и реаниматология")) return "+";
+        if(p.equals("Медицинская реабилитация")) return "↻";
+        return "•";
     }
 
     private View makeProfileListPage(String profile) {
         List<Recommendation> recs=ProfileClassifier.group(all).get(profile);
         LinearLayout outer=new LinearLayout(this);
         outer.setOrientation(LinearLayout.VERTICAL);
-        Button back=new Button(this);
-        back.setText("← Профили");
-        back.setAllCaps(false);
-        back.setTextSize(13);
-        back.setMinHeight(0);
-        back.setMinimumHeight(0);
-        back.setPadding(dp(4),dp(3),dp(4),dp(3));
+
+        LinearLayout head=new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        TextView back=text("‹  Профили",13,BLUE,true);
+        back.setPadding(dp(9),dp(7),dp(9),dp(7));
+        back.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,12));
+        back.setClickable(true);
         back.setOnClickListener(v -> { selectedProfile=null; renderCurrentPage(0); });
-        outer.addView(back,new LinearLayout.LayoutParams(-1,-2));
-        outer.addView(pageTitle(profile+" — "+recs.size()+" КР"));
-        addRecommendationList(outer,recs,false);
+        head.addView(back);
+        TextView count=text(recs.size()+" КР",12,MUTED,false);
+        LinearLayout.LayoutParams countLp=new LinearLayout.LayoutParams(-2,-2);
+        countLp.setMargins(dp(10),0,0,0);
+        head.addView(count,countLp);
+        outer.addView(head);
+
+        TextView name=pageTitle(profile);
+        name.setPadding(dp(2),dp(8),dp(2),dp(5));
+        outer.addView(name);
+        addRecommendationList(outer,recs);
         return outer;
     }
 
@@ -248,28 +360,38 @@ public class MainActivity extends Activity {
         List<Recommendation> history=db.history(200);
         LinearLayout outer=new LinearLayout(this);
         outer.setOrientation(LinearLayout.VERTICAL);
-        outer.addView(pageTitle("История просмотренных КР"));
-        TextView hint=new TextView(this);
-        hint.setText("Здесь сохраняются КР, найденные через поиск и открытые вами.");
-        hint.setTextSize(12);
-        hint.setTextColor(Color.DKGRAY);
-        hint.setPadding(0,0,0,dp(5));
-        outer.addView(hint);
+
+        LinearLayout head=new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.addView(pageTitle("История"),new LinearLayout.LayoutParams(0,-2,1));
+        TextView hint=text("← Профили",11,MUTED,false);
+        head.addView(hint);
+        outer.addView(head);
+
+        TextView caption=text("Все клинические рекомендации, которые вы открывали",12,MUTED,false);
+        caption.setPadding(dp(2),0,dp(2),dp(6));
+        outer.addView(caption);
         if(history.isEmpty()) {
-            TextView empty=new TextView(this);
-            empty.setText("История пока пуста.");
-            empty.setTextSize(15);
-            empty.setPadding(dp(8),dp(16),dp(8),dp(8));
+            TextView empty=text("История пока пуста.",14,MUTED,false);
+            empty.setGravity(Gravity.CENTER);
+            empty.setPadding(dp(8),dp(30),dp(8),dp(8));
             outer.addView(empty);
-        } else addRecommendationList(outer,history,false);
+        } else addRecommendationList(outer,history);
         return outer;
     }
 
-    private View makeListPage(String heading,List<Recommendation> recs,boolean fromSearch) {
+    private View makeListPage(String heading,List<Recommendation> recs) {
         LinearLayout outer=new LinearLayout(this);
         outer.setOrientation(LinearLayout.VERTICAL);
-        outer.addView(pageTitle(heading+" — "+recs.size()));
-        addRecommendationList(outer,recs,fromSearch);
+        LinearLayout head=new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.addView(pageTitle(heading),new LinearLayout.LayoutParams(0,-2,1));
+        TextView count=text(recs.size()+" КР",12,MUTED,false);
+        head.addView(count);
+        outer.addView(head);
+        addRecommendationList(outer,recs);
         return outer;
     }
 
@@ -279,32 +401,55 @@ public class MainActivity extends Activity {
         for(Recommendation r:all) {
             if(norm(r.title).contains(needle)||norm(r.id).contains(needle)) results.add(r);
         }
-        showContent(makeListPage("Результаты поиска",results,true),0);
+        showContent(makeListPage("Результаты поиска",results),0);
     }
 
-    private void addRecommendationList(LinearLayout outer,List<Recommendation> recs,boolean fromSearch) {
+    private void addRecommendationList(LinearLayout outer,List<Recommendation> recs) {
         ListView list=new ListView(this);
-        ArrayList<String> labels=new ArrayList<>();
-        for(Recommendation r:recs) labels.add(r.title+"\nID: "+r.id+(PdfManager.isPdf(PdfManager.file(this,r))?"   •   PDF скачан":""));
-        list.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_list_item_1,labels){
-            @Override public View getView(int p,View v,android.view.ViewGroup g){
-                TextView t=(TextView)super.getView(p,v,g);
-                t.setTextSize(15);
-                t.setPadding(dp(8),dp(10),dp(8),dp(10));
-                return t;
+        list.setDivider(null);
+        list.setDividerHeight(0);
+        list.setBackgroundColor(Color.TRANSPARENT);
+        list.setClipToPadding(false);
+        list.setPadding(0,0,0,dp(8));
+        list.setAdapter(new BaseAdapter(){
+            @Override public int getCount(){ return recs.size(); }
+            @Override public Object getItem(int p){ return recs.get(p); }
+            @Override public long getItemId(int p){ return p; }
+            @Override public View getView(int p,View convert,ViewGroup parent){
+                Recommendation r=recs.get(p);
+                LinearLayout wrap=new LinearLayout(MainActivity.this);
+                wrap.setPadding(0,dp(3),0,dp(3));
+
+                LinearLayout row=new LinearLayout(MainActivity.this);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                row.setGravity(Gravity.CENTER_VERTICAL);
+                row.setPadding(dp(12),dp(10),dp(9),dp(10));
+                row.setBackground(rounded(CARD,LINE,14));
+
+                LinearLayout labels=new LinearLayout(MainActivity.this);
+                labels.setOrientation(LinearLayout.VERTICAL);
+                TextView name=text(r.title,14,TEXT,false);
+                name.setMaxLines(3);
+                TextView meta=text("КР "+r.id+(PdfManager.isPdf(PdfManager.file(MainActivity.this,r))?"  •  PDF скачан":""),11,MUTED,false);
+                meta.setPadding(0,dp(4),0,0);
+                labels.addView(name);
+                labels.addView(meta);
+                row.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
+
+                TextView arrow=text("›",23,Color.rgb(170,179,192),false);
+                arrow.setGravity(Gravity.CENTER);
+                row.addView(arrow,new LinearLayout.LayoutParams(dp(22),-1));
+                wrap.addView(row,new LinearLayout.LayoutParams(-1,-2));
+                return wrap;
             }
         });
-        list.setOnItemClickListener((p,v,pos,id)->downloadOrOpen(recs.get(pos),fromSearch));
+        list.setOnItemClickListener((p,v,pos,id)->downloadOrOpen(recs.get(pos)));
         outer.addView(list,new LinearLayout.LayoutParams(-1,0,1));
     }
 
-    private TextView pageTitle(String text) {
-        TextView t=new TextView(this);
-        t.setText(text);
-        t.setTextSize(17);
-        t.setTypeface(null,1);
-        t.setTextColor(Color.rgb(31,78,120));
-        t.setPadding(dp(2),dp(7),dp(2),dp(6));
+    private TextView pageTitle(String value) {
+        TextView t=text(value,18,TEXT,true);
+        t.setPadding(dp(2),dp(7),dp(2),dp(7));
         return t;
     }
 
@@ -324,8 +469,9 @@ public class MainActivity extends Activity {
         return (s==null?"":s).toLowerCase(Locale.ROOT).replace('ё','е').trim();
     }
 
-    private void runSync(Button b) {
+    private void runSync(TextView b) {
         b.setEnabled(false);
+        b.setText("↻  Проверяю…");
         status.setText("Проверяю обновления…");
         final ProgressDialog progress=new ProgressDialog(this);
         progress.setTitle("Проверка клинических рекомендаций");
@@ -346,6 +492,7 @@ public class MainActivity extends Activity {
             runOnUiThread(() -> {
                 try { if(progress.isShowing()) progress.dismiss(); } catch(Exception ignored) {}
                 b.setEnabled(true);
+                b.setText("↻  Проверить");
                 try { reload(); } catch(Exception ignored) {}
                 showSyncResult(r);
             });
@@ -370,9 +517,9 @@ public class MainActivity extends Activity {
                 .show();
     }
 
-    private void downloadOrOpen(Recommendation r,boolean fromSearch) {
+    private void downloadOrOpen(Recommendation r) {
         if(PdfManager.isPdf(PdfManager.file(this,r))) {
-            if(fromSearch) db.markViewed(r.baseId);
+            db.markViewed(r.baseId);
             PdfManager.open(this,r);
             return;
         }
@@ -386,7 +533,7 @@ public class MainActivity extends Activity {
             runOnUiThread(() -> {
                 try { if(progress.isShowing()) progress.dismiss(); } catch(Exception ignored) {}
                 if(ok){
-                    if(fromSearch) db.markViewed(r.baseId);
+                    db.markViewed(r.baseId);
                     reload();
                     PdfManager.open(this,r);
                 } else new AlertDialog.Builder(this).setTitle("PDF не скачан").setMessage("Не удалось получить PDF для КР «"+r.title+"» (ID: "+r.id+"). Попробуйте повторить позже.").setPositiveButton("ОК",null).show();
