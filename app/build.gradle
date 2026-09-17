@@ -1,5 +1,12 @@
 plugins { id 'com.android.application' }
 
+def envVersionCode = System.getenv('KR_VERSION_CODE') ?: '1'
+def envVersionName = System.getenv('KR_VERSION_NAME') ?: '1.0'
+def keystorePath = System.getenv('KR_KEYSTORE_FILE')
+def keystorePassword = System.getenv('KR_KEYSTORE_PASSWORD')
+def keyAliasValue = System.getenv('KR_KEY_ALIAS')
+def keyPasswordValue = System.getenv('KR_KEY_PASSWORD')
+
 android {
     namespace 'ru.krmonitor.app'
     compileSdk 35
@@ -8,8 +15,28 @@ android {
         applicationId 'ru.krmonitor.app'
         minSdk 26
         targetSdk 35
-        versionCode 1
-        versionName '1.0'
+        versionCode Integer.parseInt(envVersionCode)
+        versionName envVersionName
+    }
+
+    signingConfigs {
+        if (keystorePath) {
+            release {
+                storeFile file(keystorePath)
+                storePassword keystorePassword
+                keyAlias keyAliasValue
+                keyPassword keyPasswordValue
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (keystorePath) {
+                signingConfig signingConfigs.release
+            }
+        }
     }
 
     compileOptions {
