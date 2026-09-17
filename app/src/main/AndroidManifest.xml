@@ -10,7 +10,7 @@
         android:allowBackup="false"
         android:icon="@mipmap/kr_launcher"
         android:roundIcon="@mipmap/kr_launcher"
-        android:label="Монитор КР"
+        android:label="КР Навигатор"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:usesCleartextTraffic="false">
 
