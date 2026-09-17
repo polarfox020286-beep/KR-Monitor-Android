@@ -1,0 +1,57 @@
+name: Export unsigned APK and signing tools
+
+on:
+  push:
+    paths:
+      - '.github/workflows/export-android-signing-tools.yml'
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Refresh official catalog with ICD-10 metadata
+        run: |
+          pip install requests
+          python scripts/build_seed.py
+      - name: Assemble launcher icon
+        run: |
+          mkdir -p app/src/main/res/mipmap-xxxhdpi
+          cat .github/icon-parts-valid/01.txt .github/icon-parts-valid/02.txt .github/icon-parts-valid/03.txt .github/icon-parts-valid/04.txt | tr -d '\n\r ' | base64 -d > app/src/main/res/mipmap-xxxhdpi/kr_launcher.png
+      - name: Build unsigned release APK
+        env:
+          KR_VERSION_CODE: '2001'
+          KR_VERSION_NAME: '1.1.1'
+        run: gradle :app:assembleRelease --stacktrace
+      - name: Collect Android signing tools
+        run: |
+          set -euo pipefail
+          TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          echo "Using build-tools: $TOOLS"
+          test -x "$TOOLS/apksigner"
+          test -x "$TOOLS/zipalign"
+          test -s "$TOOLS/lib/apksigner.jar"
+          mkdir -p exported-tools/lib
+          cp "$TOOLS/apksigner" exported-tools/
+          cp "$TOOLS/zipalign" exported-tools/
+          cp "$TOOLS/lib/apksigner.jar" exported-tools/lib/
+          chmod +x exported-tools/apksigner exported-tools/zipalign
+          ls -l app/build/outputs/apk/release/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KR-Navigator-unsigned-release
+          path: app/build/outputs/apk/release/app-release-unsigned.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-signing-tools
+          path: exported-tools
