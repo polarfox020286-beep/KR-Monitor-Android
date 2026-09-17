@@ -1,0 +1,27 @@
+name: Probe MKB fields
+on:
+  push:
+    branches: [ main ]
+jobs:
+  probe:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe official API MKB structure
+        run: |
+          python3 - <<'PY'
+          import requests, json
+          u='https://apicr.minzdrav.gov.ru/api.ashx?op=GetJsonClinrecsFilterV2'
+          body={'filters':[{'fieldName':'status','filterType':1,'filterValueType':2,'value1':0,'value2':'','values':[]}], 'sortOption':{'fieldName':'publishdate','sortType':2}, 'pageSize':50,'currentPage':1,'useANDoperator':True,'columns':[]}
+          r=requests.post(u,json=body,timeout=60,headers={'User-Agent':'Mozilla/5.0','Referer':'https://cr.minzdrav.gov.ru/clin-rec','Origin':'https://cr.minzdrav.gov.ru'})
+          r.raise_for_status()
+          data=r.json().get('Data') or []
+          for row in data:
+            m=row.get('Mkbs')
+            if m:
+              print('KR',row.get('CodeVersion'),row.get('Name'))
+              print('TYPE',type(m).__name__)
+              print('MKBS',json.dumps(m,ensure_ascii=False)[:4000])
+              break
+          PY
