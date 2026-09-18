@@ -33,6 +33,13 @@ jobs:
           KR_VERSION_CODE: '2010'
           KR_VERSION_NAME: '1.1.10'
         run: gradle :app:assembleRelease --stacktrace
+      - name: Align unsigned release APK
+        run: |
+          set -euo pipefail
+          TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          "$TOOLS/zipalign" -f -p 4 app/build/outputs/apk/release/app-release-unsigned.apk app/build/outputs/apk/release/app-release-aligned.apk
+          "$TOOLS/zipalign" -c -p 4 app/build/outputs/apk/release/app-release-aligned.apk
+
       - name: Collect Android signing tools
         run: |
           set -euo pipefail
@@ -50,7 +57,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: KR-Navigator-unsigned-release
-          path: app/build/outputs/apk/release/app-release-unsigned.apk
+          path: app/build/outputs/apk/release/app-release-aligned.apk
       - uses: actions/upload-artifact@v4
         with:
           name: android-signing-tools
