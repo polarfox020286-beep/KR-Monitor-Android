@@ -110,9 +110,9 @@ public class MainActivity extends Activity {
         LinearLayout recentHeader=new LinearLayout(this);
         recentHeader.setOrientation(LinearLayout.HORIZONTAL);
         recentHeader.setGravity(Gravity.CENTER_VERTICAL);
-        TextView recentTitle=text("Новое",15,TEXT,true);
+        TextView recentTitle=text("Изменения",15,TEXT,true);
         recentHeader.addView(recentTitle,new LinearLayout.LayoutParams(0,-2,1));
-        TextView recentCaption=text("последние добавления",11,MUTED,false);
+        TextView recentCaption=text("новые и обновлённые КР",11,MUTED,false);
         recentHeader.addView(recentCaption);
         root.addView(recentHeader);
 
@@ -189,16 +189,17 @@ public class MainActivity extends Activity {
         all=db.all();
         String last=getSharedPreferences("prefs",MODE_PRIVATE).getString("last_sync","ещё не выполнялась");
         long next=getSharedPreferences("prefs",MODE_PRIVATE).getLong("next_alarm",AlarmScheduler.nextWeekday7());
-        status.setText(all.size()+" КР  •  Последняя проверка: "+last+"\nСледующая: "+DateFormat.getDateTimeInstance(DateFormat.MEDIUM,DateFormat.SHORT).format(new Date(next)));
+        String notifyNote=notificationsEnabled()?"":"\n⚠ Уведомления Android отключены";
+        status.setText(all.size()+" КР  •  Последняя проверка: "+last+"\nСледующая: "+DateFormat.getDateTimeInstance(DateFormat.MEDIUM,DateFormat.SHORT).format(new Date(next))+notifyNote);
         renderRecent();
         String q=search==null?"":search.getText().toString().trim();
         if(q.isEmpty()) renderCurrentPage(0); else renderSearch(q);
     }
 
     private void renderRecent() {
-        List<Recommendation> recent=db.recentAdded(5);
+        List<DbHelper.ChangeEvent> recent=db.recentChanges(5);
         if(recent.isEmpty()) {
-            recentList.setText("Новых КР после установки приложения пока не обнаружено.");
+            recentList.setText("Новых или обновлённых КР после установки приложения пока не обнаружено.");
             recentList.setTextColor(MUTED);
             return;
         }
@@ -206,9 +207,15 @@ public class MainActivity extends Activity {
         StringBuilder sb=new StringBuilder();
         int max=Math.min(3,recent.size());
         for(int i=0;i<max;i++) {
-            Recommendation r=recent.get(i);
+            DbHelper.ChangeEvent e=recent.get(i);
             if(i>0) sb.append("\n");
-            sb.append("НОВАЯ  ").append(r.title).append("  ·  ").append(r.id);
+            if("NEW".equals(e.type)) {
+                sb.append("НОВАЯ  ").append(e.title).append("  ·  ").append(e.newId);
+            } else {
+                sb.append("ОБНОВЛЕНА  ").append(e.title).append("  ·  ");
+                if(e.oldId!=null && !e.oldId.isEmpty()) sb.append(e.oldId).append(" → ");
+                sb.append(e.newId);
+            }
         }
         if(recent.size()>max) sb.append("\nЕщё ").append(recent.size()-max).append("…");
         recentList.setText(sb.toString());
@@ -519,7 +526,7 @@ public class MainActivity extends Activity {
         status.setText("Проверяю обновления…");
         final ProgressDialog progress=new ProgressDialog(this);
         progress.setTitle("Проверка клинических рекомендаций");
-        progress.setMessage("Получаю актуальный каталог и проверяю новые КР…");
+        progress.setMessage("Получаю актуальный каталог и проверяю новые и обновлённые КР…");
         progress.setIndeterminate(true);
         progress.setCancelable(false);
         progress.show();
@@ -530,7 +537,7 @@ public class MainActivity extends Activity {
                 result=SyncEngine.sync(getApplicationContext());
             } catch(Throwable t) {
                 String m=t.getMessage()==null?t.getClass().getSimpleName():t.getMessage();
-                result=new SyncEngine.Result(0,0,0,0,0,"Ошибка проверки: "+m,Collections.emptyList());
+                result=new SyncEngine.Result(0,0,0,0,0,"Ошибка проверки: "+m,Collections.emptyList(),Collections.emptyList());
             }
             final SyncEngine.Result r=result;
             runOnUiThread(() -> {
@@ -546,7 +553,7 @@ public class MainActivity extends Activity {
     private void showSyncResult(SyncEngine.Result r) {
         StringBuilder text=new StringBuilder(r.message);
         if(!r.newRecommendations.isEmpty()) {
-            text.append("\n\nНайдены новые КР:");
+            text.append("\n\nНовые КР:");
             int max=Math.min(8,r.newRecommendations.size());
             for(int i=0;i<max;i++) {
                 Recommendation rec=r.newRecommendations.get(i);
@@ -554,8 +561,17 @@ public class MainActivity extends Activity {
             }
             if(r.newRecommendations.size()>max) text.append("\n…и ещё ").append(r.newRecommendations.size()-max);
         }
+        if(!r.updatedRecommendations.isEmpty()) {
+            text.append("\n\nОбновлённые КР:");
+            int max=Math.min(8,r.updatedRecommendations.size());
+            for(int i=0;i<max;i++) {
+                SyncEngine.UpdateInfo x=r.updatedRecommendations.get(i);
+                text.append("\n• ").append(x.recommendation.title).append(" (").append(x.previousId).append(" → ").append(x.recommendation.id).append(")");
+            }
+            if(r.updatedRecommendations.size()>max) text.append("\n…и ещё ").append(r.updatedRecommendations.size()-max);
+        }
         new AlertDialog.Builder(this)
-                .setTitle(r.added>0?"Найдены новые КР":"Результат проверки")
+                .setTitle(r.added+r.updated>0?"Обнаружены изменения КР":"Результат проверки")
                 .setMessage(text.toString())
                 .setPositiveButton("ОК",null)
                 .show();
@@ -583,6 +599,15 @@ public class MainActivity extends Activity {
                 } else new AlertDialog.Builder(this).setTitle("PDF не скачан").setMessage("Не удалось получить PDF для КР «"+r.title+"» (ID: "+r.id+"). Попробуйте повторить позже.").setPositiveButton("ОК",null).show();
             });
         });
+    }
+
+    private boolean notificationsEnabled() {
+        if(Build.VERSION.SDK_INT>=33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED) return false;
+        if(Build.VERSION.SDK_INT>=24) {
+            NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);
+            return nm==null || nm.areNotificationsEnabled();
+        }
+        return true;
     }
 
     private void requestExactAlarmPermission() {
