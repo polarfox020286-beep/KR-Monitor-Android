@@ -3,6 +3,7 @@ package ru.krmonitor.app;
 import android.content.*;
 import android.database.Cursor;
 import android.database.sqlite.*;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 public class DbHelper extends SQLiteOpenHelper {
@@ -102,8 +103,20 @@ public class DbHelper extends SQLiteOpenHelper {
     }
 
     public List<ChangeEvent> recentChanges(int limit) {
+        return recentChangesWithinHours(Integer.MAX_VALUE,limit);
+    }
+
+    public List<ChangeEvent> recentChangesWithinHours(int hours,int limit) {
         ArrayList<ChangeEvent> out=new ArrayList<>();
-        try(Cursor c=getReadableDatabase().query("changes",null,null,null,null,null,"id DESC",Integer.toString(limit))) {
+        String selection=null;
+        String[] args=null;
+        if(hours!=Integer.MAX_VALUE) {
+            long cutoff=System.currentTimeMillis()-hours*60L*60L*1000L;
+            String cutoffText=new SimpleDateFormat("yyyy-MM-dd HH:mm",Locale.US).format(new Date(cutoff));
+            selection="changed_at>=?";
+            args=new String[]{cutoffText};
+        }
+        try(Cursor c=getReadableDatabase().query("changes",null,selection,args,null,null,"id DESC",Integer.toString(limit))) {
             while(c.moveToNext()) out.add(new ChangeEvent(
                     c.getString(c.getColumnIndexOrThrow("event_type")),
                     c.getString(c.getColumnIndexOrThrow("base_id")),
