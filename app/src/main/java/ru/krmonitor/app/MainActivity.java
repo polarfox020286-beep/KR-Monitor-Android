@@ -20,6 +20,13 @@ import java.util.concurrent.*;
 
 public class MainActivity extends Activity {
     private final ExecutorService executor=Executors.newSingleThreadExecutor();
+    private final Handler recentHandler=new Handler(Looper.getMainLooper());
+    private final Runnable recentRefresh=new Runnable(){
+        @Override public void run(){
+            if(recentList!=null && db!=null) renderRecent();
+            recentHandler.postDelayed(this,60_000L);
+        }
+    };
     private DbHelper db;
     private TextView status;
     private TextView recentList;
@@ -112,7 +119,7 @@ public class MainActivity extends Activity {
         recentHeader.setGravity(Gravity.CENTER_VERTICAL);
         TextView recentTitle=text("Изменения",15,TEXT,true);
         recentHeader.addView(recentTitle,new LinearLayout.LayoutParams(0,-2,1));
-        TextView recentCaption=text("новые и обновлённые КР",11,MUTED,false);
+        TextView recentCaption=text("за последние 48 часов",11,MUTED,false);
         recentHeader.addView(recentCaption);
         root.addView(recentHeader);
 
@@ -197,9 +204,9 @@ public class MainActivity extends Activity {
     }
 
     private void renderRecent() {
-        List<DbHelper.ChangeEvent> recent=db.recentChanges(5);
+        List<DbHelper.ChangeEvent> recent=db.recentChangesWithinHours(48,5);
         if(recent.isEmpty()) {
-            recentList.setText("Новых или обновлённых КР после установки приложения пока не обнаружено.");
+            recentList.setText("За последние 48 часов новых или обновлённых КР не обнаружено.");
             recentList.setTextColor(MUTED);
             return;
         }
@@ -629,7 +636,20 @@ public class MainActivity extends Activity {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},44);
     }
 
+    @Override protected void onResume() {
+        super.onResume();
+        recentHandler.removeCallbacks(recentRefresh);
+        if(db!=null && recentList!=null) renderRecent();
+        recentHandler.postDelayed(recentRefresh,60_000L);
+    }
+
+    @Override protected void onPause() {
+        recentHandler.removeCallbacks(recentRefresh);
+        super.onPause();
+    }
+
     @Override protected void onDestroy(){
+        recentHandler.removeCallbacks(recentRefresh);
         super.onDestroy();
         executor.shutdownNow();
         if(db!=null) db.close();
