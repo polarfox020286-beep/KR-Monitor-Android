@@ -7,11 +7,12 @@ import java.util.*;
 
 public class DbHelper extends SQLiteOpenHelper {
     private static final String DB = "kr.db";
-    private static final int VER = 4;
+    private static final int VER = 5;
     public DbHelper(Context c) { super(c, DB, null, VER); }
     @Override public void onCreate(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE recs(base_id TEXT PRIMARY KEY,current_id TEXT NOT NULL,title TEXT NOT NULL,filename TEXT NOT NULL,mkb_codes TEXT NOT NULL DEFAULT '',last_seen TEXT,added_at TEXT)");
         db.execSQL("CREATE TABLE history(base_id TEXT PRIMARY KEY,viewed_at INTEGER NOT NULL)");
+        db.execSQL("CREATE TABLE changes(id INTEGER PRIMARY KEY AUTOINCREMENT,base_id TEXT NOT NULL,event_type TEXT NOT NULL,old_id TEXT,new_id TEXT NOT NULL,title TEXT NOT NULL,changed_at TEXT NOT NULL,UNIQUE(base_id,event_type,new_id))");
     }
     @Override public void onUpgrade(SQLiteDatabase db,int oldV,int newV) {
         if(oldV<2) db.execSQL("ALTER TABLE recs ADD COLUMN added_at TEXT");
@@ -36,7 +37,10 @@ public class DbHelper extends SQLiteOpenHelper {
             if(c.moveToFirst()) return c.isNull(0)?null:c.getString(0); return null;
         }
     }
-    public void clearAll() { getWritableDatabase().delete("recs",null,null); }
+    public void clearAll() {
+        getWritableDatabase().delete("recs",null,null);
+        try { getWritableDatabase().delete("changes",null,null); } catch(Exception ignored) {}
+    }
     public Recommendation getByBase(String base) {
         try(Cursor c=getReadableDatabase().query("recs",null,"base_id=?",new String[]{base},null,null,null)) {
             if(c.moveToFirst()) return fromCursor(c); return null;
@@ -61,6 +65,34 @@ public class DbHelper extends SQLiteOpenHelper {
         ArrayList<Recommendation> out=new ArrayList<>();
         try(Cursor c=getReadableDatabase().query("recs",null,"added_at IS NOT NULL",null,null,null,"added_at DESC",Integer.toString(limit))) {
             while(c.moveToNext()) out.add(fromCursor(c));
+        }
+        return out;
+    }
+
+    public static final class ChangeEvent {
+        public final String type,baseId,oldId,newId,title,changedAt;
+        ChangeEvent(String type,String baseId,String oldId,String newId,String title,String changedAt) {
+            this.type=type; this.baseId=baseId; this.oldId=oldId; this.newId=newId; this.title=title; this.changedAt=changedAt;
+        }
+    }
+
+    public void recordChange(String type,Recommendation r,String oldId,String changedAt) {
+        ContentValues v=new ContentValues();
+        v.put("base_id",r.baseId); v.put("event_type",type); v.put("old_id",oldId);
+        v.put("new_id",r.id); v.put("title",r.title); v.put("changed_at",changedAt);
+        getWritableDatabase().insertWithOnConflict("changes",null,v,SQLiteDatabase.CONFLICT_IGNORE);
+    }
+
+    public List<ChangeEvent> recentChanges(int limit) {
+        ArrayList<ChangeEvent> out=new ArrayList<>();
+        try(Cursor c=getReadableDatabase().query("changes",null,null,null,null,null,"id DESC",Integer.toString(limit))) {
+            while(c.moveToNext()) out.add(new ChangeEvent(
+                    c.getString(c.getColumnIndexOrThrow("event_type")),
+                    c.getString(c.getColumnIndexOrThrow("base_id")),
+                    c.isNull(c.getColumnIndexOrThrow("old_id"))?null:c.getString(c.getColumnIndexOrThrow("old_id")),
+                    c.getString(c.getColumnIndexOrThrow("new_id")),
+                    c.getString(c.getColumnIndexOrThrow("title")),
+                    c.getString(c.getColumnIndexOrThrow("changed_at"))));
         }
         return out;
     }
