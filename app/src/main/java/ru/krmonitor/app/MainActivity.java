@@ -117,7 +117,7 @@ public class MainActivity extends Activity {
         recentHeader.setGravity(Gravity.CENTER_VERTICAL);
         TextView recentTitle=text("Изменения",15,TEXT,true);
         recentHeader.addView(recentTitle,new LinearLayout.LayoutParams(0,-2,1));
-        TextView recentCaption=text("за последние 48 часов",11,MUTED,false);
+        TextView recentCaption=text("48 ч до последней проверки",11,MUTED,false);
         recentHeader.addView(recentCaption);
         root.addView(recentHeader);
 
