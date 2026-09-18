@@ -7,7 +7,7 @@ import java.util.*;
 
 public class DbHelper extends SQLiteOpenHelper {
     private static final String DB = "kr.db";
-    private static final int VER = 5;
+    private static final int VER = 6;
     public DbHelper(Context c) { super(c, DB, null, VER); }
     @Override public void onCreate(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE recs(base_id TEXT PRIMARY KEY,current_id TEXT NOT NULL,title TEXT NOT NULL,filename TEXT NOT NULL,mkb_codes TEXT NOT NULL DEFAULT '',last_seen TEXT,added_at TEXT)");
@@ -18,6 +18,24 @@ public class DbHelper extends SQLiteOpenHelper {
         if(oldV<2) db.execSQL("ALTER TABLE recs ADD COLUMN added_at TEXT");
         if(oldV<3) db.execSQL("CREATE TABLE IF NOT EXISTS history(base_id TEXT PRIMARY KEY,viewed_at INTEGER NOT NULL)");
         if(oldV<4) db.execSQL("ALTER TABLE recs ADD COLUMN mkb_codes TEXT NOT NULL DEFAULT ''");
+        if(oldV<6) ensureChangesTable(db);
+    }
+
+    @Override public void onOpen(SQLiteDatabase db) {
+        super.onOpen(db);
+        // Defensive repair for 1.1.9: that build could mark the DB as v5
+        // without creating the changes table.
+        ensureChangesTable(db);
+    }
+
+    private void ensureChangesTable(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS changes(id INTEGER PRIMARY KEY AUTOINCREMENT,base_id TEXT NOT NULL,event_type TEXT NOT NULL,old_id TEXT,new_id TEXT NOT NULL,title TEXT NOT NULL,changed_at TEXT NOT NULL,UNIQUE(base_id,event_type,new_id))");
+        // Restore events already detected by older builds. Seed rows have empty
+        // last_seen/added_at, so they are not incorrectly shown as changes.
+        db.execSQL("INSERT OR IGNORE INTO changes(base_id,event_type,old_id,new_id,title,changed_at) " +
+                "SELECT base_id,CASE WHEN added_at IS NOT NULL AND TRIM(added_at)<>'' THEN 'NEW' ELSE 'UPDATED' END,NULL,current_id,title," +
+                "CASE WHEN last_seen IS NOT NULL AND TRIM(last_seen)<>'' THEN last_seen ELSE added_at END " +
+                "FROM recs WHERE (last_seen IS NOT NULL AND TRIM(last_seen)<>'') OR (added_at IS NOT NULL AND TRIM(added_at)<>'')");
     }
 
     public void upsert(Recommendation r, String lastSeen) { upsert(r,lastSeen,null); }
