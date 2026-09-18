@@ -20,11 +20,9 @@ import java.util.concurrent.*;
 
 public class MainActivity extends Activity {
     private final ExecutorService executor=Executors.newSingleThreadExecutor();
-    private final Handler recentHandler=new Handler(Looper.getMainLooper());
-    private final Runnable recentRefresh=new Runnable(){
-        @Override public void run(){
-            if(recentList!=null && db!=null) renderRecent();
-            recentHandler.postDelayed(this,60_000L);
+    private final BroadcastReceiver syncReceiver=new BroadcastReceiver(){
+        @Override public void onReceive(Context context,Intent intent){
+            if("ru.krmonitor.app.SYNC_COMPLETE".equals(intent.getAction())) reload();
         }
     };
     private DbHelper db;
@@ -203,10 +201,16 @@ public class MainActivity extends Activity {
         if(q.isEmpty()) renderCurrentPage(0); else renderSearch(q);
     }
 
+    private List<DbHelper.ChangeEvent> changesForLastScan(int limit) {
+        String last=getSharedPreferences("prefs",MODE_PRIVATE).getString("last_sync","");
+        if(last==null || last.trim().isEmpty()) return Collections.emptyList();
+        return db.recentChangesWithinHoursAt(last,48,limit);
+    }
+
     private void renderRecent() {
-        List<DbHelper.ChangeEvent> recent=db.recentChangesWithinHours(48,5);
+        List<DbHelper.ChangeEvent> recent=changesForLastScan(5);
         if(recent.isEmpty()) {
-            recentList.setText("За последние 48 часов новых или обновлённых КР не обнаружено.");
+            recentList.setText("За 48 часов до последней проверки новых или обновлённых КР не обнаружено.");
             recentList.setTextColor(MUTED);
             return;
         }
@@ -558,27 +562,30 @@ public class MainActivity extends Activity {
     }
 
     private void showSyncResult(SyncEngine.Result r) {
-        StringBuilder text=new StringBuilder(r.message);
-        if(!r.newRecommendations.isEmpty()) {
-            text.append("\n\nНовые КР:");
-            int max=Math.min(8,r.newRecommendations.size());
+        List<DbHelper.ChangeEvent> recent=changesForLastScan(50);
+        StringBuilder text=new StringBuilder();
+        if(recent.isEmpty()) {
+            text.append("За 48 часов до момента этой проверки новых или обновлённых КР не обнаружено.");
+        } else {
+            text.append("Новые и обновлённые КР за 48 часов до момента проверки:");
+            int max=Math.min(12,recent.size());
             for(int i=0;i<max;i++) {
-                Recommendation rec=r.newRecommendations.get(i);
-                text.append("\n• ").append(rec.title).append(" (ID: ").append(rec.id).append(")");
+                DbHelper.ChangeEvent e=recent.get(i);
+                text.append("\n\n• ");
+                if("NEW".equals(e.type)) {
+                    text.append("НОВАЯ — ").append(e.title).append(" (ID: ").append(e.newId).append(")");
+                } else {
+                    text.append("ОБНОВЛЕНА — ").append(e.title).append(" (");
+                    if(e.oldId!=null && !e.oldId.isEmpty()) text.append(e.oldId).append(" → ");
+                    text.append(e.newId).append(")");
+                }
             }
-            if(r.newRecommendations.size()>max) text.append("\n…и ещё ").append(r.newRecommendations.size()-max);
+            if(recent.size()>max) text.append("\n\n…и ещё ").append(recent.size()-max);
         }
-        if(!r.updatedRecommendations.isEmpty()) {
-            text.append("\n\nОбновлённые КР:");
-            int max=Math.min(8,r.updatedRecommendations.size());
-            for(int i=0;i<max;i++) {
-                SyncEngine.UpdateInfo x=r.updatedRecommendations.get(i);
-                text.append("\n• ").append(x.recommendation.title).append(" (").append(x.previousId).append(" → ").append(x.recommendation.id).append(")");
-            }
-            if(r.updatedRecommendations.size()>max) text.append("\n…и ещё ").append(r.updatedRecommendations.size()-max);
-        }
+        if(r.downloaded>0) text.append("\n\nPDF скачано: ").append(r.downloaded).append(".");
+        if(r.downloadFailed>0) text.append("\nНе удалось скачать PDF: ").append(r.downloadFailed).append(".");
         new AlertDialog.Builder(this)
-                .setTitle(r.added+r.updated>0?"Обнаружены изменения КР":"Результат проверки")
+                .setTitle("Результат проверки")
                 .setMessage(text.toString())
                 .setPositiveButton("ОК",null)
                 .show();
@@ -636,20 +643,24 @@ public class MainActivity extends Activity {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},44);
     }
 
-    @Override protected void onResume() {
-        super.onResume();
-        recentHandler.removeCallbacks(recentRefresh);
-        if(db!=null && recentList!=null) renderRecent();
-        recentHandler.postDelayed(recentRefresh,60_000L);
+    @Override protected void onStart() {
+        super.onStart();
+        IntentFilter filter=new IntentFilter("ru.krmonitor.app.SYNC_COMPLETE");
+        if(Build.VERSION.SDK_INT>=33) registerReceiver(syncReceiver,filter,Context.RECEIVER_NOT_EXPORTED);
+        else registerReceiver(syncReceiver,filter);
     }
 
-    @Override protected void onPause() {
-        recentHandler.removeCallbacks(recentRefresh);
-        super.onPause();
+    @Override protected void onResume() {
+        super.onResume();
+        if(db!=null && recentList!=null) reload();
+    }
+
+    @Override protected void onStop() {
+        try { unregisterReceiver(syncReceiver); } catch(Exception ignored) {}
+        super.onStop();
     }
 
     @Override protected void onDestroy(){
-        recentHandler.removeCallbacks(recentRefresh);
         super.onDestroy();
         executor.shutdownNow();
         if(db!=null) db.close();
