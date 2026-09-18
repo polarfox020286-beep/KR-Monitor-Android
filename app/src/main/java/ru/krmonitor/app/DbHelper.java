@@ -107,14 +107,28 @@ public class DbHelper extends SQLiteOpenHelper {
     }
 
     public List<ChangeEvent> recentChangesWithinHours(int hours,int limit) {
+        String now=new SimpleDateFormat("yyyy-MM-dd HH:mm",Locale.US).format(new Date());
+        return recentChangesWithinHoursAt(now,hours,limit);
+    }
+
+    public List<ChangeEvent> recentChangesWithinHoursAt(String referenceTime,int hours,int limit) {
         ArrayList<ChangeEvent> out=new ArrayList<>();
         String selection=null;
         String[] args=null;
         if(hours!=Integer.MAX_VALUE) {
-            long cutoff=System.currentTimeMillis()-hours*60L*60L*1000L;
-            String cutoffText=new SimpleDateFormat("yyyy-MM-dd HH:mm",Locale.US).format(new Date(cutoff));
-            selection="changed_at>=?";
-            args=new String[]{cutoffText};
+            try {
+                SimpleDateFormat f=new SimpleDateFormat("yyyy-MM-dd HH:mm",Locale.US);
+                Date ref=f.parse(referenceTime);
+                long refMs=ref==null?System.currentTimeMillis():ref.getTime();
+                String cutoffText=f.format(new Date(refMs-hours*60L*60L*1000L));
+                selection="changed_at>=? AND changed_at<=?";
+                args=new String[]{cutoffText,referenceTime};
+            } catch(Exception e) {
+                long cutoff=System.currentTimeMillis()-hours*60L*60L*1000L;
+                String cutoffText=new SimpleDateFormat("yyyy-MM-dd HH:mm",Locale.US).format(new Date(cutoff));
+                selection="changed_at>=?";
+                args=new String[]{cutoffText};
+            }
         }
         try(Cursor c=getReadableDatabase().query("changes",null,selection,args,null,null,"id DESC",Integer.toString(limit))) {
             while(c.moveToNext()) out.add(new ChangeEvent(
