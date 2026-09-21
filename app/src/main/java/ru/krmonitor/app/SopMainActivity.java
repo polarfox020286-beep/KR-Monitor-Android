@@ -5,6 +5,7 @@ import android.app.*;
 import android.content.*;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.database.ContentObserver;
 import android.database.sqlite.*;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -1341,13 +1342,6 @@ class SopScanner {
         Uri children=DocumentsContract.buildChildDocumentsUriUsingTree(tree,parent);
         ContentResolver resolver=c.getContentResolver();
 
-        // Explicitly ask the cloud DocumentsProvider to refresh its cached directory
-        // before reading it.  Re-selecting the folder in DocumentsUI did this
-        // implicitly; now the Update button does it directly.
-        boolean refreshRequested=false;
-        try{refreshRequested|=resolver.refresh(directory,Bundle.EMPTY,null);}catch(Exception ignored){}
-        try{refreshRequested|=resolver.refresh(children,Bundle.EMPTY,null);}catch(Exception ignored){}
-
         String[] projection={
                 DocumentsContract.Document.COLUMN_DOCUMENT_ID,
                 DocumentsContract.Document.COLUMN_DISPLAY_NAME,
@@ -1356,62 +1350,105 @@ class SopScanner {
                 DocumentsContract.Document.COLUMN_SIZE
         };
 
+        CountDownLatch providerChanged=new CountDownLatch(1);
+        ContentObserver observer=new ContentObserver(new Handler(Looper.getMainLooper())){
+            @Override public void onChange(boolean selfChange){
+                providerChanged.countDown();
+            }
+            @Override public void onChange(boolean selfChange,Uri uri){
+                providerChanged.countDown();
+            }
+        };
+
+        try{
+            resolver.registerContentObserver(children,true,observer);
+        }catch(Exception ignored){}
+
         ArrayList<SopDocument> latest=null;
+        boolean lastLoading=false;
 
-        // Cloud providers are allowed to return a cached cursor while network
-        // refresh is still running.  Requery several times and keep the latest
-        // result, so additions and deletions made in the browser are visible
-        // without choosing the folder again.
-        for(int attempt=0;attempt<4;attempt++){
-            if(attempt>0){
-                try{Thread.sleep(attempt==1?500L:attempt==2?900L:1500L);}catch(InterruptedException e){
-                    Thread.currentThread().interrupt();
-                    throw e;
+        try{
+            // Each pass obtains a brand-new provider client.  This is important for
+            // Google Drive: a long-lived SAF provider connection may keep returning
+            // the directory snapshot that existed when the app session was opened.
+            // Releasing and reacquiring the provider mirrors what happens after
+            // leaving and reopening the app.
+            for(int attempt=0;attempt<5;attempt++){
+                if(attempt>0){
+                    long waitMs=attempt==1?1200L:attempt==2?1800L:attempt==3?2500L:3200L;
+                    try{
+                        if(attempt==1)providerChanged.await(waitMs,TimeUnit.MILLISECONDS);
+                        else Thread.sleep(waitMs);
+                    }catch(InterruptedException e){
+                        Thread.currentThread().interrupt();
+                        throw e;
+                    }
                 }
-            }
 
-            ArrayList<SopDocument> current=new ArrayList<>();
-            boolean loading=false;
-            try(Cursor cur=resolver.query(children,projection,Bundle.EMPTY,null)){
-                if(cur==null)throw new IllegalStateException("Google Drive не вернул список документов.");
-                Bundle extras=cur.getExtras();
-                loading=extras!=null&&extras.getBoolean(DocumentsContract.EXTRA_LOADING,false);
+                ContentProviderClient client=null;
+                Cursor cur=null;
+                ArrayList<SopDocument> current=new ArrayList<>();
+                boolean loading=false;
+                try{
+                    client=resolver.acquireUnstableContentProviderClient(tree.getAuthority());
+                    if(client==null)throw new IllegalStateException("Не удалось подключиться к Google Drive.");
 
-                int iId=cur.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID);
-                int iName=cur.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME);
-                int iMime=cur.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE);
-                int iMod=cur.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED);
-                int iSize=cur.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE);
+                    // User-initiated refresh: explicitly ask the provider to discard /
+                    // update stale cloud content before every fresh query.
+                    try{client.refresh(directory,Bundle.EMPTY,null);}catch(Exception ignored){}
+                    try{client.refresh(children,Bundle.EMPTY,null);}catch(Exception ignored){}
 
-                while(cur.moveToNext()){
-                    String id=iId>=0?cur.getString(iId):null;
-                    String name=iName>=0?cur.getString(iName):null;
-                    String mime=iMime>=0?cur.getString(iMime):null;
-                    if(id==null||name==null||DocumentsContract.Document.MIME_TYPE_DIR.equals(mime))continue;
-                    String low=name.toLowerCase(Locale.ROOT);
-                    if(!(low.endsWith(".pdf")||low.endsWith(".doc")||low.endsWith(".docx")||
-                            "application/pdf".equals(mime)||"application/msword".equals(mime)||
-                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document".equals(mime)))continue;
-                    long mod=iMod>=0&&!cur.isNull(iMod)?cur.getLong(iMod):0L;
-                    long size=iSize>=0&&!cur.isNull(iSize)?cur.getLong(iSize):0L;
-                    Uri doc=DocumentsContract.buildDocumentUriUsingTree(tree,id);
-                    String title=SopClassifier.realTitle(name);
-                    String type=SopClassifier.type(name,title);
-                    String category=SopClassifier.category(name,title);
-                    String keywords=SopClassifier.keywords(title,category,type);
-                    current.add(new SopDocument(id,name,title,category,type,keywords,doc.toString(),mime,mod,size));
+                    cur=client.query(children,projection,Bundle.EMPTY,null);
+                    if(cur==null)throw new IllegalStateException("Google Drive не вернул список документов.");
+
+                    Bundle extras=cur.getExtras();
+                    loading=extras!=null&&extras.getBoolean(DocumentsContract.EXTRA_LOADING,false);
+
+                    int iId=cur.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID);
+                    int iName=cur.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME);
+                    int iMime=cur.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE);
+                    int iMod=cur.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED);
+                    int iSize=cur.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE);
+
+                    while(cur.moveToNext()){
+                        String id=iId>=0?cur.getString(iId):null;
+                        String name=iName>=0?cur.getString(iName):null;
+                        String mime=iMime>=0?cur.getString(iMime):null;
+                        if(id==null||name==null||DocumentsContract.Document.MIME_TYPE_DIR.equals(mime))continue;
+
+                        String low=name.toLowerCase(Locale.ROOT);
+                        if(!(low.endsWith(".pdf")||low.endsWith(".doc")||low.endsWith(".docx")||
+                                "application/pdf".equals(mime)||"application/msword".equals(mime)||
+                                "application/vnd.openxmlformats-officedocument.wordprocessingml.document".equals(mime)))continue;
+
+                        long mod=iMod>=0&&!cur.isNull(iMod)?cur.getLong(iMod):0L;
+                        long size=iSize>=0&&!cur.isNull(iSize)?cur.getLong(iSize):0L;
+                        Uri doc=DocumentsContract.buildDocumentUriUsingTree(tree,id);
+                        String title=SopClassifier.realTitle(name);
+                        String type=SopClassifier.type(name,title);
+                        String category=SopClassifier.category(name,title);
+                        String keywords=SopClassifier.keywords(title,category,type);
+                        current.add(new SopDocument(id,name,title,category,type,keywords,doc.toString(),mime,mod,size));
+                    }
+                }finally{
+                    if(cur!=null)try{cur.close();}catch(Exception ignored){}
+                    if(client!=null)try{client.close();}catch(Exception ignored){}
                 }
+
+                latest=current;
+                lastLoading=loading;
+
+                // If the cloud provider says its network load is complete, still do
+                // at least three independent sessions before accepting the result.
+                // This avoids the stale first snapshot that Google Drive can return
+                // while the app remains open.
+                if(!loading&&attempt>=2)break;
             }
-
-            latest=current;
-
-            // If the provider explicitly says it is still loading, keep waiting.
-            // Even when it does not expose EXTRA_LOADING, a refresh request gets
-            // several requeries to work around stale Google Drive directory cache.
-            if(!refreshRequested&&!loading)break;
-            if(!loading&&attempt>=2)break;
+        }finally{
+            try{resolver.unregisterContentObserver(observer);}catch(Exception ignored){}
         }
 
+        if(lastLoading)throw new IllegalStateException("Google Drive ещё обновляет содержимое папки. Повторите проверку через несколько секунд.");
         if(latest==null)latest=new ArrayList<>();
         latest.sort(Comparator.comparing(d->d.title.toLowerCase(Locale.ROOT)));
         return latest;
