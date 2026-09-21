@@ -19,6 +19,7 @@ import android.view.animation.Animation;
 import android.view.animation.TranslateAnimation;
 import android.widget.*;
 
+import java.io.*;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -413,19 +414,86 @@ public class SopMainActivity extends Activity {
 
     private void openDocument(SopDocument d){
         db.markViewed(d.key);
-        try{
-            Uri uri=Uri.parse(d.uri);
-            Intent i=new Intent(Intent.ACTION_VIEW);
-            i.setDataAndType(uri,d.mime==null||d.mime.isEmpty()?"application/pdf":d.mime);
-            i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            startActivity(i);
-        }catch(Exception e){
+        Toast.makeText(this,"Загрузка документа…",Toast.LENGTH_SHORT).show();
+        executor.submit(() -> {
             try{
-                Intent i=new Intent(Intent.ACTION_VIEW,Uri.parse(d.uri)); i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION); startActivity(i);
-            }catch(Exception x){
-                Toast.makeText(this,"Не удалось открыть документ. Проверьте доступ к Google Drive.",Toast.LENGTH_LONG).show();
+                File local=downloadToCache(d);
+                Uri localUri=Uri.parse("content://ru.sopnavigator.app.files/"+Uri.encode(local.getName()));
+                String mime=d.mime==null||d.mime.trim().isEmpty()?mimeForFile(d.fileName):d.mime;
+                runOnUiThread(() -> {
+                    try{
+                        Intent i=new Intent(Intent.ACTION_VIEW);
+                        i.setDataAndType(localUri,mime);
+                        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        startActivity(i);
+                    }catch(Exception e){
+                        try{
+                            Intent i=new Intent(Intent.ACTION_VIEW);
+                            i.setDataAndType(localUri,"*/*");
+                            i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                            startActivity(i);
+                        }catch(Exception x){
+                            Toast.makeText(this,"Документ скачан, но на устройстве нет приложения для его открытия.",Toast.LENGTH_LONG).show();
+                        }
+                    }
+                });
+            }catch(Exception e){
+                String m=e.getMessage()==null?e.getClass().getSimpleName():e.getMessage();
+                runOnUiThread(() -> Toast.makeText(this,"Не удалось скачать документ из Google Drive. "+m,Toast.LENGTH_LONG).show());
+            }
+        });
+    }
+
+    private File downloadToCache(SopDocument d) throws Exception{
+        File dir=new File(getFilesDir(),"sop_cache");
+        if(!dir.exists()&&!dir.mkdirs())throw new IOException("Не удалось создать локальное хранилище.");
+        String safe=safeFileName(d.fileName);
+        File target=new File(dir,safe);
+        Uri src=Uri.parse(d.uri);
+
+        // Reuse an already downloaded copy while its metadata still matches.
+        if(target.isFile()&&target.length()>0&&d.size>0&&target.length()==d.size)return target;
+
+        File tmp=new File(dir,safe+".part");
+        if(tmp.exists())tmp.delete();
+        try(InputStream in=getContentResolver().openInputStream(src)){
+            if(in==null)throw new IOException("Google Drive не предоставил поток файла.");
+            try(OutputStream out=new FileOutputStream(tmp)){
+                byte[] buf=new byte[64*1024];
+                int n;
+                while((n=in.read(buf))!=-1)out.write(buf,0,n);
+                out.flush();
             }
         }
+        if(tmp.length()==0){tmp.delete();throw new IOException("Получен пустой файл.");}
+        if(target.exists()&&!target.delete()){tmp.delete();throw new IOException("Не удалось заменить локальную копию.");}
+        if(!tmp.renameTo(target)){
+            try(InputStream in=new FileInputStream(tmp);OutputStream out=new FileOutputStream(target)){
+                byte[] buf=new byte[64*1024];int n;while((n=in.read(buf))!=-1)out.write(buf,0,n);
+            }
+            tmp.delete();
+        }
+        return target;
+    }
+
+    private String safeFileName(String name){
+        String n=name==null||name.trim().isEmpty()?"document.pdf":name.trim();
+        n=n.replaceAll("[\\\\/:*?\\\"<>|\\p{Cntrl}]","_");
+        if(n.length()>140){
+            int dot=n.lastIndexOf('.');
+            String ext=dot>0?n.substring(dot):"";
+            n=n.substring(0,Math.max(1,140-ext.length()))+ext;
+        }
+        return n;
+    }
+
+    private String mimeForFile(String name){
+        String n=name==null?"":name.toLowerCase(Locale.ROOT);
+        if(n.endsWith(".pdf"))return "application/pdf";
+        if(n.endsWith(".docx"))return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        if(n.endsWith(".doc"))return "application/msword";
+        if(n.endsWith(".rtf"))return "application/rtf";
+        return "application/octet-stream";
     }
 
     private void renderSearch(String query){
