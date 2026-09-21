@@ -1,1 +1,1 @@
-Trigger signed SOP Navigator build with splash screen.
+Trigger signed SOP Navigator build with splash screen. Build 2.
