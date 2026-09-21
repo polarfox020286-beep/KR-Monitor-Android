@@ -1399,6 +1399,21 @@ class SopDbHelper extends SQLiteOpenHelper {
         v.put("last_modified",d.lastModified);v.put("size",d.size);
         getWritableDatabase().insertWithOnConflict("docs",null,v,SQLiteDatabase.CONFLICT_REPLACE);
     }
+    int deleteMissing(Set<String> presentKeys){
+        SQLiteDatabase d=getWritableDatabase();
+        ArrayList<String> missing=new ArrayList<>();
+        try(Cursor c=d.query("docs",new String[]{"doc_key"},null,null,null,null,null)){
+            while(c.moveToNext()){
+                String key=c.getString(0);
+                if(!presentKeys.contains(key))missing.add(key);
+            }
+        }
+        for(String key:missing){
+            d.delete("history","doc_key=?",new String[]{key});
+            d.delete("docs","doc_key=?",new String[]{key});
+        }
+        return missing.size();
+    }
     List<SopDocument> all(){
         ArrayList<SopDocument> out=new ArrayList<>();
         try(Cursor c=getReadableDatabase().query("docs",null,null,null,null,null,"title COLLATE NOCASE")){
@@ -1481,7 +1496,9 @@ class SopSyncEngine {
             int added=0,updated=0;
             ArrayList<SopDocument> changed=new ArrayList<>();
 
+            HashSet<String> presentKeys=new HashSet<>();
             for(SopDocument d:scanned){
+                presentKeys.add(d.key);
                 SopDocument old=db.get(d.key);
                 if(old==null){
                     db.upsert(d);
@@ -1501,6 +1518,11 @@ class SopSyncEngine {
                     }
                 }
             }
+
+            // Mirror deletions from the selected Google Drive folder.
+            // If a document no longer exists in Drive, remove it from the local
+            // catalogue (and history) so counters, search and categories stay exact.
+            int removed=baseline?0:db.deleteMissing(presentKeys);
 
             long now=System.currentTimeMillis();
 
@@ -1531,8 +1553,11 @@ class SopSyncEngine {
             db.close();
 
             if(baseline)return new Result(0,0,scanned.size(),"Папка подключена. В каталог добавлено "+scanned.size()+" документов.");
-            if(added==0&&updated==0)return new Result(0,0,scanned.size(),"Новых или обновлённых документов не найдено.");
-            return new Result(added,updated,scanned.size(),"Проверка завершена. Новых: "+added+", обновлено: "+updated+".");
+            if(added==0&&updated==0&&removed==0)return new Result(0,0,scanned.size(),"Изменений не найдено.");
+            String message="Проверка завершена. Новых: "+added+", обновлено: "+updated;
+            if(removed>0)message+=", удалено: "+removed;
+            message+=".";
+            return new Result(added,updated,scanned.size(),message);
         }catch(Exception e){
             String m=e.getMessage()==null?e.getClass().getSimpleName():e.getMessage();
             return new Result(0,0,0,"Не удалось проверить папку Google Drive.\n"+m);
