@@ -8,6 +8,10 @@ import android.database.Cursor;
 import android.database.sqlite.*;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.RectF;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.*;
@@ -340,12 +344,20 @@ public class SopMainActivity extends Activity {
 
     private void runSync(TextView button){
         if(!hasFolder()){chooseFolder();return;}
-        if(button!=null){button.setEnabled(false);button.setText("Проверка…");}
+        if(button!=null){
+            button.setEnabled(false);
+            button.setText("…");
+            button.setAlpha(0.62f);
+        }
         status.setText("Проверяю папку Google Drive…");
         executor.submit(() -> {
             SopSyncEngine.Result result=SopSyncEngine.sync(getApplicationContext());
             runOnUiThread(() -> {
-                if(button!=null){button.setEnabled(true);button.setText("↻  Проверить");}
+                if(button!=null){
+                    button.setEnabled(true);
+                    button.setText("↻");
+                    button.setAlpha(1f);
+                }
                 Toast.makeText(this,result.message,Toast.LENGTH_LONG).show();
                 reload();
             });
@@ -462,10 +474,9 @@ public class SopMainActivity extends Activity {
         top.setOrientation(LinearLayout.HORIZONTAL);
         top.setGravity(Gravity.CENTER_VERTICAL);
 
-        TextView icon=text(SopClassifier.icon(category),18,BLUE_DARK,true);
-        icon.setGravity(Gravity.CENTER);
+        CategoryIconView icon=new CategoryIconView(category);
         icon.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,13));
-        top.addView(icon,new LinearLayout.LayoutParams(dp(36),dp(36)));
+        top.addView(icon,new LinearLayout.LayoutParams(dp(42),dp(42)));
 
         TextView number=text(count+"",11,BLUE_DARK,true);
         number.setGravity(Gravity.CENTER);
@@ -486,6 +497,253 @@ public class SopMainActivity extends Activity {
 
         card.setOnClickListener(v->{selectedCategory=category;currentPage=PAGE_GROUPS;renderCurrentPage(0);});
         return card;
+    }
+
+    private class CategoryIconView extends View {
+        private final String category;
+        private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Path path=new Path();
+        private final RectF rect=new RectF();
+        private final int red=Color.rgb(208,62,76);
+
+        CategoryIconView(String category){
+            super(SopMainActivity.this);
+            this.category=category==null?"":category;
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            paint.setStrokeJoin(Paint.Join.ROUND);
+        }
+
+        @Override protected void onDraw(Canvas canvas){
+            super.onDraw(canvas);
+            float scale=Math.min(getWidth(),getHeight())/100f;
+            if(scale<=0)return;
+            canvas.save();
+            canvas.translate((getWidth()-100f*scale)/2f,(getHeight()-100f*scale)/2f);
+            canvas.scale(scale,scale);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(5.5f);
+            paint.setColor(BLUE_DARK);
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            paint.setStrokeJoin(Paint.Join.ROUND);
+
+            String k=category.toLowerCase(Locale.ROOT);
+            if(k.contains("переливания крови")) drawBloodShield(canvas);
+            else if(k.contains("преемствен")) drawContinuity(canvas);
+            else if(k.contains("лекарствен")) drawPillShield(canvas);
+            else if(k.contains("эпидемиолог")) drawMicrobeShield(canvas);
+            else if(k.contains("экстренн")) drawEmergency(canvas);
+            else if(k.contains("приемное отделение")) drawAdmission(canvas);
+            else if(k.contains("доказательн")) drawEvidence(canvas);
+            else if(k.contains("хирургическ")) drawScalpelShield(canvas);
+            else if(k.contains("идентификац")) drawIdentity(canvas);
+            else if(k.contains("паден")) drawFall(canvas);
+            else if(k.contains("лаборатор")) drawTestTube(canvas);
+            else if(k.contains("управление персоналом")) drawPersonnel(canvas);
+            else if(k.contains("управление качеством")) drawQuality(canvas);
+            else if(k.contains("сестринский менеджмент")) drawNurse(canvas);
+            else if(k.contains("инвазивные")) drawSyringe(canvas);
+            else if(k.contains("сестринский уход")) drawCare(canvas);
+            else if(k.contains("оборудование")) drawEquipment(canvas);
+            else drawFolder(canvas);
+            canvas.restore();
+        }
+
+        private void shield(Canvas c,float x,float y,float w,float h){
+            path.reset();
+            path.moveTo(x+w*0.50f,y);
+            path.lineTo(x+w*0.90f,y+h*0.16f);
+            path.lineTo(x+w*0.84f,y+h*0.63f);
+            path.quadTo(x+w*0.72f,y+h*0.88f,x+w*0.50f,y+h);
+            path.quadTo(x+w*0.28f,y+h*0.88f,x+w*0.16f,y+h*0.63f);
+            path.lineTo(x+w*0.10f,y+h*0.16f);
+            path.close();
+            c.drawPath(path,paint);
+        }
+
+        private void check(Canvas c,float x,float y,float s){
+            path.reset();
+            path.moveTo(x,y+s*0.48f);
+            path.lineTo(x+s*0.34f,y+s*0.82f);
+            path.lineTo(x+s,y);
+            c.drawPath(path,paint);
+        }
+
+        private void cross(Canvas c,float cx,float cy,float s){
+            float old=paint.getStrokeWidth();
+            paint.setStrokeWidth(6.5f);
+            c.drawLine(cx-s,cy,cx+s,cy,paint);
+            c.drawLine(cx,cy-s,cx,cy+s,paint);
+            paint.setStrokeWidth(old);
+        }
+
+        private void drawBloodShield(Canvas c){
+            paint.setColor(red);
+            path.reset();
+            path.moveTo(28,18);
+            path.cubicTo(22,31,14,39,14,52);
+            path.cubicTo(14,66,24,75,36,75);
+            path.cubicTo(48,75,57,66,57,53);
+            path.cubicTo(57,40,46,30,28,18);
+            path.close();
+            c.drawPath(path,paint);
+            paint.setColor(BLUE_DARK);
+            shield(c,54,25,34,50);
+            check(c,63,45,16);
+        }
+
+        private void drawContinuity(Canvas c){
+            paint.setStrokeWidth(6f);
+            c.drawLine(18,36,72,36,paint);
+            path.reset(); path.moveTo(72,36);path.lineTo(62,27);path.moveTo(72,36);path.lineTo(62,45);c.drawPath(path,paint);
+            c.drawLine(82,64,28,64,paint);
+            path.reset(); path.moveTo(28,64);path.lineTo(38,55);path.moveTo(28,64);path.lineTo(38,73);c.drawPath(path,paint);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(CYAN); c.drawCircle(18,36,5,paint); c.drawCircle(82,64,5,paint);
+            paint.setStyle(Paint.Style.STROKE);paint.setColor(BLUE_DARK);
+        }
+
+        private void drawPillShield(Canvas c){
+            canvasCapsule(c,12,30,48,30,-28f);
+            shield(c,55,23,34,52);
+            check(c,64,44,15);
+        }
+
+        private void canvasCapsule(Canvas c,float x,float y,float w,float h,float angle){
+            c.save();
+            c.rotate(angle,x+w/2f,y+h/2f);
+            rect.set(x,y,x+w,y+h);
+            c.drawRoundRect(rect,h/2f,h/2f,paint);
+            c.drawLine(x+w/2f,y+2,x+w/2f,y+h-2,paint);
+            c.restore();
+        }
+
+        private void drawMicrobeShield(Canvas c){
+            shield(c,44,18,46,64);
+            paint.setColor(red);
+            c.drawCircle(36,50,13,paint);
+            for(int i=0;i<8;i++){
+                double a=Math.PI*2*i/8.0;
+                float x1=(float)(36+13*Math.cos(a)),y1=(float)(50+13*Math.sin(a));
+                float x2=(float)(36+19*Math.cos(a)),y2=(float)(50+19*Math.sin(a));
+                c.drawLine(x1,y1,x2,y2,paint);
+            }
+            c.drawCircle(31,46,2.5f,paint);c.drawCircle(41,54,2.5f,paint);
+            paint.setStrokeWidth(7f);
+            c.drawLine(20,72,51,28,paint);
+            paint.setStrokeWidth(5.5f);
+            paint.setColor(BLUE_DARK);
+        }
+
+        private void drawEmergency(Canvas c){
+            paint.setColor(CYAN);
+            path.reset();
+            path.moveTo(34,13);path.lineTo(17,53);path.lineTo(34,53);path.lineTo(25,86);path.lineTo(58,43);path.lineTo(40,43);path.close();
+            c.drawPath(path,paint);
+            paint.setColor(BLUE_DARK);
+            cross(c,72,53,14);
+        }
+
+        private void drawAdmission(Canvas c){
+            rect.set(17,20,60,82);c.drawRoundRect(rect,3,3,paint);
+            c.drawCircle(52,53,2.5f,paint);
+            cross(c,77,48,11);
+            c.drawLine(62,75,88,75,paint);
+        }
+
+        private void drawEvidence(Canvas c){
+            path.reset();
+            path.moveTo(14,24);path.quadTo(31,18,45,28);path.lineTo(45,78);path.quadTo(30,68,14,74);path.close();c.drawPath(path,paint);
+            path.reset();
+            path.moveTo(86,24);path.quadTo(69,18,55,28);path.lineTo(55,78);path.quadTo(70,68,86,74);path.close();c.drawPath(path,paint);
+            paint.setColor(SUCCESS);
+            check(c,60,45,20);
+            paint.setColor(BLUE_DARK);
+        }
+
+        private void drawScalpelShield(Canvas c){
+            c.save();c.rotate(-33,34,52);
+            rect.set(10,46,50,58);c.drawRoundRect(rect,5,5,paint);
+            path.reset();path.moveTo(50,46);path.lineTo(68,52);path.lineTo(50,58);path.close();c.drawPath(path,paint);
+            c.restore();
+            shield(c,54,22,35,55);
+            check(c,63,44,15);
+        }
+
+        private void drawIdentity(Canvas c){
+            rect.set(14,20,70,80);c.drawRoundRect(rect,8,8,paint);
+            c.drawLine(30,20,30,13,paint);c.drawLine(54,20,54,13,paint);
+            c.drawCircle(34,43,9,paint);
+            path.reset();path.moveTo(20,67);path.quadTo(34,55,48,67);c.drawPath(path,paint);
+            paint.setColor(SUCCESS);check(c,59,52,22);paint.setColor(BLUE_DARK);
+        }
+
+        private void drawFall(Canvas c){
+            paint.setColor(WARN);
+            path.reset();path.moveTo(70,17);path.lineTo(92,78);path.lineTo(48,78);path.close();c.drawPath(path,paint);
+            c.drawLine(70,38,70,58,paint);c.drawCircle(70,68,2.5f,paint);
+            paint.setColor(BLUE_DARK);
+            c.drawCircle(24,31,7,paint);
+            c.drawLine(28,39,42,52,paint);c.drawLine(42,52,31,69,paint);
+            c.drawLine(38,48,52,40,paint);c.drawLine(32,48,17,57,paint);
+            c.drawLine(31,69,18,79,paint);c.drawLine(31,69,46,79,paint);
+        }
+
+        private void drawTestTube(Canvas c){
+            path.reset();
+            path.moveTo(31,17);path.lineTo(69,17);path.moveTo(38,17);path.lineTo(38,63);
+            path.quadTo(38,82,50,84);path.quadTo(62,82,62,63);path.lineTo(62,17);c.drawPath(path,paint);
+            paint.setColor(CYAN);
+            c.drawLine(39,58,61,58,paint);c.drawCircle(46,67,3,paint);c.drawCircle(55,74,2.5f,paint);
+            paint.setColor(BLUE_DARK);
+        }
+
+        private void drawPersonnel(Canvas c){
+            c.drawCircle(36,34,10,paint);c.drawCircle(65,38,8,paint);
+            path.reset();path.moveTo(18,72);path.quadTo(36,52,54,72);c.drawPath(path,paint);
+            path.reset();path.moveTo(51,72);path.quadTo(65,56,81,72);c.drawPath(path,paint);
+        }
+
+        private void drawQuality(Canvas c){
+            rect.set(20,20,72,82);c.drawRoundRect(rect,7,7,paint);
+            rect.set(33,14,59,27);c.drawRoundRect(rect,5,5,paint);
+            c.drawLine(31,42,61,42,paint);c.drawLine(31,54,54,54,paint);
+            paint.setColor(SUCCESS);check(c,54,59,23);paint.setColor(BLUE_DARK);
+        }
+
+        private void drawNurse(Canvas c){
+            c.drawCircle(50,45,16,paint);
+            path.reset();path.moveTo(27,78);path.quadTo(50,61,73,78);c.drawPath(path,paint);
+            path.reset();path.moveTo(36,29);path.lineTo(40,18);path.lineTo(60,18);path.lineTo(64,29);c.drawPath(path,paint);
+            cross(c,50,24,5);
+        }
+
+        private void drawSyringe(Canvas c){
+            c.save();c.rotate(-35,50,50);
+            rect.set(27,39,69,58);c.drawRect(rect,paint);
+            c.drawLine(35,39,35,58,paint);c.drawLine(69,48,88,48,paint);
+            c.drawLine(88,48,94,48,paint);c.drawLine(20,48,27,48,paint);
+            c.drawLine(18,37,18,59,paint);c.drawLine(18,48,27,48,paint);
+            c.restore();
+        }
+
+        private void drawCare(Canvas c){
+            paint.setColor(red);
+            path.reset();path.moveTo(50,62);path.cubicTo(25,47,25,27,39,27);path.cubicTo(47,27,50,34,50,34);path.cubicTo(50,34,53,27,61,27);path.cubicTo(75,27,75,47,50,62);c.drawPath(path,paint);
+            paint.setColor(BLUE_DARK);
+            path.reset();path.moveTo(18,72);path.quadTo(38,58,50,66);path.quadTo(63,58,82,72);c.drawPath(path,paint);
+        }
+
+        private void drawEquipment(Canvas c){
+            rect.set(14,22,86,68);c.drawRoundRect(rect,7,7,paint);
+            path.reset();path.moveTo(23,49);path.lineTo(34,49);path.lineTo(40,38);path.lineTo(48,59);path.lineTo(56,44);path.lineTo(63,49);path.lineTo(77,49);c.drawPath(path,paint);
+            c.drawLine(42,68,42,79,paint);c.drawLine(58,68,58,79,paint);c.drawLine(34,79,66,79,paint);
+        }
+
+        private void drawFolder(Canvas c){
+            path.reset();
+            path.moveTo(13,31);path.lineTo(41,31);path.lineTo(49,39);path.lineTo(87,39);path.lineTo(87,78);path.lineTo(13,78);path.close();
+            c.drawPath(path,paint);
+        }
     }
 
     private View makeCategoryListPage(String category){
