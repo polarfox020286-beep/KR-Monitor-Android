@@ -20,6 +20,12 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Restore valid legacy resource
+        run: |
+          mkdir -p app/src/main/res/mipmap-xxxhdpi
+          cat .github/icon-parts-valid/01.txt .github/icon-parts-valid/02.txt .github/icon-parts-valid/03.txt .github/icon-parts-valid/04.txt | tr -d '\\n\\r ' | base64 -d > app/src/main/res/mipmap-xxxhdpi/kr_launcher.png
+          file app/src/main/res/mipmap-xxxhdpi/kr_launcher.png
+
       - name: Build unsigned release APK
         run: |
           export KR_VERSION_CODE=$((10000 + GITHUB_RUN_NUMBER))
