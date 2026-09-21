@@ -8,16 +8,35 @@ jobs:
   tools:
     runs-on: ubuntu-latest
     steps:
-      - name: Collect current Android build tools
+      - uses: actions/checkout@v4
+
+      - name: Collect Android build tools and SOP source
         run: |
+          set -euo pipefail
           BT=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
           test -n "$BT"
-          mkdir -p out
-          cp "$BT/zipalign" out/zipalign
-          cp "$BT/lib/apksigner.jar" out/apksigner.jar
-          chmod +x out/zipalign
-          ls -l out
+          mkdir -p out/sdk/lib out/source
+
+          cp "$BT/aapt2" out/sdk/aapt2
+          cp "$BT/d8" out/sdk/d8
+          cp "$BT/zipalign" out/sdk/zipalign
+          cp "$BT/lib/apksigner.jar" out/sdk/lib/apksigner.jar
+          if [ -f "$BT/lib/d8.jar" ]; then
+            cp "$BT/lib/d8.jar" out/sdk/lib/d8.jar
+          elif [ -f "$BT/lib/r8.jar" ]; then
+            cp "$BT/lib/r8.jar" out/sdk/lib/d8.jar
+          else
+            echo "No d8/r8 jar found"; exit 1
+          fi
+          cp "$ANDROID_HOME/platforms/android-35/android.jar" out/sdk/android.jar
+
+          cp -R app/src/main out/source/main
+          cp app/build.gradle out/source/app-build.gradle
+
+          chmod +x out/sdk/aapt2 out/sdk/d8 out/sdk/zipalign
+          find out -maxdepth 4 -type f -printf '%p %s bytes\n' | sort
+
       - uses: actions/upload-artifact@v4
         with:
-          name: Android-signing-tools
+          name: Android-SOP-build-kit
           path: out
