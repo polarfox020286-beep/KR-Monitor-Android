@@ -39,6 +39,8 @@ public class SopMainActivity extends Activity {
     private TextView status,source,recentList;
     private EditText search;
     private FrameLayout contentHost;
+    private LinearLayout bottomNav;
+    private TextView navAll,navGroups,navHistory;
     private List<SopDocument> all=new ArrayList<>();
 
     private static final int PAGE_ALL=0;
@@ -49,16 +51,20 @@ public class SopMainActivity extends Activity {
     private float swipeX,swipeY;
     private boolean swipeTracking=false;
 
-    private static final int BG=Color.rgb(247,249,252);
+    private static final int BG=Color.rgb(244,249,252);
     private static final int CARD=Color.WHITE;
-    private static final int BLUE=Color.rgb(37,99,199);
-    private static final int BLUE_DARK=Color.rgb(25,70,145);
-    private static final int BLUE_SOFT=Color.rgb(235,243,255);
-    private static final int TEXT=Color.rgb(29,38,52);
-    private static final int MUTED=Color.rgb(104,115,132);
-    private static final int LINE=Color.rgb(228,233,240);
-    private static final int WARN=Color.rgb(180,92,20);
-    private static final int WARN_BG=Color.rgb(255,246,233);
+    private static final int BLUE=Color.rgb(21,132,224);
+    private static final int BLUE_DARK=Color.rgb(10,71,146);
+    private static final int CYAN=Color.rgb(48,198,231);
+    private static final int BLUE_SOFT=Color.rgb(232,246,252);
+    private static final int BLUE_PALE=Color.rgb(241,250,253);
+    private static final int TEXT=Color.rgb(22,49,73);
+    private static final int MUTED=Color.rgb(101,121,139);
+    private static final int LINE=Color.rgb(218,232,240);
+    private static final int WARN=Color.rgb(178,103,24);
+    private static final int WARN_BG=Color.rgb(255,247,234);
+    private static final int SUCCESS=Color.rgb(26,140,112);
+    private static final int SUCCESS_BG=Color.rgb(235,249,245);
 
     @Override protected void onCreate(Bundle b){
         super.onCreate(b);
@@ -102,6 +108,13 @@ public class SopMainActivity extends Activity {
         return d;
     }
 
+    private GradientDrawable gradient(int left,int right,int radius){
+        GradientDrawable d=new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,new int[]{left,right});
+        d.setCornerRadius(dp(radius));
+        return d;
+    }
+
+
     private TextView text(String value,float size,int color,boolean bold){
         TextView t=new TextView(this);
         t.setText(value); t.setTextSize(size); t.setTextColor(color);
@@ -112,68 +125,139 @@ public class SopMainActivity extends Activity {
     private void buildUi(){
         LinearLayout root=new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(16),dp(14),dp(16),dp(10));
+        root.setPadding(dp(14),dp(12),dp(14),dp(8));
         root.setBackgroundColor(BG);
+
+        LinearLayout hero=new LinearLayout(this);
+        hero.setOrientation(LinearLayout.VERTICAL);
+        hero.setPadding(dp(14),dp(13),dp(14),dp(12));
+        hero.setBackground(gradient(Color.rgb(239,251,255),Color.rgb(225,243,252),20));
+        if(Build.VERSION.SDK_INT>=21)hero.setElevation(dp(1));
 
         LinearLayout header=new LinearLayout(this);
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
 
+        TextView mark=text("➤",20,Color.WHITE,true);
+        mark.setGravity(Gravity.CENTER);
+        mark.setBackground(rounded(BLUE,Color.TRANSPARENT,14));
+        LinearLayout.LayoutParams markLp=new LinearLayout.LayoutParams(dp(44),dp(44));
+        markLp.setMargins(0,0,dp(11),0);
+        header.addView(mark,markLp);
+
         LinearLayout heading=new LinearLayout(this);
         heading.setOrientation(LinearLayout.VERTICAL);
-        TextView title=text("СОП Навигатор",23,TEXT,true);
-        TextView subtitle=text("Автоматическая проверка новых и обновлённых документов в 07:00",12,MUTED,false);
+        TextView title=text("СОП Навигатор",24,BLUE_DARK,true);
+        title.setLetterSpacing(0.01f);
+        TextView subtitle=text("Елизаветинская больница · локальные документы",11.5f,MUTED,false);
         subtitle.setPadding(0,dp(2),0,0);
-        heading.addView(title); heading.addView(subtitle);
+        heading.addView(title);
+        heading.addView(subtitle);
         header.addView(heading,new LinearLayout.LayoutParams(0,-2,1));
 
-        TextView sync=text("↻  Проверить",13,BLUE,true);
+        TextView sync=text("↻",23,BLUE_DARK,true);
         sync.setGravity(Gravity.CENTER);
-        sync.setPadding(dp(12),dp(9),dp(12),dp(9));
-        sync.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,14));
+        sync.setContentDescription("Проверить обновления");
+        sync.setBackground(rounded(Color.WHITE,LINE,15));
         sync.setClickable(true); sync.setFocusable(true);
-        header.addView(sync);
-        root.addView(header);
+        header.addView(sync,new LinearLayout.LayoutParams(dp(44),dp(44)));
+        hero.addView(header);
 
-        status=text("",12,MUTED,false);
-        status.setPadding(0,dp(9),0,dp(3));
-        root.addView(status);
+        status=text("",11.5f,MUTED,false);
+        status.setLineSpacing(dp(1),1f);
+        status.setPadding(dp(2),dp(10),dp(2),dp(4));
+        hero.addView(status);
 
-        source=text("",12,BLUE,true);
+        source=text("",11.5f,BLUE_DARK,true);
         source.setPadding(dp(10),dp(7),dp(10),dp(7));
         source.setGravity(Gravity.CENTER_VERTICAL);
         source.setClickable(true); source.setFocusable(true);
         LinearLayout.LayoutParams sourceLp=new LinearLayout.LayoutParams(-1,-2);
-        sourceLp.setMargins(0,0,0,dp(9));
-        root.addView(source,sourceLp);
+        sourceLp.setMargins(0,dp(4),0,0);
+        hero.addView(source,sourceLp);
+
+        LinearLayout.LayoutParams heroLp=new LinearLayout.LayoutParams(-1,-2);
+        heroLp.setMargins(0,0,0,dp(10));
+        root.addView(hero,heroLp);
+
+        LinearLayout updates=new LinearLayout(this);
+        updates.setOrientation(LinearLayout.HORIZONTAL);
+        updates.setBackground(rounded(CARD,LINE,18));
+        if(Build.VERSION.SDK_INT>=21)updates.setElevation(dp(1));
+
+        View accent=new View(this);
+        accent.setBackground(rounded(CYAN,Color.TRANSPARENT,3));
+        LinearLayout.LayoutParams accentLp=new LinearLayout.LayoutParams(dp(4),-1);
+        accentLp.setMargins(dp(7),dp(8),dp(9),dp(8));
+        updates.addView(accent,accentLp);
+
+        LinearLayout updateBody=new LinearLayout(this);
+        updateBody.setOrientation(LinearLayout.VERTICAL);
+        updateBody.setPadding(0,dp(10),dp(12),dp(10));
 
         LinearLayout recentHeader=new LinearLayout(this);
         recentHeader.setOrientation(LinearLayout.HORIZONTAL);
         recentHeader.setGravity(Gravity.CENTER_VERTICAL);
-        recentHeader.addView(text("Изменения",15,TEXT,true),new LinearLayout.LayoutParams(0,-2,1));
-        recentHeader.addView(text("последние 48 ч",11,MUTED,false));
-        root.addView(recentHeader);
+        recentHeader.addView(text("Обновления",15.5f,TEXT,true),new LinearLayout.LayoutParams(0,-2,1));
+        TextView badge=text("48 часов",10.5f,BLUE_DARK,true);
+        badge.setGravity(Gravity.CENTER);
+        badge.setPadding(dp(9),dp(4),dp(9),dp(4));
+        badge.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,12));
+        recentHeader.addView(badge);
+        updateBody.addView(recentHeader);
 
-        recentList=text("",13,TEXT,false);
-        recentList.setLineSpacing(dp(2),1f);
-        recentList.setPadding(dp(11),dp(9),dp(11),dp(9));
-        recentList.setBackground(rounded(CARD,LINE,14));
-        LinearLayout.LayoutParams recentLp=new LinearLayout.LayoutParams(-1,-2);
-        recentLp.setMargins(0,dp(5),0,dp(10));
-        root.addView(recentList,recentLp);
+        recentList=text("",12.5f,TEXT,false);
+        recentList.setLineSpacing(dp(2),1.04f);
+        recentList.setPadding(0,dp(7),0,0);
+        updateBody.addView(recentList);
+        updates.addView(updateBody,new LinearLayout.LayoutParams(0,-2,1));
+
+        LinearLayout.LayoutParams updatesLp=new LinearLayout.LayoutParams(-1,-2);
+        updatesLp.setMargins(0,0,0,dp(10));
+        root.addView(updates,updatesLp);
+
+        LinearLayout searchBox=new LinearLayout(this);
+        searchBox.setOrientation(LinearLayout.HORIZONTAL);
+        searchBox.setGravity(Gravity.CENTER_VERTICAL);
+        searchBox.setPadding(dp(12),0,dp(8),0);
+        searchBox.setBackground(rounded(CARD,LINE,17));
+        if(Build.VERSION.SDK_INT>=21)searchBox.setElevation(dp(1));
+
+        TextView searchIcon=text("⌕",22,BLUE,false);
+        searchIcon.setGravity(Gravity.CENTER);
+        searchBox.addView(searchIcon,new LinearLayout.LayoutParams(dp(31),dp(48)));
 
         search=new EditText(this);
-        search.setHint("Название, раздел СМК или ключевое слово");
-        search.setHintTextColor(Color.rgb(145,153,165));
-        search.setTextColor(TEXT); search.setTextSize(15); search.setSingleLine(true);
-        search.setPadding(dp(14),0,dp(14),0);
-        search.setBackground(rounded(CARD,LINE,15));
-        root.addView(search,new LinearLayout.LayoutParams(-1,dp(48)));
+        search.setHint("Поиск по названию, разделу или ключевому слову");
+        search.setHintTextColor(Color.rgb(139,156,169));
+        search.setTextColor(TEXT);
+        search.setTextSize(14.5f);
+        search.setSingleLine(true);
+        search.setPadding(dp(4),0,dp(6),0);
+        search.setBackgroundColor(Color.TRANSPARENT);
+        searchBox.addView(search,new LinearLayout.LayoutParams(0,dp(48),1));
+        root.addView(searchBox,new LinearLayout.LayoutParams(-1,dp(50)));
 
         contentHost=new FrameLayout(this);
         LinearLayout.LayoutParams contentLp=new LinearLayout.LayoutParams(-1,0,1);
-        contentLp.setMargins(0,dp(6),0,0);
+        contentLp.setMargins(0,dp(8),0,dp(7));
         root.addView(contentHost,contentLp);
+
+        bottomNav=new LinearLayout(this);
+        bottomNav.setOrientation(LinearLayout.HORIZONTAL);
+        bottomNav.setGravity(Gravity.CENTER);
+        bottomNav.setPadding(dp(4),dp(4),dp(4),dp(4));
+        bottomNav.setBackground(rounded(CARD,LINE,18));
+        if(Build.VERSION.SDK_INT>=21)bottomNav.setElevation(dp(2));
+
+        navAll=navButton("Все");
+        navGroups=navButton("Разделы");
+        navHistory=navButton("История");
+        bottomNav.addView(navAll,new LinearLayout.LayoutParams(0,dp(43),1));
+        bottomNav.addView(navGroups,new LinearLayout.LayoutParams(0,dp(43),1));
+        bottomNav.addView(navHistory,new LinearLayout.LayoutParams(0,dp(43),1));
+        root.addView(bottomNav,new LinearLayout.LayoutParams(-1,dp(51)));
+
         setContentView(root);
 
         sync.setOnClickListener(v -> {
@@ -181,6 +265,11 @@ public class SopMainActivity extends Activity {
             else runSync(sync);
         });
         source.setOnClickListener(v -> chooseFolder());
+
+        navAll.setOnClickListener(v->{selectedCategory=null;currentPage=PAGE_ALL;renderCurrentPage(0);});
+        navGroups.setOnClickListener(v->{selectedCategory=null;currentPage=PAGE_GROUPS;renderCurrentPage(0);});
+        navHistory.setOnClickListener(v->{selectedCategory=null;currentPage=PAGE_HISTORY;renderCurrentPage(0);});
+
         search.addTextChangedListener(new TextWatcher(){
             public void beforeTextChanged(CharSequence s,int st,int c,int a){}
             public void onTextChanged(CharSequence s,int st,int b,int c){
@@ -189,6 +278,29 @@ public class SopMainActivity extends Activity {
             }
             public void afterTextChanged(Editable e){}
         });
+    }
+
+    private TextView navButton(String label){
+        TextView t=text(label,12.5f,MUTED,true);
+        t.setGravity(Gravity.CENTER);
+        t.setClickable(true);t.setFocusable(true);
+        t.setBackground(rounded(Color.TRANSPARENT,Color.TRANSPARENT,14));
+        return t;
+    }
+
+    private void updateBottomNav(){
+        if(navAll==null)return;
+        TextView[] items={navAll,navGroups,navHistory};
+        int[] pages={PAGE_ALL,PAGE_GROUPS,PAGE_HISTORY};
+        for(int i=0;i<items.length;i++){
+            boolean active=currentPage==pages[i] && selectedCategory==null;
+            items[i].setTextColor(active?BLUE_DARK:MUTED);
+            items[i].setBackground(rounded(active?BLUE_SOFT:Color.TRANSPARENT,Color.TRANSPARENT,14));
+        }
+        if(selectedCategory!=null){
+            navGroups.setTextColor(BLUE_DARK);
+            navGroups.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,14));
+        }
     }
 
     private boolean hasFolder(){
@@ -239,14 +351,14 @@ public class SopMainActivity extends Activity {
         long next=p.getLong("next_alarm",SopAlarmScheduler.nextWeekday7());
         String lastText=last==0?"ещё не выполнялась":DateFormat.getDateTimeInstance(DateFormat.MEDIUM,DateFormat.SHORT).format(new Date(last));
         String note=notificationsEnabled()?"":"\n⚠ Уведомления Android отключены";
-        status.setText(all.size()+" документов  •  Последняя проверка: "+lastText+"\nСледующая: "+
+        status.setText(all.size()+" документов  ·  проверено: "+lastText+"\nСледующая автоматическая проверка: "+
                 DateFormat.getDateTimeInstance(DateFormat.MEDIUM,DateFormat.SHORT).format(new Date(next))+note);
         if(hasFolder()){
-            source.setText("Google Drive подключён  ·  нажмите, чтобы изменить папку");
-            source.setTextColor(BLUE);
-            source.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,12));
+            source.setText("●  Google Drive подключён    Изменить папку ›");
+            source.setTextColor(SUCCESS);
+            source.setBackground(rounded(SUCCESS_BG,Color.TRANSPARENT,12));
         }else{
-            source.setText("Подключить папку СОПов на Google Drive");
+            source.setText("＋  Подключить папку СОПов на Google Drive");
             source.setTextColor(WARN);
             source.setBackground(rounded(WARN_BG,Color.TRANSPARENT,12));
         }
@@ -258,8 +370,9 @@ public class SopMainActivity extends Activity {
     private void renderRecent(){
         List<SopDbHelper.ChangeEvent> recent=db.recentChangesWithinHours(48,8);
         if(recent.isEmpty()){
-            recentList.setText("За последние 48 часов новых или обновлённых документов не обнаружено.");
-            recentList.setTextColor(MUTED); return;
+            recentList.setText("✓  Новых или обновлённых документов нет");
+            recentList.setTextColor(SUCCESS);
+            return;
         }
         recentList.setTextColor(TEXT);
         StringBuilder sb=new StringBuilder();
@@ -267,14 +380,15 @@ public class SopMainActivity extends Activity {
         for(int i=0;i<max;i++){
             SopDbHelper.ChangeEvent e=recent.get(i);
             if(i>0)sb.append("\n");
-            sb.append("NEW".equals(e.type)?"НОВЫЙ  ":"ОБНОВЛЁН  ").append(e.title);
+            sb.append("NEW".equals(e.type)?"НОВЫЙ   ":"ОБНОВЛЁН   ").append(e.title);
         }
-        if(recent.size()>max)sb.append("\nЕщё ").append(recent.size()-max).append("…");
+        if(recent.size()>max)sb.append("\n+ ещё ").append(recent.size()-max);
         recentList.setText(sb.toString());
     }
 
     private void renderCurrentPage(int direction){
         if(contentHost==null)return;
+        updateBottomNav();
         if(currentPage==PAGE_ALL)showContent(makeListPage("Все документы",all,true),direction);
         else if(currentPage==PAGE_HISTORY)showContent(makeHistoryPage(),direction);
         else if(selectedCategory!=null)showContent(makeCategoryListPage(selectedCategory),direction);
@@ -282,30 +396,46 @@ public class SopMainActivity extends Activity {
     }
 
     private View makeCategoriesPage(){
-        LinearLayout outer=new LinearLayout(this); outer.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout pageHead=new LinearLayout(this); pageHead.setOrientation(LinearLayout.HORIZONTAL); pageHead.setGravity(Gravity.CENTER_VERTICAL);
-        pageHead.addView(pageTitle("Разделы реестра СМК"),new LinearLayout.LayoutParams(0,-2,1));
-        pageHead.addView(text("← Все     История →",11,MUTED,false));
+        LinearLayout outer=new LinearLayout(this);
+        outer.setOrientation(LinearLayout.VERTICAL);
+
+        LinearLayout pageHead=new LinearLayout(this);
+        pageHead.setOrientation(LinearLayout.HORIZONTAL);
+        pageHead.setGravity(Gravity.CENTER_VERTICAL);
+        pageHead.addView(pageTitle("Разделы"),new LinearLayout.LayoutParams(0,-2,1));
+        TextView total=text(all.size()+" документов",11,MUTED,false);
+        total.setPadding(dp(8),dp(4),dp(8),dp(4));
+        total.setBackground(rounded(BLUE_PALE,Color.TRANSPARENT,11));
+        pageHead.addView(total);
         outer.addView(pageHead);
 
+        TextView intro=text("Выберите направление СМК",11.5f,MUTED,false);
+        intro.setPadding(dp(2),0,0,dp(4));
+        outer.addView(intro);
+
         Map<String,List<SopDocument>> groups=group(all);
-        ScrollView scroll=new ScrollView(this); scroll.setFillViewport(true); scroll.setVerticalScrollBarEnabled(false);
-        LinearLayout rows=new LinearLayout(this); rows.setOrientation(LinearLayout.VERTICAL); rows.setPadding(0,dp(2),0,dp(10));
+        ScrollView scroll=new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setVerticalScrollBarEnabled(false);
+        LinearLayout rows=new LinearLayout(this);
+        rows.setOrientation(LinearLayout.VERTICAL);
+        rows.setPadding(0,dp(1),0,dp(10));
         scroll.addView(rows,new ScrollView.LayoutParams(-1,-2));
 
         ArrayList<String> visible=new ArrayList<>();
-        for(String c:SopClassifier.CATEGORIES){
-            List<SopDocument> docs=groups.get(c);
-            if(docs!=null&&!docs.isEmpty())visible.add(c);
+        for(String category:SopClassifier.CATEGORIES){
+            List<SopDocument> docs=groups.get(category);
+            if(docs!=null&&!docs.isEmpty())visible.add(category);
         }
         for(int i=0;i<visible.size();i+=2){
-            LinearLayout row=new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL);
+            LinearLayout row=new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
             for(int j=0;j<2;j++){
-                LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(126),1);
+                LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(120),1);
                 if(j==0)lp.setMargins(0,dp(4),dp(4),dp(4)); else lp.setMargins(dp(4),dp(4),0,dp(4));
                 if(i+j<visible.size()){
-                    String c=visible.get(i+j);
-                    row.addView(categoryCard(c,groups.get(c).size()),lp);
+                    String category=visible.get(i+j);
+                    row.addView(categoryCard(category,groups.get(category).size()),lp);
                 }else row.addView(new Space(this),lp);
             }
             rows.addView(row,new LinearLayout.LayoutParams(-1,-2));
@@ -316,29 +446,39 @@ public class SopMainActivity extends Activity {
 
     private View categoryCard(String category,int count){
         LinearLayout card=new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL); card.setGravity(Gravity.CENTER);
-        card.setPadding(dp(9),dp(9),dp(9),dp(8));
-        card.setBackground(rounded(CARD,LINE,16));
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(11),dp(10),dp(11),dp(9));
+        card.setBackground(rounded(CARD,LINE,18));
         if(Build.VERSION.SDK_INT>=21)card.setElevation(dp(1));
         card.setClickable(true); card.setFocusable(true);
 
-        TextView icon=text(SopClassifier.icon(category),24,BLUE_DARK,true);
-        icon.setGravity(Gravity.CENTER);
-        card.addView(icon,new LinearLayout.LayoutParams(-1,dp(38)));
+        LinearLayout top=new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
 
-        TextView name=text(category.replace("-","‑"),12.5f,TEXT,true);
-        name.setGravity(Gravity.CENTER); name.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
-        name.setIncludeFontPadding(false); name.setMaxLines(4); name.setLineSpacing(dp(1),1.0f);
-        if(Build.VERSION.SDK_INT>=23){
-            name.setBreakStrategy(Layout.BREAK_STRATEGY_SIMPLE);
-            name.setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_NONE);
-        }
+        TextView icon=text(SopClassifier.icon(category),18,BLUE_DARK,true);
+        icon.setGravity(Gravity.CENTER);
+        icon.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,13));
+        top.addView(icon,new LinearLayout.LayoutParams(dp(36),dp(36)));
+
+        TextView number=text(count+"",11,BLUE_DARK,true);
+        number.setGravity(Gravity.CENTER);
+        number.setBackground(rounded(Color.rgb(240,249,253),Color.TRANSPARENT,12));
+        LinearLayout.LayoutParams nlp=new LinearLayout.LayoutParams(dp(34),dp(28));
+        nlp.setMargins(dp(7),0,0,0);
+        top.addView(new Space(this),new LinearLayout.LayoutParams(0,1,1));
+        top.addView(number,nlp);
+        card.addView(top);
+
+        TextView name=text(category.replace("-","‑"),12.4f,TEXT,true);
+        name.setGravity(Gravity.LEFT|Gravity.CENTER_VERTICAL);
+        name.setMaxLines(3);
+        name.setEllipsize(TextUtils.TruncateAt.END);
+        name.setLineSpacing(dp(1),1f);
+        name.setPadding(0,dp(7),0,0);
         card.addView(name,new LinearLayout.LayoutParams(-1,0,1));
 
-        TextView number=text(count+" док.",11,MUTED,false);
-        number.setGravity(Gravity.CENTER); number.setPadding(0,dp(4),0,0);
-        card.addView(number);
-        card.setOnClickListener(v->{selectedCategory=category;renderCurrentPage(0);});
+        card.setOnClickListener(v->{selectedCategory=category;currentPage=PAGE_GROUPS;renderCurrentPage(0);});
         return card;
     }
 
@@ -346,15 +486,29 @@ public class SopMainActivity extends Activity {
         List<SopDocument> docs=group(all).get(category);
         if(docs==null)docs=Collections.emptyList();
         LinearLayout outer=new LinearLayout(this); outer.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout head=new LinearLayout(this); head.setOrientation(LinearLayout.HORIZONTAL); head.setGravity(Gravity.CENTER_VERTICAL);
-        TextView back=text("‹  Разделы",13,BLUE,true);
-        back.setPadding(dp(9),dp(7),dp(9),dp(7)); back.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,12)); back.setClickable(true);
+
+        LinearLayout head=new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView back=text("‹",24,BLUE_DARK,true);
+        back.setGravity(Gravity.CENTER);
+        back.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,13));
+        back.setClickable(true);
         back.setOnClickListener(v->{selectedCategory=null;renderCurrentPage(0);});
-        head.addView(back);
-        TextView count=text(docs.size()+" док.",12,MUTED,false);
-        LinearLayout.LayoutParams clp=new LinearLayout.LayoutParams(-2,-2); clp.setMargins(dp(10),0,0,0); head.addView(count,clp);
+        head.addView(back,new LinearLayout.LayoutParams(dp(38),dp(38)));
+
+        LinearLayout titles=new LinearLayout(this);
+        titles.setOrientation(LinearLayout.VERTICAL);
+        TextView name=text(category,16,TEXT,true);
+        name.setMaxLines(2); name.setEllipsize(TextUtils.TruncateAt.END);
+        TextView count=text(docs.size()+" документов",11,MUTED,false);
+        titles.addView(name);titles.addView(count);
+        LinearLayout.LayoutParams tlp=new LinearLayout.LayoutParams(0,-2,1);
+        tlp.setMargins(dp(10),0,0,0);
+        head.addView(titles,tlp);
         outer.addView(head);
-        TextView name=pageTitle(category); name.setPadding(dp(2),dp(8),dp(2),dp(5)); outer.addView(name);
+
         addDocumentList(outer,docs);
         return outer;
     }
@@ -363,15 +517,18 @@ public class SopMainActivity extends Activity {
         LinearLayout outer=new LinearLayout(this); outer.setOrientation(LinearLayout.VERTICAL);
         LinearLayout head=new LinearLayout(this); head.setOrientation(LinearLayout.HORIZONTAL); head.setGravity(Gravity.CENTER_VERTICAL);
         head.addView(pageTitle("История"),new LinearLayout.LayoutParams(0,-2,1));
-        TextView hint=text("← Разделы",11,MUTED,false); head.addView(hint);
-        outer.addView(head);
 
         List<SopDocument> docs=db.history(100);
         if(!docs.isEmpty()){
-            TextView clear=text("Очистить историю",12,BLUE,true); clear.setGravity(Gravity.RIGHT); clear.setPadding(0,dp(4),0,dp(4)); clear.setClickable(true);
+            TextView clear=text("Очистить",11.5f,BLUE_DARK,true);
+            clear.setGravity(Gravity.CENTER);
+            clear.setPadding(dp(10),dp(6),dp(10),dp(6));
+            clear.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,12));
+            clear.setClickable(true);
             clear.setOnClickListener(v->{db.clearHistory();renderCurrentPage(0);});
-            outer.addView(clear);
+            head.addView(clear);
         }
+        outer.addView(head);
         addDocumentList(outer,docs);
         return outer;
     }
@@ -380,7 +537,10 @@ public class SopMainActivity extends Activity {
         LinearLayout outer=new LinearLayout(this); outer.setOrientation(LinearLayout.VERTICAL);
         LinearLayout head=new LinearLayout(this); head.setOrientation(LinearLayout.HORIZONTAL); head.setGravity(Gravity.CENTER_VERTICAL);
         head.addView(pageTitle(title),new LinearLayout.LayoutParams(0,-2,1));
-        if(allPage)head.addView(text("Разделы →",11,MUTED,false));
+        TextView count=text(docs.size()+"",11,BLUE_DARK,true);
+        count.setGravity(Gravity.CENTER);
+        count.setBackground(rounded(BLUE_PALE,Color.TRANSPARENT,11));
+        head.addView(count,new LinearLayout.LayoutParams(dp(38),dp(28)));
         outer.addView(head);
         addDocumentList(outer,docs);
         return outer;
@@ -389,25 +549,78 @@ public class SopMainActivity extends Activity {
     private void addDocumentList(LinearLayout outer,List<SopDocument> docs){
         if(docs==null||docs.isEmpty()){
             TextView empty=text(hasFolder()?"Документов нет.":"Сначала подключите папку Google Drive.",14,MUTED,false);
-            empty.setGravity(Gravity.CENTER); empty.setPadding(dp(10),dp(50),dp(10),dp(20));
-            outer.addView(empty,new LinearLayout.LayoutParams(-1,0,1)); return;
+            empty.setGravity(Gravity.CENTER);
+            empty.setPadding(dp(10),dp(50),dp(10),dp(20));
+            outer.addView(empty,new LinearLayout.LayoutParams(-1,0,1));
+            return;
         }
-        ScrollView scroll=new ScrollView(this); scroll.setFillViewport(true); scroll.setVerticalScrollBarEnabled(false);
-        LinearLayout list=new LinearLayout(this); list.setOrientation(LinearLayout.VERTICAL); list.setPadding(0,dp(2),0,dp(10));
+        ScrollView scroll=new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setVerticalScrollBarEnabled(false);
+        LinearLayout list=new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        list.setPadding(0,dp(2),0,dp(10));
         for(SopDocument d:docs)list.addView(documentCard(d));
         scroll.addView(list,new ScrollView.LayoutParams(-1,-2));
         outer.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
     }
 
     private View documentCard(SopDocument d){
-        LinearLayout card=new LinearLayout(this); card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(12),dp(10),dp(12),dp(10)); card.setBackground(rounded(CARD,LINE,14)); card.setClickable(true);
-        TextView title=text(d.title,14,TEXT,true); title.setLineSpacing(dp(1),1.05f); card.addView(title);
-        TextView meta=text(d.type+"  ·  "+d.category,11,MUTED,false); meta.setPadding(0,dp(5),0,0); card.addView(meta);
+        LinearLayout card=new LinearLayout(this);
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(8),dp(10),dp(8),dp(10));
+        card.setBackground(rounded(CARD,LINE,17));
+        card.setClickable(true); card.setFocusable(true);
+        if(Build.VERSION.SDK_INT>=21)card.setElevation(dp(1));
+
+        View accent=new View(this);
+        int accentColor="СОП".equalsIgnoreCase(d.type)?BLUE:CYAN;
+        accent.setBackground(rounded(accentColor,Color.TRANSPARENT,3));
+        LinearLayout.LayoutParams alp=new LinearLayout.LayoutParams(dp(4),-1);
+        alp.setMargins(0,dp(2),dp(10),dp(2));
+        card.addView(accent,alp);
+
+        LinearLayout body=new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+
+        LinearLayout metaRow=new LinearLayout(this);
+        metaRow.setOrientation(LinearLayout.HORIZONTAL);
+        metaRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView type=text(d.type.toUpperCase(Locale.ROOT),10,BLUE_DARK,true);
+        type.setGravity(Gravity.CENTER);
+        type.setPadding(dp(8),dp(3),dp(8),dp(3));
+        type.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,10));
+        metaRow.addView(type);
+
+        TextView category=text(d.category,10.5f,MUTED,false);
+        category.setMaxLines(1); category.setEllipsize(TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams catLp=new LinearLayout.LayoutParams(0,-2,1);
+        catLp.setMargins(dp(8),0,0,0);
+        metaRow.addView(category,catLp);
+        body.addView(metaRow);
+
+        TextView title=text(d.title,14,TEXT,true);
+        title.setLineSpacing(dp(1),1.05f);
+        title.setPadding(0,dp(7),0,0);
+        body.addView(title);
+
         if(!SopClassifier.similarFileName(d.fileName,d.title)){
-            TextView file=text("Файл: "+d.fileName,10,MUTED,false); file.setPadding(0,dp(3),0,0); file.setMaxLines(1); file.setEllipsize(TextUtils.TruncateAt.END); card.addView(file);
+            TextView file=text(d.fileName,9.5f,MUTED,false);
+            file.setPadding(0,dp(4),0,0);
+            file.setMaxLines(1); file.setEllipsize(TextUtils.TruncateAt.END);
+            body.addView(file);
         }
-        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2); lp.setMargins(0,dp(4),0,dp(4)); card.setLayoutParams(lp);
+        card.addView(body,new LinearLayout.LayoutParams(0,-2,1));
+
+        TextView arrow=text("›",28,Color.rgb(125,151,168),false);
+        arrow.setGravity(Gravity.CENTER);
+        card.addView(arrow,new LinearLayout.LayoutParams(dp(30),-1));
+
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
+        lp.setMargins(0,dp(4),0,dp(4));
+        card.setLayoutParams(lp);
         card.setOnClickListener(v->openDocument(d));
         return card;
     }
@@ -514,7 +727,10 @@ public class SopMainActivity extends Activity {
     }
 
     private TextView pageTitle(String s){
-        TextView t=text(s,18,TEXT,true); t.setPadding(dp(2),dp(5),dp(2),dp(5)); return t;
+        TextView t=text(s,18,TEXT,true);
+        t.setPadding(dp(2),dp(4),dp(2),dp(5));
+        t.setLetterSpacing(0.01f);
+        return t;
     }
 
     private void showContent(View next,int direction){
