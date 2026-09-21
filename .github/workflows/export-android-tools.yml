@@ -1,0 +1,23 @@
+name: Export Android signing tools
+
+on:
+  push:
+    branches: [ sop-navigator-v1 ]
+
+jobs:
+  tools:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Collect current Android build tools
+        run: |
+          BT=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
+          test -n "$BT"
+          mkdir -p out
+          cp "$BT/zipalign" out/zipalign
+          cp "$BT/lib/apksigner.jar" out/apksigner.jar
+          chmod +x out/zipalign
+          ls -l out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Android-signing-tools
+          path: out
