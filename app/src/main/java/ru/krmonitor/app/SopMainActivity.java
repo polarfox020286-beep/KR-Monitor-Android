@@ -188,32 +188,40 @@ public class SopMainActivity extends Activity {
         View accent=new View(this);
         accent.setBackground(rounded(CYAN,Color.TRANSPARENT,3));
         LinearLayout.LayoutParams accentLp=new LinearLayout.LayoutParams(dp(4),-1);
-        accentLp.setMargins(dp(7),dp(8),dp(9),dp(8));
+        accentLp.setMargins(dp(7),dp(7),dp(9),dp(7));
         updates.addView(accent,accentLp);
 
         LinearLayout updateBody=new LinearLayout(this);
         updateBody.setOrientation(LinearLayout.VERTICAL);
-        updateBody.setPadding(0,dp(10),dp(12),dp(10));
+        updateBody.setPadding(0,dp(7),dp(10),dp(7));
 
         LinearLayout recentHeader=new LinearLayout(this);
         recentHeader.setOrientation(LinearLayout.HORIZONTAL);
         recentHeader.setGravity(Gravity.CENTER_VERTICAL);
-        recentHeader.addView(text("Обновления",15.5f,TEXT,true),new LinearLayout.LayoutParams(0,-2,1));
-        TextView badge=text("48 часов",10.5f,BLUE_DARK,true);
+        recentHeader.addView(text("Обновления",14.5f,TEXT,true),new LinearLayout.LayoutParams(0,-2,1));
+        TextView badge=text("48 часов",10,BLUE_DARK,true);
         badge.setGravity(Gravity.CENTER);
-        badge.setPadding(dp(9),dp(4),dp(9),dp(4));
-        badge.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,12));
+        badge.setPadding(dp(8),dp(3),dp(8),dp(3));
+        badge.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,11));
         recentHeader.addView(badge);
-        updateBody.addView(recentHeader);
+        updateBody.addView(recentHeader,new LinearLayout.LayoutParams(-1,dp(28)));
 
-        recentList=text("",12.5f,TEXT,false);
-        recentList.setLineSpacing(dp(2),1.04f);
-        recentList.setPadding(0,dp(7),0,0);
-        updateBody.addView(recentList);
-        updates.addView(updateBody,new LinearLayout.LayoutParams(0,-2,1));
+        ScrollView recentScroll=new ScrollView(this);
+        recentScroll.setFillViewport(true);
+        recentScroll.setVerticalScrollBarEnabled(true);
+        recentScroll.setScrollbarFadingEnabled(true);
+        recentScroll.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
 
-        LinearLayout.LayoutParams updatesLp=new LinearLayout.LayoutParams(-1,-2);
-        updatesLp.setMargins(0,0,0,dp(10));
+        recentList=text("",11.5f,TEXT,false);
+        recentList.setLineSpacing(dp(1),1.02f);
+        recentList.setPadding(0,dp(4),dp(5),dp(3));
+        recentScroll.addView(recentList,new ScrollView.LayoutParams(-1,-2));
+        updateBody.addView(recentScroll,new LinearLayout.LayoutParams(-1,0,1));
+
+        updates.addView(updateBody,new LinearLayout.LayoutParams(0,-1,1));
+
+        LinearLayout.LayoutParams updatesLp=new LinearLayout.LayoutParams(-1,dp(82));
+        updatesLp.setMargins(0,0,0,dp(8));
         root.addView(updates,updatesLp);
 
         LinearLayout searchBox=new LinearLayout(this);
@@ -368,7 +376,7 @@ public class SopMainActivity extends Activity {
     }
 
     private void renderRecent(){
-        List<SopDbHelper.ChangeEvent> recent=db.recentChangesWithinHours(48,8);
+        List<SopDbHelper.ChangeEvent> recent=db.recentChangesWithinHours(48,0);
         if(recent.isEmpty()){
             recentList.setText("✓  Новых или обновлённых документов нет");
             recentList.setTextColor(SUCCESS);
@@ -376,13 +384,11 @@ public class SopMainActivity extends Activity {
         }
         recentList.setTextColor(TEXT);
         StringBuilder sb=new StringBuilder();
-        int max=Math.min(3,recent.size());
-        for(int i=0;i<max;i++){
+        for(int i=0;i<recent.size();i++){
             SopDbHelper.ChangeEvent e=recent.get(i);
-            if(i>0)sb.append("\n");
-            sb.append("NEW".equals(e.type)?"НОВЫЙ   ":"ОБНОВЛЁН   ").append(e.title);
+            if(i>0)sb.append("\n\n");
+            sb.append("NEW".equals(e.type)?"НОВЫЙ  ":"ОБНОВЛЁН  ").append(e.title);
         }
-        if(recent.size()>max)sb.append("\n+ ещё ").append(recent.size()-max);
         recentList.setText(sb.toString());
     }
 
@@ -743,6 +749,97 @@ public class SopMainActivity extends Activity {
         }
     }
 
+    @Override public void onBackPressed(){
+        showExitMenu();
+    }
+
+    private void showExitMenu(){
+        final Dialog dialog=new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+
+        LinearLayout shell=new LinearLayout(this);
+        shell.setOrientation(LinearLayout.VERTICAL);
+        shell.setPadding(dp(18),dp(18),dp(18),dp(16));
+        shell.setBackground(gradient(Color.rgb(242,251,254),Color.rgb(226,244,252),22));
+
+        LinearLayout top=new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView mark=text("➤",20,Color.WHITE,true);
+        mark.setGravity(Gravity.CENTER);
+        mark.setBackground(rounded(BLUE,Color.TRANSPARENT,14));
+        top.addView(mark,new LinearLayout.LayoutParams(dp(44),dp(44)));
+
+        LinearLayout titleBox=new LinearLayout(this);
+        titleBox.setOrientation(LinearLayout.VERTICAL);
+        TextView title=text("СОП Навигатор",20,BLUE_DARK,true);
+        TextView subtitle=text("Завершить работу с приложением?",12,MUTED,false);
+        subtitle.setPadding(0,dp(2),0,0);
+        titleBox.addView(title);
+        titleBox.addView(subtitle);
+        LinearLayout.LayoutParams titleLp=new LinearLayout.LayoutParams(0,-2,1);
+        titleLp.setMargins(dp(11),0,0,0);
+        top.addView(titleBox,titleLp);
+        shell.addView(top);
+
+        TextView message=text("Вы можете продолжить работу или выйти из приложения.",13,TEXT,false);
+        message.setLineSpacing(dp(2),1.03f);
+        message.setPadding(dp(2),dp(16),dp(2),dp(15));
+        shell.addView(message);
+
+        LinearLayout actions=new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        actions.setGravity(Gravity.CENTER);
+
+        TextView exit=text("Выход",14,BLUE_DARK,true);
+        exit.setGravity(Gravity.CENTER);
+        exit.setBackground(rounded(Color.WHITE,LINE,15));
+        exit.setClickable(true); exit.setFocusable(true);
+
+        TextView continueBtn=text("Продолжить",14,Color.WHITE,true);
+        continueBtn.setGravity(Gravity.CENTER);
+        continueBtn.setBackground(gradient(BLUE,CYAN,15));
+        continueBtn.setClickable(true); continueBtn.setFocusable(true);
+
+        LinearLayout.LayoutParams exitLp=new LinearLayout.LayoutParams(0,dp(48),1);
+        exitLp.setMargins(0,0,dp(5),0);
+        LinearLayout.LayoutParams continueLp=new LinearLayout.LayoutParams(0,dp(48),1);
+        continueLp.setMargins(dp(5),0,0,0);
+        actions.addView(exit,exitLp);
+        actions.addView(continueBtn,continueLp);
+        shell.addView(actions);
+
+        exit.setOnClickListener(v -> {
+            dialog.dismiss();
+            finishAffinity();
+        });
+        continueBtn.setOnClickListener(v -> dialog.dismiss());
+
+        dialog.setContentView(shell);
+        dialog.setCanceledOnTouchOutside(false);
+        dialog.setOnCancelListener(d -> {});
+
+        Window w=dialog.getWindow();
+        if(w!=null){
+            w.setBackgroundDrawableResource(android.R.color.transparent);
+            WindowManager.LayoutParams lp=new WindowManager.LayoutParams();
+            lp.copyFrom(w.getAttributes());
+            lp.width=(int)(getResources().getDisplayMetrics().widthPixels*0.88f);
+            lp.height=WindowManager.LayoutParams.WRAP_CONTENT;
+            lp.dimAmount=0.32f;
+            w.setAttributes(lp);
+            w.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        }
+        dialog.show();
+        if(w!=null){
+            WindowManager.LayoutParams lp=w.getAttributes();
+            lp.width=(int)(getResources().getDisplayMetrics().widthPixels*0.88f);
+            lp.height=WindowManager.LayoutParams.WRAP_CONTENT;
+            w.setAttributes(lp);
+        }
+    }
+
     @Override public boolean dispatchTouchEvent(android.view.MotionEvent e){
         if(contentHost!=null){
             int action=e.getActionMasked();
@@ -1062,8 +1159,9 @@ class SopDbHelper extends SQLiteOpenHelper {
     List<ChangeEvent> recentChangesWithinHours(int hours,int limit){
         long since=System.currentTimeMillis()-hours*60L*60L*1000L;
         ArrayList<ChangeEvent> out=new ArrayList<>();
+        String limitSql=limit>0?Integer.toString(limit):null;
         try(Cursor c=getReadableDatabase().query("changes",new String[]{"event_type","doc_key","title","changed_at"},
-                "changed_at>=?",new String[]{Long.toString(since)},null,null,"changed_at DESC",Integer.toString(limit))){
+                "changed_at>=?",new String[]{Long.toString(since)},null,null,"changed_at DESC",limitSql)){
             while(c.moveToNext())out.add(new ChangeEvent(c.getString(0),c.getString(1),c.getString(2),c.getLong(3)));
         }
         return out;
