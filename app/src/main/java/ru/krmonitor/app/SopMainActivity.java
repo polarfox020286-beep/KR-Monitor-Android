@@ -15,6 +15,7 @@ import android.provider.DocumentsContract;
 import android.provider.Settings;
 import android.text.*;
 import android.view.*;
+import android.view.animation.Animation;
 import android.view.animation.TranslateAnimation;
 import android.widget.*;
 
