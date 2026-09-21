@@ -41,13 +41,15 @@ jobs:
 
       - name: Build signed release APK
         env:
-          KR_VERSION_CODE: ${{ 10000 + github.run_number }}
-          KR_VERSION_NAME: "1.0.${{ github.run_number }}"
+          RUN_NUM: ${{ github.run_number }}
           KR_KEYSTORE_FILE: ${{ runner.temp }}/sop-navigator-release.jks
           KR_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KR_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KR_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: gradle :app:assembleRelease --stacktrace
+        run: |
+          export KR_VERSION_CODE=$((10000 + RUN_NUM))
+          export KR_VERSION_NAME="1.0.${RUN_NUM}"
+          gradle :app:assembleRelease --stacktrace
 
       - name: Verify APK signature
         run: |
