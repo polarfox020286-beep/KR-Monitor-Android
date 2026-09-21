@@ -8,8 +8,8 @@
 
     <application
         android:allowBackup="false"
-        android:icon="@drawable/sop_launcher"
-        android:roundIcon="@drawable/sop_launcher"
+        android:icon="@drawable/sop_launcher_icon"
+        android:roundIcon="@drawable/sop_launcher_icon"
         android:label="СОП Навигатор"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:usesCleartextTraffic="false">
