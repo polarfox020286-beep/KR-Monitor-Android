@@ -8,14 +8,14 @@
 
     <application
         android:allowBackup="false"
-        android:icon="@mipmap/kr_launcher"
-        android:roundIcon="@mipmap/kr_launcher"
-        android:label="КР Навигатор"
+        android:icon="@drawable/sop_launcher"
+        android:roundIcon="@drawable/sop_launcher"
+        android:label="СОП Навигатор"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:usesCleartextTraffic="false">
 
         <activity
-            android:name=".MainActivity"
+            android:name=".SopMainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
@@ -23,8 +23,8 @@
             </intent-filter>
         </activity>
 
-        <receiver android:name=".AlarmReceiver" android:exported="false"/>
-        <receiver android:name=".BootReceiver" android:exported="true">
+        <receiver android:name=".SopAlarmReceiver" android:exported="false"/>
+        <receiver android:name=".SopBootReceiver" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
@@ -32,14 +32,8 @@
         </receiver>
 
         <service
-            android:name=".SyncJobService"
+            android:name=".SopSyncJobService"
             android:exported="true"
             android:permission="android.permission.BIND_JOB_SERVICE"/>
-
-        <provider
-            android:name=".PdfProvider"
-            android:authorities="ru.krmonitor.app.pdf"
-            android:exported="false"
-            android:grantUriPermissions="true"/>
     </application>
 </manifest>
