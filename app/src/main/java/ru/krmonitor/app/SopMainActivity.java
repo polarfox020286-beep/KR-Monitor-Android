@@ -1410,6 +1410,14 @@ class SopDbHelper extends SQLiteOpenHelper {
         ContentValues v=new ContentValues();v.put("event_type",type);v.put("doc_key",d.key);v.put("title",d.title);v.put("changed_at",System.currentTimeMillis());
         getWritableDatabase().insert("changes",null,v);
     }
+    boolean hasRecentChange(String key,int hours){
+        long since=System.currentTimeMillis()-hours*60L*60L*1000L;
+        try(Cursor c=getReadableDatabase().rawQuery(
+                "SELECT 1 FROM changes WHERE doc_key=? AND changed_at>=? LIMIT 1",
+                new String[]{key,Long.toString(since)})){
+            return c.moveToFirst();
+        }
+    }
     static final class ChangeEvent{
         final String type,key,title;final long changedAt;
         ChangeEvent(String type,String key,String title,long changedAt){this.type=type;this.key=key;this.title=title;this.changedAt=changedAt;}
@@ -1465,26 +1473,63 @@ class SopSyncEngine {
             List<SopDocument> scanned=SopScanner.scan(c);
             SopDbHelper db=new SopDbHelper(c);
             SharedPreferences p=c.getSharedPreferences("prefs",Context.MODE_PRIVATE);
-            boolean baseline=!p.getBoolean("baseline_done",false);
+
+            // A baseline is only a truly empty local catalogue.  Do not rely on
+            // baseline_done: that preference can be lost or reset while the DB
+            // still contains the already-known SOPs.
+            boolean baseline=db.count()==0;
             int added=0,updated=0;
             ArrayList<SopDocument> changed=new ArrayList<>();
+
             for(SopDocument d:scanned){
                 SopDocument old=db.get(d.key);
                 if(old==null){
                     db.upsert(d);
-                    if(!baseline){db.recordChange("NEW",d);added++;changed.add(d);}
+                    if(!baseline){
+                        db.recordChange("NEW",d);
+                        added++;
+                        changed.add(d);
+                    }
                 }else{
                     boolean modified=(d.lastModified>0&&old.lastModified>0&&d.lastModified!=old.lastModified)||
                             (d.size>0&&old.size>0&&d.size!=old.size);
                     db.upsert(d);
-                    if(!baseline&&modified){db.recordChange("UPDATED",d);updated++;changed.add(d);}
+                    if(!baseline&&modified){
+                        db.recordChange("UPDATED",d);
+                        updated++;
+                        changed.add(d);
+                    }
                 }
             }
+
             long now=System.currentTimeMillis();
-            p.edit().putBoolean("baseline_done",true).putLong("last_sync_ms",now)
-                    .putString("last_sync_text",new SimpleDateFormat("yyyy-MM-dd HH:mm",Locale.US).format(new Date(now))).apply();
+
+            // One-time repair for documents that were already added to the local
+            // catalogue by the buggy build but never entered in the 48h changes log.
+            // A recently modified Drive document without a recent change event is
+            // restored as NEW.  This also recovers the four currently missed SOPs.
+            boolean repairDone=p.getBoolean("repair_recent_events_v28",false);
+            if(!baseline&&!repairDone){
+                long since=now-48L*60L*60L*1000L;
+                for(SopDocument d:scanned){
+                    if(d.lastModified>0&&d.lastModified>=since&&!db.hasRecentChange(d.key,48)){
+                        db.recordChange("NEW",d);
+                        added++;
+                        changed.add(d);
+                    }
+                }
+            }
+
+            p.edit()
+                    .putBoolean("baseline_done",true)
+                    .putBoolean("repair_recent_events_v28",true)
+                    .putLong("last_sync_ms",now)
+                    .putString("last_sync_text",new SimpleDateFormat("yyyy-MM-dd HH:mm",Locale.US).format(new Date(now)))
+                    .apply();
+
             if(!baseline&&added+updated>0)notifyChanges(c,added,updated,changed);
             db.close();
+
             if(baseline)return new Result(0,0,scanned.size(),"Папка подключена. В каталог добавлено "+scanned.size()+" документов.");
             if(added==0&&updated==0)return new Result(0,0,scanned.size(),"Новых или обновлённых документов не найдено.");
             return new Result(added,updated,scanned.size(),"Проверка завершена. Новых: "+added+", обновлено: "+updated+".");
