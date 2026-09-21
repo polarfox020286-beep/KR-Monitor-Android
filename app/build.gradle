@@ -1,7 +1,7 @@
 plugins { id 'com.android.application' }
 
-def envVersionCode = System.getenv('KR_VERSION_CODE') ?: '1'
-def envVersionName = System.getenv('KR_VERSION_NAME') ?: '1.0'
+def envVersionCode = System.getenv('KR_VERSION_CODE') ?: '10001'
+def envVersionName = System.getenv('KR_VERSION_NAME') ?: '1.0.0'
 def keystorePath = System.getenv('KR_KEYSTORE_FILE')
 def keystorePassword = System.getenv('KR_KEYSTORE_PASSWORD')
 def keyAliasValue = System.getenv('KR_KEY_ALIAS')
@@ -12,7 +12,7 @@ android {
     compileSdk 35
 
     defaultConfig {
-        applicationId 'ru.krmonitor.app'
+        applicationId 'ru.sopnavigator.app'
         minSdk 26
         targetSdk 35
         versionCode Integer.parseInt(envVersionCode)
@@ -33,9 +33,7 @@ android {
     buildTypes {
         release {
             minifyEnabled false
-            if (keystorePath) {
-                signingConfig signingConfigs.release
-            }
+            if (keystorePath) signingConfig signingConfigs.release
         }
     }
 
