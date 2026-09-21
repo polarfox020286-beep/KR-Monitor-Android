@@ -6,16 +6,16 @@ import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
-import android.view.animation.DecelerateInterpolator;
-import android.widget.FrameLayout;
-import android.widget.ImageView;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 
 public class SplashActivity extends Activity {
-    private static final long HOLD_MS = 650L;
+    private static final long SPLASH_MS = 3000L;
     private final Handler handler = new Handler(Looper.getMainLooper());
+    private WebView webView;
     private boolean opened = false;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
@@ -34,46 +34,44 @@ public class SplashActivity extends Activity {
                 View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
         );
 
-        FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(bg);
+        webView = new WebView(this);
+        webView.setBackgroundColor(bg);
+        webView.setVerticalScrollBarEnabled(false);
+        webView.setHorizontalScrollBarEnabled(false);
+        webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
 
-        ImageView splash = new ImageView(this);
-        splash.setImageResource(ru.krmonitor.app.R.drawable.sop_splash);
-        splash.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        splash.setAdjustViewBounds(false);
+        WebSettings settings = webView.getSettings();
+        settings.setJavaScriptEnabled(false);
+        settings.setAllowFileAccess(true);
+        settings.setAllowContentAccess(false);
+        settings.setBuiltInZoomControls(false);
+        settings.setDisplayZoomControls(false);
+        settings.setLoadWithOverviewMode(true);
+        settings.setUseWideViewPort(true);
 
-        // Initial state: invisible and slightly smaller.
-        splash.setAlpha(0f);
-        splash.setScaleX(0.965f);
-        splash.setScaleY(0.965f);
+        webView.setWebViewClient(new WebViewClient());
+        setContentView(webView);
 
-        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                Gravity.CENTER
+        String html =
+                "<!doctype html><html><head>" +
+                "<meta name='viewport' content='width=device-width,height=device-height,initial-scale=1,maximum-scale=1,user-scalable=no'>" +
+                "<style>" +
+                "html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#EEF9FD;}" +
+                "body{display:flex;align-items:center;justify-content:center;}" +
+                "img{display:block;width:100%;height:100%;object-fit:contain;}" +
+                "</style></head><body>" +
+                "<img src='sop_splash.webp' alt='СОП Навигатор'>" +
+                "</body></html>";
+
+        webView.loadDataWithBaseURL(
+                "file:///android_asset/",
+                html,
+                "text/html",
+                "UTF-8",
+                null
         );
-        root.addView(splash, lp);
-        setContentView(root);
 
-        // Calm medical-style entrance: fade-in + gentle scale.
-        splash.animate()
-                .alpha(1f)
-                .scaleX(1f)
-                .scaleY(1f)
-                .setDuration(650L)
-                .setInterpolator(new DecelerateInterpolator())
-                .withEndAction(() -> handler.postDelayed(() -> {
-                    // Smooth disappearance before entering the application.
-                    splash.animate()
-                            .alpha(0f)
-                            .scaleX(1.012f)
-                            .scaleY(1.012f)
-                            .setDuration(350L)
-                            .setInterpolator(new DecelerateInterpolator())
-                            .withEndAction(this::openMain)
-                            .start();
-                }, HOLD_MS))
-                .start();
+        handler.postDelayed(this::openMain, SPLASH_MS);
     }
 
     private void openMain() {
@@ -86,6 +84,12 @@ public class SplashActivity extends Activity {
 
     @Override protected void onDestroy() {
         handler.removeCallbacksAndMessages(null);
+        if (webView != null) {
+            webView.stopLoading();
+            webView.loadUrl("about:blank");
+            webView.destroy();
+            webView = null;
+        }
         super.onDestroy();
     }
 }
