@@ -125,12 +125,12 @@ public class SopMainActivity extends Activity {
     private void buildUi(){
         LinearLayout root=new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(14),dp(12),dp(14),dp(8));
+        root.setPadding(dp(14),dp(8),dp(14),dp(7));
         root.setBackgroundColor(BG);
 
         LinearLayout hero=new LinearLayout(this);
         hero.setOrientation(LinearLayout.VERTICAL);
-        hero.setPadding(dp(14),dp(13),dp(14),dp(12));
+        hero.setPadding(dp(11),dp(8),dp(11),dp(8));
         hero.setBackground(gradient(Color.rgb(239,251,255),Color.rgb(225,243,252),20));
         if(Build.VERSION.SDK_INT>=21)hero.setElevation(dp(1));
 
@@ -138,46 +138,46 @@ public class SopMainActivity extends Activity {
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
 
-        TextView mark=text("➤",20,Color.WHITE,true);
+        TextView mark=text("➤",17,Color.WHITE,true);
         mark.setGravity(Gravity.CENTER);
-        mark.setBackground(rounded(BLUE,Color.TRANSPARENT,14));
-        LinearLayout.LayoutParams markLp=new LinearLayout.LayoutParams(dp(44),dp(44));
-        markLp.setMargins(0,0,dp(11),0);
+        mark.setBackground(rounded(BLUE,Color.TRANSPARENT,12));
+        LinearLayout.LayoutParams markLp=new LinearLayout.LayoutParams(dp(36),dp(36));
+        markLp.setMargins(0,0,dp(9),0);
         header.addView(mark,markLp);
 
         LinearLayout heading=new LinearLayout(this);
         heading.setOrientation(LinearLayout.VERTICAL);
-        TextView title=text("СОП Навигатор",24,BLUE_DARK,true);
+        TextView title=text("СОП Навигатор",20,BLUE_DARK,true);
         title.setLetterSpacing(0.01f);
-        TextView subtitle=text("Елизаветинская больница · локальные документы",11.5f,MUTED,false);
-        subtitle.setPadding(0,dp(2),0,0);
+        TextView subtitle=text("Елизаветинская больница · локальные документы",10.2f,MUTED,false);
+        subtitle.setPadding(0,dp(1),0,0);
         heading.addView(title);
         heading.addView(subtitle);
         header.addView(heading,new LinearLayout.LayoutParams(0,-2,1));
 
-        TextView sync=text("↻",23,BLUE_DARK,true);
+        TextView sync=text("↻",20,BLUE_DARK,true);
         sync.setGravity(Gravity.CENTER);
         sync.setContentDescription("Проверить обновления");
-        sync.setBackground(rounded(Color.WHITE,LINE,15));
+        sync.setBackground(rounded(Color.WHITE,LINE,12));
         sync.setClickable(true); sync.setFocusable(true);
-        header.addView(sync,new LinearLayout.LayoutParams(dp(44),dp(44)));
+        header.addView(sync,new LinearLayout.LayoutParams(dp(36),dp(36)));
         hero.addView(header);
 
-        status=text("",11.5f,MUTED,false);
-        status.setLineSpacing(dp(1),1f);
-        status.setPadding(dp(2),dp(10),dp(2),dp(4));
+        status=text("",10.2f,MUTED,false);
+        status.setLineSpacing(0,0.98f);
+        status.setPadding(dp(1),dp(6),dp(1),dp(1));
         hero.addView(status);
 
-        source=text("",11.5f,BLUE_DARK,true);
-        source.setPadding(dp(10),dp(7),dp(10),dp(7));
+        source=text("",10.3f,BLUE_DARK,true);
+        source.setPadding(dp(8),dp(5),dp(8),dp(5));
         source.setGravity(Gravity.CENTER_VERTICAL);
         source.setClickable(true); source.setFocusable(true);
         LinearLayout.LayoutParams sourceLp=new LinearLayout.LayoutParams(-1,-2);
-        sourceLp.setMargins(0,dp(4),0,0);
+        sourceLp.setMargins(0,dp(2),0,0);
         hero.addView(source,sourceLp);
 
         LinearLayout.LayoutParams heroLp=new LinearLayout.LayoutParams(-1,-2);
-        heroLp.setMargins(0,0,0,dp(10));
+        heroLp.setMargins(0,0,0,dp(6));
         root.addView(hero,heroLp);
 
         LinearLayout updates=new LinearLayout(this);
@@ -227,28 +227,28 @@ public class SopMainActivity extends Activity {
         LinearLayout searchBox=new LinearLayout(this);
         searchBox.setOrientation(LinearLayout.HORIZONTAL);
         searchBox.setGravity(Gravity.CENTER_VERTICAL);
-        searchBox.setPadding(dp(12),0,dp(8),0);
+        searchBox.setPadding(dp(8),0,dp(6),0);
         searchBox.setBackground(rounded(CARD,LINE,17));
         if(Build.VERSION.SDK_INT>=21)searchBox.setElevation(dp(1));
 
-        TextView searchIcon=text("⌕",22,BLUE,false);
+        TextView searchIcon=text("⌕",19,BLUE,false);
         searchIcon.setGravity(Gravity.CENTER);
-        searchBox.addView(searchIcon,new LinearLayout.LayoutParams(dp(31),dp(48)));
+        searchBox.addView(searchIcon,new LinearLayout.LayoutParams(dp(26),dp(44)));
 
         search=new EditText(this);
-        search.setHint("Поиск по названию, разделу или ключевому слову");
+        search.setHint("Поиск по названию, разделу и ключевому слову");
         search.setHintTextColor(Color.rgb(139,156,169));
         search.setTextColor(TEXT);
-        search.setTextSize(14.5f);
+        search.setTextSize(12.2f);
         search.setSingleLine(true);
-        search.setPadding(dp(4),0,dp(6),0);
+        search.setPadding(dp(2),0,dp(2),0);
         search.setBackgroundColor(Color.TRANSPARENT);
-        searchBox.addView(search,new LinearLayout.LayoutParams(0,dp(48),1));
-        root.addView(searchBox,new LinearLayout.LayoutParams(-1,dp(50)));
+        searchBox.addView(search,new LinearLayout.LayoutParams(0,dp(44),1));
+        root.addView(searchBox,new LinearLayout.LayoutParams(-1,dp(46)));
 
         contentHost=new FrameLayout(this);
         LinearLayout.LayoutParams contentLp=new LinearLayout.LayoutParams(-1,0,1);
-        contentLp.setMargins(0,dp(8),0,dp(7));
+        contentLp.setMargins(0,dp(6),0,dp(7));
         root.addView(contentHost,contentLp);
 
         bottomNav=new LinearLayout(this);
@@ -359,7 +359,7 @@ public class SopMainActivity extends Activity {
         long next=p.getLong("next_alarm",SopAlarmScheduler.nextWeekday7());
         String lastText=last==0?"ещё не выполнялась":DateFormat.getDateTimeInstance(DateFormat.MEDIUM,DateFormat.SHORT).format(new Date(last));
         String note=notificationsEnabled()?"":"\n⚠ Уведомления Android отключены";
-        status.setText(all.size()+" документов  ·  проверено: "+lastText+"\nСледующая автоматическая проверка: "+
+        status.setText(all.size()+" документов  ·  Проверено: "+lastText+"\nСледующая проверка: "+
                 DateFormat.getDateTimeInstance(DateFormat.MEDIUM,DateFormat.SHORT).format(new Date(next))+note);
         if(hasFolder()){
             source.setText("●  Google Drive подключён    Изменить папку ›");
