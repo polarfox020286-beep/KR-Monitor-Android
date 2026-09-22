@@ -4,6 +4,9 @@ import android.content.*;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.ParcelFileDescriptor;
+import android.os.Environment;
+
+import java.util.List;
 
 import java.io.*;
 
@@ -26,9 +29,13 @@ public class SopFileProvider extends ContentProvider {
         String name=uri.getLastPathSegment();
         if(name==null||name.contains("/")||name.contains("\\"))throw new FileNotFoundException("invalid name");
         try{
-            File dir=new File(getContext().getFilesDir(),"sop_cache").getCanonicalFile();
+            List<String> parts=uri.getPathSegments();
+            boolean visible=parts.size()>=2&&"download".equals(parts.get(0));
+            File dir=visible
+                    ?new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),"СОП Навигатор").getCanonicalFile()
+                    :new File(getContext().getFilesDir(),"sop_cache").getCanonicalFile();
             File requested=new File(dir,name).getCanonicalFile();
-            if(!dir.equals(requested.getParentFile()))throw new FileNotFoundException("outside cache");
+            if(!dir.equals(requested.getParentFile()))throw new FileNotFoundException("outside allowed folder");
             if(!requested.isFile())throw new FileNotFoundException("not found");
             return ParcelFileDescriptor.open(requested,ParcelFileDescriptor.MODE_READ_ONLY);
         }catch(IOException e){

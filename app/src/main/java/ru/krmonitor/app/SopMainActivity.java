@@ -17,6 +17,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.*;
 import android.provider.DocumentsContract;
+import android.provider.MediaStore;
 import android.provider.Settings;
 import android.text.*;
 import android.view.*;
@@ -33,6 +34,7 @@ import java.util.concurrent.*;
 public class SopMainActivity extends Activity {
     public static final String ACTION_SYNC_COMPLETE="ru.sopnavigator.app.SYNC_COMPLETE";
     private static final int REQ_TREE=44;
+    private static final int REQ_WRITE_DOWNLOADS=4402;
     private final ExecutorService executor=Executors.newSingleThreadExecutor();
     private final BroadcastReceiver syncReceiver=new BroadcastReceiver(){
         @Override public void onReceive(Context context,Intent intent){
@@ -41,6 +43,7 @@ public class SopMainActivity extends Activity {
     };
 
     private SopDbHelper db;
+    private SopDocument pendingDownload;
     private TextView status,source,recentList;
     private EditText search;
     private FrameLayout contentHost;
@@ -891,14 +894,20 @@ public class SopMainActivity extends Activity {
     }
 
     private void openDocument(SopDocument d){
+        if(Build.VERSION.SDK_INT<29&&checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)!=PackageManager.PERMISSION_GRANTED){
+            pendingDownload=d;
+            requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE,Manifest.permission.READ_EXTERNAL_STORAGE},REQ_WRITE_DOWNLOADS);
+            return;
+        }
+
         db.markViewed(d.key);
-        Toast.makeText(this,"Загрузка документа…",Toast.LENGTH_SHORT).show();
+        Toast.makeText(this,"Загрузка в Downloads/СОП Навигатор…",Toast.LENGTH_SHORT).show();
         executor.submit(() -> {
             try{
-                File local=downloadToCache(d);
-                Uri localUri=Uri.parse("content://ru.sopnavigator.app.files/"+Uri.encode(local.getName()));
+                Uri localUri=downloadToVisibleStorage(d);
                 String mime=d.mime==null||d.mime.trim().isEmpty()?mimeForFile(d.fileName):d.mime;
                 runOnUiThread(() -> {
+                    Toast.makeText(this,"Файл сохранён в Downloads/СОП Навигатор",Toast.LENGTH_SHORT).show();
                     try{
                         Intent i=new Intent(Intent.ACTION_VIEW);
                         i.setDataAndType(localUri,mime);
@@ -911,7 +920,7 @@ public class SopMainActivity extends Activity {
                             i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                             startActivity(i);
                         }catch(Exception x){
-                            Toast.makeText(this,"Документ скачан, но на устройстве нет приложения для его открытия.",Toast.LENGTH_LONG).show();
+                            Toast.makeText(this,"Файл сохранён, но на устройстве нет приложения для его открытия.",Toast.LENGTH_LONG).show();
                         }
                     }
                 });
@@ -922,19 +931,93 @@ public class SopMainActivity extends Activity {
         });
     }
 
-    private File downloadToCache(SopDocument d) throws Exception{
-        File dir=new File(getFilesDir(),"sop_cache");
-        if(!dir.exists()&&!dir.mkdirs())throw new IOException("Не удалось создать локальное хранилище.");
+    @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] grantResults){
+        super.onRequestPermissionsResult(requestCode,permissions,grantResults);
+        if(requestCode!=REQ_WRITE_DOWNLOADS)return;
+        SopDocument pending=pendingDownload;
+        pendingDownload=null;
+        if(grantResults.length>0&&grantResults[0]==PackageManager.PERMISSION_GRANTED){
+            if(pending!=null)openDocument(pending);
+        }else{
+            Toast.makeText(this,"Для сохранения в папку Downloads нужен доступ к памяти устройства.",Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private Uri downloadToVisibleStorage(SopDocument d) throws Exception{
+        return Build.VERSION.SDK_INT>=29?downloadToMediaStore(d):downloadToLegacyDownloads(d);
+    }
+
+    private Uri downloadToMediaStore(SopDocument d) throws Exception{
+        ContentResolver resolver=getContentResolver();
+        Uri collection=MediaStore.Downloads.EXTERNAL_CONTENT_URI;
+        String safe=safeFileName(d.fileName);
+        String relative=Environment.DIRECTORY_DOWNLOADS+"/СОП Навигатор/";
+        String mime=d.mime==null||d.mime.trim().isEmpty()?mimeForFile(d.fileName):d.mime;
+
+        String[] projection={MediaStore.Downloads._ID,MediaStore.Downloads.SIZE};
+        String selection=MediaStore.Downloads.DISPLAY_NAME+"=? AND "+MediaStore.Downloads.RELATIVE_PATH+"=?";
+        String[] args={safe,relative};
+
+        try(Cursor cur=resolver.query(collection,projection,selection,args,MediaStore.Downloads.DATE_ADDED+" DESC")){
+            if(cur!=null&&cur.moveToFirst()){
+                long id=cur.getLong(cur.getColumnIndexOrThrow(MediaStore.Downloads._ID));
+                long size=cur.getLong(cur.getColumnIndexOrThrow(MediaStore.Downloads.SIZE));
+                Uri existing=ContentUris.withAppendedId(collection,id);
+                if(size>0&&(d.size<=0||size==d.size))return existing;
+                try{resolver.delete(existing,null,null);}catch(Exception ignored){}
+            }
+        }
+
+        ContentValues values=new ContentValues();
+        values.put(MediaStore.Downloads.DISPLAY_NAME,safe);
+        values.put(MediaStore.Downloads.MIME_TYPE,mime);
+        values.put(MediaStore.Downloads.RELATIVE_PATH,relative);
+        values.put(MediaStore.Downloads.IS_PENDING,1);
+
+        Uri target=resolver.insert(collection,values);
+        if(target==null)throw new IOException("Android не создал файл в Downloads.");
+
+        boolean ok=false;
+        try(InputStream in=resolver.openInputStream(Uri.parse(d.uri));
+            OutputStream out=resolver.openOutputStream(target,"w")){
+            if(in==null)throw new IOException("Google Drive не предоставил поток файла.");
+            if(out==null)throw new IOException("Не удалось открыть файл в Downloads для записи.");
+            byte[] buf=new byte[64*1024];
+            long total=0;
+            int n;
+            while((n=in.read(buf))!=-1){
+                out.write(buf,0,n);
+                total+=n;
+            }
+            out.flush();
+            if(total<=0)throw new IOException("Получен пустой файл.");
+            ok=true;
+        }finally{
+            if(!ok){
+                try{resolver.delete(target,null,null);}catch(Exception ignored){}
+            }
+        }
+
+        ContentValues done=new ContentValues();
+        done.put(MediaStore.Downloads.IS_PENDING,0);
+        resolver.update(target,done,null,null);
+        return target;
+    }
+
+    private Uri downloadToLegacyDownloads(SopDocument d) throws Exception{
+        File root=Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+        File dir=new File(root,"СОП Навигатор");
+        if(!dir.exists()&&!dir.mkdirs())throw new IOException("Не удалось создать папку Downloads/СОП Навигатор.");
+
         String safe=safeFileName(d.fileName);
         File target=new File(dir,safe);
-        Uri src=Uri.parse(d.uri);
-
-        // Reuse an already downloaded copy while its metadata still matches.
-        if(target.isFile()&&target.length()>0&&d.size>0&&target.length()==d.size)return target;
+        if(target.isFile()&&target.length()>0&&(d.size<=0||target.length()==d.size)){
+            return Uri.parse("content://ru.sopnavigator.app.files/download/"+Uri.encode(target.getName()));
+        }
 
         File tmp=new File(dir,safe+".part");
         if(tmp.exists())tmp.delete();
-        try(InputStream in=getContentResolver().openInputStream(src)){
+        try(InputStream in=getContentResolver().openInputStream(Uri.parse(d.uri))){
             if(in==null)throw new IOException("Google Drive не предоставил поток файла.");
             try(OutputStream out=new FileOutputStream(tmp)){
                 byte[] buf=new byte[64*1024];
@@ -947,11 +1030,13 @@ public class SopMainActivity extends Activity {
         if(target.exists()&&!target.delete()){tmp.delete();throw new IOException("Не удалось заменить локальную копию.");}
         if(!tmp.renameTo(target)){
             try(InputStream in=new FileInputStream(tmp);OutputStream out=new FileOutputStream(target)){
-                byte[] buf=new byte[64*1024];int n;while((n=in.read(buf))!=-1)out.write(buf,0,n);
+                byte[] buf=new byte[64*1024];
+                int n;
+                while((n=in.read(buf))!=-1)out.write(buf,0,n);
             }
             tmp.delete();
         }
-        return target;
+        return Uri.parse("content://ru.sopnavigator.app.files/download/"+Uri.encode(target.getName()));
     }
 
     private String safeFileName(String name){
