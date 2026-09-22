@@ -954,17 +954,40 @@ public class SopMainActivity extends Activity {
         String relative=Environment.DIRECTORY_DOWNLOADS+"/СОП Навигатор/";
         String mime=d.mime==null||d.mime.trim().isEmpty()?mimeForFile(d.fileName):d.mime;
 
-        String[] projection={MediaStore.Downloads._ID,MediaStore.Downloads.SIZE};
-        String selection=MediaStore.Downloads.DISPLAY_NAME+"=? AND "+MediaStore.Downloads.RELATIVE_PATH+"=?";
-        String[] args={safe,relative};
+        Uri existing=findExistingVisibleDownload(resolver,collection,safe);
+        if(existing!=null){
+            long existingSize=queryMediaSize(resolver,existing);
 
-        try(Cursor cur=resolver.query(collection,projection,selection,args,MediaStore.Downloads.DATE_ADDED+" DESC")){
-            if(cur!=null&&cur.moveToFirst()){
-                long id=cur.getLong(cur.getColumnIndexOrThrow(MediaStore.Downloads._ID));
-                long size=cur.getLong(cur.getColumnIndexOrThrow(MediaStore.Downloads.SIZE));
-                Uri existing=ContentUris.withAppendedId(collection,id);
-                if(size>0&&(d.size<=0||size==d.size))return existing;
-                try{resolver.delete(existing,null,null);}catch(Exception ignored){}
+            // If the already downloaded file matches the Drive file, just open it.
+            if(existingSize>0&&(d.size<=0||existingSize==d.size)){
+                rememberDownloadedVersion(d,existing);
+                return existing;
+            }
+
+            // Same document name, but Drive version changed: overwrite the same
+            // MediaStore item instead of inserting "filename (1).pdf".
+            boolean written=false;
+            try(InputStream in=resolver.openInputStream(Uri.parse(d.uri));
+                OutputStream out=resolver.openOutputStream(existing,"wt")){
+                if(in==null)throw new IOException("Google Drive не предоставил поток файла.");
+                if(out==null)throw new IOException("Не удалось открыть существующий файл для обновления.");
+                byte[] buf=new byte[64*1024];
+                long total=0;
+                int n;
+                while((n=in.read(buf))!=-1){
+                    out.write(buf,0,n);
+                    total+=n;
+                }
+                out.flush();
+                if(total<=0)throw new IOException("Получен пустой файл.");
+                written=true;
+            }
+            if(written){
+                ContentValues update=new ContentValues();
+                update.put(MediaStore.Downloads.MIME_TYPE,mime);
+                resolver.update(existing,update,null,null);
+                rememberDownloadedVersion(d,existing);
+                return existing;
             }
         }
 
@@ -1001,7 +1024,67 @@ public class SopMainActivity extends Activity {
         ContentValues done=new ContentValues();
         done.put(MediaStore.Downloads.IS_PENDING,0);
         resolver.update(target,done,null,null);
+        rememberDownloadedVersion(d,target);
         return target;
+    }
+
+    private Uri findExistingVisibleDownload(ContentResolver resolver,Uri collection,String safe){
+        // First try the URI saved by this app for the same filename.
+        SharedPreferences p=getSharedPreferences("downloaded_files",MODE_PRIVATE);
+        String saved=p.getString("uri_"+safe,null);
+        if(saved!=null){
+            Uri u=Uri.parse(saved);
+            try{
+                long size=queryMediaSize(resolver,u);
+                if(size>=0)return u;
+            }catch(Exception ignored){}
+        }
+
+        // Search by file name only. Some Android/Drive combinations normalize
+        // RELATIVE_PATH differently, which made the previous exact query miss
+        // an existing file and create duplicates.
+        String[] projection={
+                MediaStore.Downloads._ID,
+                MediaStore.Downloads.RELATIVE_PATH,
+                MediaStore.Downloads.SIZE,
+                MediaStore.Downloads.DATE_ADDED
+        };
+        String selection=MediaStore.Downloads.DISPLAY_NAME+"=?";
+        String[] args={safe};
+
+        try(Cursor cur=resolver.query(collection,projection,selection,args,MediaStore.Downloads.DATE_ADDED+" DESC")){
+            if(cur==null)return null;
+            int idCol=cur.getColumnIndexOrThrow(MediaStore.Downloads._ID);
+            int pathCol=cur.getColumnIndex(MediaStore.Downloads.RELATIVE_PATH);
+            while(cur.moveToNext()){
+                String path=pathCol>=0&&!cur.isNull(pathCol)?cur.getString(pathCol):"";
+                String normalized=path==null?"":path.replace('\\','/').toLowerCase(Locale.ROOT);
+                if(normalized.contains("соп навигатор")){
+                    Uri found=ContentUris.withAppendedId(collection,cur.getLong(idCol));
+                    p.edit().putString("uri_"+safe,found.toString()).apply();
+                    return found;
+                }
+            }
+        }catch(Exception ignored){}
+        return null;
+    }
+
+    private long queryMediaSize(ContentResolver resolver,Uri uri){
+        try(Cursor cur=resolver.query(uri,new String[]{MediaStore.Downloads.SIZE},null,null,null)){
+            if(cur!=null&&cur.moveToFirst()){
+                int col=cur.getColumnIndex(MediaStore.Downloads.SIZE);
+                if(col>=0&&!cur.isNull(col))return cur.getLong(col);
+            }
+        }catch(Exception ignored){}
+        return -1;
+    }
+
+    private void rememberDownloadedVersion(SopDocument d,Uri uri){
+        SharedPreferences.Editor e=getSharedPreferences("downloaded_files",MODE_PRIVATE).edit();
+        e.putString("uri_"+safeFileName(d.fileName),uri.toString());
+        e.putLong("size_"+d.key,d.size);
+        e.putLong("modified_"+d.key,d.lastModified);
+        e.apply();
     }
 
     private Uri downloadToLegacyDownloads(SopDocument d) throws Exception{
