@@ -1,0 +1,47 @@
+name: Build personnel filter test APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ personnel-filter-apk-test ]
+    paths-ignore:
+      - 'dist/**'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Prepare splash asset
+        run: |
+          mkdir -p app/src/main/assets
+          cp app/src/main/res/drawable-nodpi/sop_splash.webp app/src/main/assets/sop_splash.webp
+
+      - name: Build installable test APK
+        env:
+          KR_VERSION_CODE: ${{ 20000 + github.run_number }}
+          KR_VERSION_NAME: "test-${{ github.run_number }}"
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Publish APK to branch
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk dist/SOP-Navigator-personnel-filter-test.apk
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist/SOP-Navigator-personnel-filter-test.apk
+          git commit -m "Publish personnel filter test APK [skip ci]" || exit 0
+          git push
