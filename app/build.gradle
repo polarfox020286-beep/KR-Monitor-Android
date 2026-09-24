@@ -31,6 +31,10 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix ".test"
+            versionNameSuffix "-test"
+        }
         release {
             minifyEnabled false
             if (keystorePath) signingConfig signingConfigs.release
