@@ -10,6 +10,8 @@
 
     <application
         android:allowBackup="false"
+        android:testOnly="false"
+        android:debuggable="false"
         android:icon="@drawable/sop_launcher_icon"
         android:roundIcon="@drawable/sop_launcher_icon"
         android:label="СОП Навигатор · тест"
