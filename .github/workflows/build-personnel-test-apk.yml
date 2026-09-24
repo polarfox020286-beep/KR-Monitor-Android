@@ -31,7 +31,7 @@ jobs:
           mkdir -p app/src/main/assets
           cp app/src/main/res/drawable-nodpi/sop_splash.webp app/src/main/assets/sop_splash.webp
 
-      - name: Build installable test APK
+      - name: Build test APK
         env:
           RUN_NUM: ${{ github.run_number }}
         run: |
@@ -39,43 +39,44 @@ jobs:
           export KR_VERSION_NAME="test-${RUN_NUM}"
           gradle :app:assembleDebug --stacktrace
 
-      - name: Re-sign APK with v1 signature for artifact transport
+      - name: Make v1-signed APK suitable for chat artifact packaging
         run: |
-          mkdir -p "$HOME/.android"
-          keytool -genkeypair -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
-          "$APKSIGNER" sign             --v1-signing-enabled true             --v2-signing-enabled false             --v3-signing-enabled false             --ks "$HOME/.android/debug.keystore"             --ks-key-alias androiddebugkey             --ks-pass pass:android             --key-pass pass:android             --out /tmp/personnel-v1.apk             app/build/outputs/apk/debug/app-debug.apk
-          "$APKSIGNER" verify --verbose --print-certs /tmp/personnel-v1.apk
+          test -x "$APKSIGNER"
+          test -f "$HOME/.android/debug.keystore"
+          "$APKSIGNER" sign             --ks "$HOME/.android/debug.keystore"             --ks-key-alias androiddebugkey             --ks-pass pass:android             --key-pass pass:android             --v1-signing-enabled true             --v2-signing-enabled false             --v3-signing-enabled false             --v4-signing-enabled false             --out /tmp/personnel-v1.apk             app/build/outputs/apk/debug/app-debug.apk
+          "$APKSIGNER" verify --verbose /tmp/personnel-v1.apk
+          mkdir -p chat_apk_root
+          unzip -q /tmp/personnel-v1.apk -d chat_apk_root
 
-      - name: Prepare artifact-as-APK
-        run: |
-          rm -rf apkroot
-          mkdir apkroot
-          unzip -q /tmp/personnel-v1.apk -d apkroot
-          test -f apkroot/META-INF/MANIFEST.MF
-
-      - name: Upload installable APK container
-        id: upload_apk_container
+      - name: Upload installable APK bytes as artifact archive
         uses: actions/upload-artifact@v4
         with:
-          name: SOP-Navigator-personnel-filter-installable
-          path: apkroot/
+          name: SOP-Navigator-personnel-filter-chat-apk
+          path: chat_apk_root/
+          compression-level: 0
           include-hidden-files: true
-          compression-level: 6
 
-      - name: Verify downloaded artifact itself is an APK
+      - name: Verify downloaded artifact archive is itself an installable APK
         env:
           GH_TOKEN: ${{ github.token }}
-          ARTIFACT_ID: ${{ steps.upload_apk_container.outputs.artifact-id }}
         run: |
-          curl -fL             -H "Authorization: Bearer $GH_TOKEN"             -H "Accept: application/vnd.github+json"             -H "X-GitHub-Api-Version: 2022-11-28"             "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip"             -o /tmp/SOP-Navigator-personnel-filter-test.apk
+          ART_ID=""
+          for i in 1 2 3 4 5 6; do
+            ART_ID=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json"               "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts"               | jq -r '.artifacts[] | select(.name=="SOP-Navigator-personnel-filter-chat-apk") | .id' | head -1)
+            [ -n "$ART_ID" ] && [ "$ART_ID" != "null" ] && break
+            sleep 3
+          done
+          test -n "$ART_ID"
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json"             -o /tmp/SOP-Navigator-personnel-filter-test.apk             "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$ART_ID/zip"
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
           "$APKSIGNER" verify --verbose --print-certs /tmp/SOP-Navigator-personnel-filter-test.apk
+          unzip -l /tmp/SOP-Navigator-personnel-filter-test.apk | grep -q "AndroidManifest.xml"
 
-      - name: Publish conventional APK to branch
+      - name: Publish ordinary APK to branch
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/debug/app-debug.apk dist/SOP-Navigator-personnel-filter-test.apk
+          cp /tmp/personnel-v1.apk dist/SOP-Navigator-personnel-filter-test.apk
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add dist/SOP-Navigator-personnel-filter-test.apk
