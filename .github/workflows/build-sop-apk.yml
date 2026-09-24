@@ -20,44 +20,15 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Require persistent signing secrets
-        env:
-          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          test -n "$KEYSTORE_B64"
-          test -n "$STORE_PASSWORD"
-          test -n "$KEY_ALIAS"
-          test -n "$KEY_PASSWORD"
-
-      - name: Restore release signing key
-        env:
-          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-        run: |
-          echo "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/sop-navigator-release.jks"
-          test -s "$RUNNER_TEMP/sop-navigator-release.jks"
-
-      - name: Build signed release APK
+      - name: Build unsigned release APK
         env:
           RUN_NUM: ${{ github.run_number }}
-          KR_KEYSTORE_FILE: ${{ runner.temp }}/sop-navigator-release.jks
-          KR_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KR_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KR_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           export KR_VERSION_CODE=$((10000 + RUN_NUM))
           export KR_VERSION_NAME="1.0.${RUN_NUM}"
           gradle :app:assembleRelease --stacktrace
 
-      - name: Verify APK signature
-        run: |
-          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
-          test -x "$APKSIGNER"
-          "$APKSIGNER" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
-
       - uses: actions/upload-artifact@v4
         with:
-          name: SOP-Navigator-APK
-          path: app/build/outputs/apk/release/app-release.apk
+          name: SOP-Navigator-unsigned
+          path: app/build/outputs/apk/release/app-release-unsigned.apk
