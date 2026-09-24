@@ -1158,7 +1158,7 @@ public class SopMainActivity extends Activity {
         String safe=safeFileName(d.fileName);
         File target=new File(dir,safe);
         if(target.isFile()&&target.length()>0&&(d.size<=0||target.length()==d.size)){
-            return Uri.parse("content://ru.sopnavigator.app.files/download/"+Uri.encode(target.getName()));
+            return Uri.parse(("content://"+getPackageName()+".files/download/")+Uri.encode(target.getName()));
         }
 
         File tmp=new File(dir,safe+".part");
@@ -1182,7 +1182,7 @@ public class SopMainActivity extends Activity {
             }
             tmp.delete();
         }
-        return Uri.parse("content://ru.sopnavigator.app.files/download/"+Uri.encode(target.getName()));
+        return Uri.parse(("content://"+getPackageName()+".files/download/")+Uri.encode(target.getName()));
     }
 
     private String safeFileName(String name){
