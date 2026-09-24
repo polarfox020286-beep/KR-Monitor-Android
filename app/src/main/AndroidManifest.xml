@@ -12,7 +12,7 @@
         android:allowBackup="false"
         android:icon="@drawable/sop_launcher_icon"
         android:roundIcon="@drawable/sop_launcher_icon"
-        android:label="СОП Навигатор"
+        android:label="СОП Навигатор · тест"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:usesCleartextTraffic="false">
 
@@ -44,7 +44,7 @@
 
         <provider
             android:name=".SopFileProvider"
-            android:authorities="ru.sopnavigator.app.files"
+            android:authorities="${applicationId}.files"
             android:exported="false"
             android:grantUriPermissions="true"/>
     </application>
