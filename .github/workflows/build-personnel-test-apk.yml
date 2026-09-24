@@ -32,9 +32,11 @@ jobs:
 
       - name: Build installable test APK
         env:
-          KR_VERSION_CODE: ${{ 20000 + github.run_number }}
-          KR_VERSION_NAME: "test-${{ github.run_number }}"
-        run: gradle :app:assembleDebug --stacktrace
+          RUN_NUM: ${{ github.run_number }}
+        run: |
+          export KR_VERSION_CODE=$((20000 + RUN_NUM))
+          export KR_VERSION_NAME="test-${RUN_NUM}"
+          gradle :app:assembleDebug --stacktrace
 
       - name: Publish APK to branch
         run: |
