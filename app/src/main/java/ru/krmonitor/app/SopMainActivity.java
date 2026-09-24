@@ -1395,6 +1395,217 @@ class SopPersonnelIndex {
     static final Set<String> NONMED=new HashSet<>(Arrays.asList("1saFkG3Hfloljs74iGRspFlD1FuP4kcau","116-_4MvlOOU7UQfiiLuptCcXx9wlFeeU","1xdwULVm7l7HORoyxn4WPqqqx-qG1_WD2","14UThS3AsUUcIPr4qKpjse-FxoO0j0KXY","1YwsAAOq516Hy-vh0_bQcBWvFJ-QidV-2","1APUEBo1xfDOCfvcmMQnsY9YVKuHeA62m","19ndj-H87wTn8eWI9CdsaovUlWvkF3IG7","17dy1pF_BphYGqBWr9UtHF8AvafAj3Lzy","1Udvl5Z7hKNw40JQgcM40Qwuy2Q1NNpDg","1-GDZocbcxLeZxcQCeYE97vTKPoHyvkBy"));
     static final Set<String> ALL_STAFF=new HashSet<>(Arrays.asList("1GL4BFSu1cLrlf_TnBtsNJh0hYPj7ySg-","1EDQzBzrxdVu2YiWzIn9O2gra-3NuhS0v","1rIKLee_yLIx_hgm2aphsa4_FC5VhsiQU","116-_4MvlOOU7UQfiiLuptCcXx9wlFeeU","1OCUA8wiJWAzQNSo-U3qufRvOypX-fuLn","1PfRDfmzjyCbpdJF7iLHpudA6hbhD3Un8","1FI-HPXm4hpOXlmbb0vy125Bp7MuiPN1f","1nv1jy-TxKNzGhuUewXIuuY5idcqdIUZ5","1xdwULVm7l7HORoyxn4WPqqqx-qG1_WD2","1PejvKQ7HjvqfRAghipehMCBObsAZFoBE","14UThS3AsUUcIPr4qKpjse-FxoO0j0KXY","1YwsAAOq516Hy-vh0_bQcBWvFJ-QidV-2","1APUEBo1xfDOCfvcmMQnsY9YVKuHeA62m","1lN4za78rTozmXMroFr5uhjETAFL7M46B","1BWvTkQ7REDg6md6lPh4WDcIEJNi7umkm","1Bta2ALJ8VUKtPLm2BeM0QkpQVpEpry2B","1q7YH-vb9B7ektHtgbf8qLYwycjtHjBtE","19jzI5j8EggcD2EsacXIGlemqvE-B3En5"));
 
+
+    // Android's Google Drive DocumentsProvider exposes opaque SAF document IDs,
+    // not the public Google Drive file IDs used by the personnel index above.
+    // Resolve the current display filename back to its real Drive ID so the
+    // personnel filters work reliably on-device.
+    static final Map<String,String> DRIVE_ID_BY_NAME=buildDriveIdByName();
+
+    private static Map<String,String> buildDriveIdByName(){
+        Map<String,String> m=new HashMap<>();
+        putDriveName(m,"1g1MSpZ77VFFvJBA3oThb-awc_UDuhqCE","А-1-ВК-20.26 Порядок информирования сотрудников СПб ГБУЗ «Елизаветинская больница» об изменении или выходе новых ОРД, регламентирующих вопросы обеспечения качества и безопасности медицинской деятельно.pdf");
+        putDriveName(m,"1QRo3CcNL3w6_4liBJxmXhD3klnJLkixW","А-1-ДМ-28.26 Порядок доступа к клиническим рекомендациям и информирования об обновлениях в клинических рекомендациях медицинских работников.pdf");
+        putDriveName(m,"1TYACh-cW5fxdEFp-Stx8ynSpOPrF3UpP","А-1-ЛБ-27.26 Алгоритм вербальных назначений лекарственных препаратов.pdf");
+        putDriveName(m,"1YkisJ-BSxETgZ8KVJhKoVnIzzHwH3ANt","А-1-МИ-30.26 Алгоритм  действия персонала при работе с электрокардиографом Валента ЭКГК-01.pdf");
+        putDriveName(m,"1tlvxPtx1H45bctZYdodThwO3xUgWqw9T","А-1-ПК-3.25 Алгоритм при экстренной трансфузии по жизненным показаниям.Лодин.pdf");
+        putDriveName(m,"1-AG_kI3g0Xzv7zfMUSFDW_93H8-ZEVQI","А-1-ПК-4.25 Алгоритм переливания эритроцитосодержащих компонентов донорской крови.Лодин.pdf");
+        putDriveName(m,"1X5tp_-CTB_v1nC83PTEFhBBkR9G8Llbo","А-1-ПК-5.25 Алгоритм переливания свежезамороженной плазмы.pdf");
+        putDriveName(m,"19ndj-H87wTn8eWI9CdsaovUlWvkF3IG7","А-1-ПК-6.25 Алгоритм действий при проведении трансфузии компонентами донорской крови реципиентам, с отягощенным трансфузионным анамнезом.pdf");
+        putDriveName(m,"1CHdmK7_h6vswLhe_QXVydmfwuNgyBhms","А-1-ПК-7.25 Алгоритм переливания концентрата тромбоцитов.pdf");
+        putDriveName(m,"1xp3mI_-ie9AJWecz9DYSgK6VPWCe7SlL","А-1-ПК-8.25 Алгоритм переливания криопреципитата.pdf");
+        putDriveName(m,"1oXkNgEZOxGJP9BnamWgsq2OdNsSoUp9-","А-1-ПР-12.26 Алгоритм действий медицинского персонала при определении профильного отделения пациента в спорных случаях.pdf");
+        putDriveName(m,"1_AgiLn8IQshQB6rab7XshTznofBs-RB0","А-1-ПР-21.26 Алгоритм ведения пациентов, нуждающихся в сестринском уходе, паллиативной медицинской помощи (ОСУ и ОПМП) и социальном обслуживании.pdf");
+        putDriveName(m,"1uxv4YCRmgQUcDX3v5wKDDVu2wSDKhrJ6","А-1-ПР-22.26 Порядок перевода пациентов внутри медицинской организации.pdf");
+        putDriveName(m,"14HTXw0QDfU1U7kSlngYusWgkb1sAhP3x","А-1-ПР-25.26 Алгоритм действий персонала при передаче телефонограммы в органы внутренних дел.pdf");
+        putDriveName(m,"1Q8Lzm1Kk27nu9B6n01BTJyRk8S6IZMXE","А-1-ПР-26.26 Транспортировка разных категорий пациентов, включая определение медицинского работникаработников для сопровождения (при необходимости).pdf");
+        putDriveName(m,"1Ze-9aEHDhHXg0C1eOWMPV1_7gEskCbjI","А-1-ПР-9.26 Порядок перевода пациента в другое медицинское учреждение.pdf");
+        putDriveName(m,"1VYW6s1vJRdlLJ8pOxS8CP7QcaBuri388","А-1-СМ-29.26 Оценка риска развития пролежней у пациента.pdf");
+        putDriveName(m,"16x7ywxJ6NxFbwjQ-aI8uxeqtkqnL7te8","А-1-СМ-4.26 Порядок внутривенного введения рентгеноконтрастных лекарственных препаратов в рентгеновском отделении.pdf");
+        putDriveName(m,"1xw0P3tnQUCUG907MIJ9Qq_XXEIVMijDR","А-1-УП-18.26 Алгоритм допуска врачей-анестезиологов-реаниматологов, врачей-стажеров, принятых на работу, к самостоятельной постановке центрального венозного катетера.pdf");
+        putDriveName(m,"1T5rb7rO25F2mWyyGdNnAjdPjv1FD1k_Y","А-1-ХБ-13.26 Алгоритм действий врачей при регистрации и передаче инородных тел, извлеченных из пациента.pdf");
+        putDriveName(m,"1Go3PFjEOjXUhTiaiBzO3WU3YGHS7Ne7v","А-1-ХБ-14.26 Алгоритм осуществления контроля работы операционного блока.pdf");
+        putDriveName(m,"19Icj4YH1umX1599ESuE7foac9p1I10ym","А-1-ХБ-31.26 Порядок оценки операционно-анестезиологического риска пациентов перед оперативным вмешательством.pdf");
+        putDriveName(m,"1msb8YgO5gkbhqHJZ-N6WL7knUJ9Feyxg","А-1-ЭБ-6.26 Приоритетный алгоритм размещения пациентов, нуждающихся в лечении в условиях отделения анестезиологии-реанимации №1.pdf");
+        putDriveName(m,"1fnUks7L2ENAUPKC7vI9J2p_A6L-Mgg8-","А-1-ЭМП-10.26 Алгоритм действий медицинского персонала при подозрении на ушиб сердца у пациента.pdf");
+        putDriveName(m,"1CdJazrMPA6byxcnBMqCtjpri7Ds_uEUG","А-1-ЭМП-11.26 Алгоритм действий медицинского персонала при подозрении на ушиб легкого у пациента.pdf");
+        putDriveName(m,"1EDQzBzrxdVu2YiWzIn9O2gra-3NuhS0v","А-1-ЭМП-15.26 Алгоритм действий персонала при проведении базовой сердечно-легочной реанимации.pdf");
+        putDriveName(m,"1ahL4PHn9C3G2Sve18e-Md2Tv_5rJh2hK","А-1-ЭМП-16.26 Алгоритм действий медицинского персонала при поступлении пациента со стенозом гортани, трахеи.pdf");
+        putDriveName(m,"1rIKLee_yLIx_hgm2aphsa4_FC5VhsiQU","А-1-ЭМП-17.26 Порядок фиксации и седации пациентов в операционном отделении для противошоковых мероприятий.pdf");
+        putDriveName(m,"1QFV3O4MqH1zegPqvYFLFBtCJchou18St","А-1-ЭМП-19.26 Порядок работы врача отделения скорой медицинской помощи при поступлении пациента с абстинентным синдромом и травматологической_соматической патологией.pdf");
+        putDriveName(m,"10jVUQJxKWE8NK4grtpxd7_t5kHxZ94ap","А-1-ЭМП-23.26 Порядок диагностики, маршрутизации и применения активной стратегии при оказании помощи пациентам с тромбоэмболией лёгочной артерии.pdf");
+        putDriveName(m,"1PejvKQ7HjvqfRAghipehMCBObsAZFoBE","А-1-ЭМП-24.26 Порядок ведения пациента с переломом проксимального отдела бедренной кости.pdf");
+        putDriveName(m,"12IrqeMvKVtBlC-hiEyzPckSPR83L2jRg","А-1-ЭМП-8.26 Порядок катетеризации центральных вен.pdf");
+        putDriveName(m,"1xdwULVm7l7HORoyxn4WPqqqx-qG1_WD2","А-1-ЭМП-9.25 Алгоритм действий медперсонала при поступлении пациентов с подозрением на диагноз Сочетанная травма.pdf");
+        putDriveName(m,"1WTrtG_t3ebM4QXl8rHFc4nkgKaSFYMUp","А-2-ПР-7.26 Алгоритм маршрутизации пациента с желудочно-кишечным кровотечением в ОСМП.pdf");
+        putDriveName(m,"17dy1pF_BphYGqBWr9UtHF8AvafAj3Lzy","А-2-ЭМП Алгоритм передачи критических значений по результатам исследований пациентов.pdf");
+        putDriveName(m,"13hMWS5xVAVISDsI55ZehSUzzwMn8PaZo","Алгоритм А-5-ЛП-015 ЛП ВР версия 2.pdf");
+        putDriveName(m,"17AWlbFHeoS4nF9BINMU-dIdUnIYpjb-V","Алгоритм А-5-ЛП-016 Правила обращения с ЛП ВР версия 2.pdf");
+        putDriveName(m,"1EMk8iWS-UMLxV5ptRgoqTnBo0al17-o1","СОП 004.22 орг.погрузо-разгр.работ.pdf");
+        putDriveName(m,"1AHT75T6zJVqMIs_QjozP2KiCiKALgznv","СОП 005.22.01ЛП.pdf");
+        putDriveName(m,"1jSNF42cyWfgRr8P78QNUoXAG05EXaVCI","СОП 005.24-02МСУ Уход за полостью рта.pdf");
+        putDriveName(m,"1PfRDfmzjyCbpdJF7iLHpudA6hbhD3Un8","СОП 008.22.01ЛБ Порядок отпуска лекарственных препаратов.pdf");
+        putDriveName(m,"1Bta2ALJ8VUKtPLm2BeM0QkpQVpEpry2B","СОП 009.22.01ЛБ Порядок отпуска медицинских изделий.pdf");
+        putDriveName(m,"1_gSMkr_xh6dcydXOxIxAOYjM9CvCwTue","СОП 009.24-01ИВ Выполнение внутримышечной инъекции.pdf");
+        putDriveName(m,"1wBu7PVX-b5fKfjlr_SG8sepAAJB4PtCQ","СОП 010_25-01ЛП Выполнение исследования «Определение антител к вирусу гепатита A (Hepatitis A virus)..pdf");
+        putDriveName(m,"1_PHqbULCGIahO2tdeu-7gSdfRYaP0Kyd","СОП 013 Выполнение исследования «клинический анализ крови» с использованием автоматического гематологического анализатора MINDRAY BC-5380.pdf");
+        putDriveName(m,"17fDnwyBqQCcYbNbww-M4Qg_DZyAsepHR","СОП 014_25-01ЛП Определение кислотоустойчивых микобактерий (КУМ) методом световой микроскопии в преп..pdf");
+        putDriveName(m,"12VTNZCuLP6pz4X0mLj9czl8Q-0EwucYF","СОП 016.25-01МСУ Исследования глюкозы крови с помощью глюкометра.pdf");
+        putDriveName(m,"1ykVuVlLXcNYnyiN5-qKxpapyDdDfaA-Y","СОП 022 Приготовление суспензии (бариевой взвеси) из рентгеноконтрастного средства Бария сульфат.pdf");
+        putDriveName(m,"1MBjFGSn1EdPfvWZ0lNIUYDxROkRJkCY6","СОП 023 Хранение рентгеноконтрастного средства Бария сульфат в рентгеновском отделении.pdf");
+        putDriveName(m,"1QOi3nNoGLt4fFUX3GmPvRwg1nNm8L-gR","СОП 024 Наложение электродов и регистрация ЭКГ в 12-ти отведениях.pdf");
+        putDriveName(m,"1CDma0NrnUSLpn1pDzUBtySKluGgyLMpB","СОП 025 Подготовка пациента к рентгеноскопическому исследованию с рентгеноконтрастным средством Бария сульфат.pdf");
+        putDriveName(m,"1SPEDjJODvPueTT7L716bUwNoZfP0BiqU","СОП 026.23-01МСУ Постановка подкожной инъекции инсулина с помощью шприц-ручки.pdf");
+        putDriveName(m,"1_IVa9VjzaFHuebh4jX7_EYSLAxQUUMJ5","СОП 027.23-01МСУ Действия медицинской сестры при подготовке пациента к плановой операции.pdf");
+        putDriveName(m,"16DcVwU2txtOkXu4f7To6_38HeeP5KwwG","СОП 028.23-01МСУ Рентгенологическое исследование органов грудной клетки (флюорография).pdf");
+        putDriveName(m,"1_-E-g0aF5zo-TcWtwPeBW7YzJARh6LwR","СОП Выполнение подкожной инъекции.pdf");
+        putDriveName(m,"1sEw8QuM93Mp8a6tYWRHjos_pycIxtpCf","СОП Гигиена рук медицинского персонала.pdf");
+        putDriveName(m,"1kt18I4o2NhWWel4a-SHmW_8J5fhL_zke","СОП Обработка оборудования для УЗИ.pdf");
+        putDriveName(m,"1NUJVRpbEM5fNDxq7JcGN-yDd3TZQP9nl","СОП Организация и осуществление дезинсекционных мероприятий.pdf");
+        putDriveName(m,"16c-BEZwCpRjOJF367r98dckKxWH9aiyH","СОП порядок проведения генеральной уборки.pdf");
+        putDriveName(m,"1l_QjMShSztch30BSlwTz0maDQDX9KVg_","СОП Профилактика анаэробной инфекции.pdf");
+        putDriveName(m,"1pN9haEWv-SBwuQtMxAujaB3ZpLXS1dWu","СОП Профилактика педикулеза и чесотки.pdf");
+        putDriveName(m,"1DzBXGy9d59iaESJEm-izzWNI2JGDmQh0","СОП Санация трахеобронхиального дерева.pdf");
+        putDriveName(m,"17pHsm8Z1Jsg0P_QSJiw9bazhegjrYeM5","СОП Хирургическая обработка кожи опер.поля.pdf");
+        putDriveName(m,"1Msqi_2fEjO77CYgosTFEt0BK2JDXvo15","СОП-1-ВК-86.25 Порядок организации и проведения анкетирования пациентов.pdf");
+        putDriveName(m,"1saFkG3Hfloljs74iGRspFlD1FuP4kcau","СОП-1-ВК-87.25 Правила оформления, порядок согласования и регистрации СОПов и алгоритмов.pdf");
+        putDriveName(m,"1EDF-L4fET_bzDBHpynGvn4r3EqVSp59z","СОП-1-ВК-99.25 Порядок регистрации и управления нежелательными событиями.pdf");
+        putDriveName(m,"1YwsAAOq516Hy-vh0_bQcBWvFJ-QidV-2","СОП-1-ПК-90.25 Оценка эффективности трансфузии компонентами донорской крови.pdf");
+        putDriveName(m,"1Udvl5Z7hKNw40JQgcM40Qwuy2Q1NNpDg","СОП-1-ПК-91.25 Правила назначения компонентов донорской крови.pdf");
+        putDriveName(m,"1APUEBo1xfDOCfvcmMQnsY9YVKuHeA62m","СОП-1-ПК-92.25 Действия медицинского персонала при возникновении реакций и осложнений у реципиентов, связанных с трансфузией.pdf");
+        putDriveName(m,"14UThS3AsUUcIPr4qKpjse-FxoO0j0KXY","СОП-1-ПК-93.25 Проведение реинфузии аутоэритроцитов на аппарате Sorin.xtra.pdf");
+        putDriveName(m,"1RKgxkIH_q_ALTw--SP3L38SXSRCCL8Vm","СОП-1-ПР-13.26 Порядок действий персонала при обнаружении тела человека без признаков жизни на территории учреждения.pdf");
+        putDriveName(m,"1dElNpZp9sr9t8nU7JI4PpN3guRyy9z6v","СОП-1-ПР-2.26 Порядок перевода пациентов в отделения анестезиологии-реанимации.pdf");
+        putDriveName(m,"1apcC8niUNQeO2EQJWAcHsYIlyMXWLld8","СОП-1-ПР-98.25 Регламент определения уровня глюкозы.pdf");
+        putDriveName(m,"1AV6yUgH-fRImkFUX9fiBBVckjunl1aoK","СОП-1-СМ-16.26 Профилактика пролежней.pdf");
+        putDriveName(m,"1EYcsjMpAVdV6ycvurtuFnyCX2zjLhQit","СОП-1-УП-6.26 Регламент работы плановой операционной медсестры.pdf");
+        putDriveName(m,"1aQr5uKJa3zNIcpM0IfCXmobZircqY7gz","СОП-1-УП-9.26 Порядок работы старшего врача отделения скорой медицинской помощи.pdf");
+        putDriveName(m,"1g4g0GBXPTTfMMrpEA5TlnPY6mfQ5WZ4o","СОП-1-ХБ-5.26 Порядок оформления направления и транспортировки биопсийного (операционного) материала в патологоанатомическое отделение.pdf");
+        putDriveName(m,"1nv1jy-TxKNzGhuUewXIuuY5idcqdIUZ5","СОП-1-ХБ-97.25 Контроль обеспечения хирургической безопасности в плановой операционной при оперативных вмешательствах под наркозом.pdf");
+        putDriveName(m,"1-GDZocbcxLeZxcQCeYE97vTKPoHyvkBy","СОП-1-ЭБ-1.26 Стандартные определения случаев инфекций, связанных с оказанием медицинской помощи.pdf");
+        putDriveName(m,"19jzI5j8EggcD2EsacXIGlemqvE-B3En5","СОП-1-ЭМП-100.25 Порядок лечения пациентов в блоке экзогенной интоксикации отделения скорой медицинской помощи_compressed.pdf");
+        putDriveName(m,"1FI-HPXm4hpOXlmbb0vy125Bp7MuiPN1f","СОП-1-ЭМП-101.25  Регламент работы блока экзогенной интоксикации отделения скорой медицинской помощи.pdf");
+        putDriveName(m,"1q7YH-vb9B7ektHtgbf8qLYwycjtHjBtE","СОП-1-ЭМП-102.25 Регламент использования Чек-листа обследования пациента в отделении скорой медицинской помощи в СПб ГБУЗ «Елизаветинская больница».pdf");
+        putDriveName(m,"1rhQG3QynJq-r2asLRBfEnN0hq8RDicjo","СОП-1-ЭМП-11.26 Порядок действий медицинского персонала при развитии у пациента криза злокачественной гипертермии.pdf");
+        putDriveName(m,"1viEy6njVrvWEqgT0Y1I9zZmy_RXmUjDN","СОП-1-ЭМП-4.26 Порядок действий медицинского персонала при анафилактическом шоке.pdf");
+        putDriveName(m,"116-_4MvlOOU7UQfiiLuptCcXx9wlFeeU","СОП-2-ИД-12.26 Идентификация личности пациентов.pdf");
+        putDriveName(m,"1lsb8UUhBnBIhH1xzcf0Usbc8BiY4Qhxd","СОП-2-ЭБ-15.26 Обеззараживание биологического материала и изделий медицинского назначения, контаминированных микроорганизмами II – IV групп патогенности, а также при проведении работ с ПБА.pdf");
+        putDriveName(m,"1nf3xSdrh3HxSrUP20oZJaU7hby_2a68T","СОП-2-ЭБ-7.26 Обработка силового оборудования после хирургического вмешательства.pdf");
+        putDriveName(m,"1GL4BFSu1cLrlf_TnBtsNJh0hYPj7ySg-","СОП-3-А-95.25 Порядок хранения лекарственных препаратов.pdf");
+        putDriveName(m,"19-BZ6Zt3j_FAF9O_UvGVDCIW7rZSidCo","СОП-3-ЭБ-96.25 Экстренная профилактика парентеральных инфекций.pdf");
+        putDriveName(m,"1OCUA8wiJWAzQNSo-U3qufRvOypX-fuLn","СОП-4-ЭБ-14.26 Порядок соблюдения биологической безопасности в клинико-диагностической лаборатории.pdf");
+        putDriveName(m,"1vtCo5dfLp5LmZpJSVjRQLtgzzSYhcEUD","СОП002.24-01ЭП Алгоритм осуществления дежурства врачом-хирургом операционного отделения для противошоковых мероприятий.pdf");
+        putDriveName(m,"10zwTAeJexX0YTSHEk6eaxht2izJdQ-BA","СОП003.22.02ЛБ Контроль температуры.pdf");
+        putDriveName(m,"15lRshIzPOXlAX8UPEcY6oO0XNldLOMWY","СОП003.24-01МО Панорамная рентгенография. Синонимы телерентгенограмма, сшивка.pdf");
+        putDriveName(m,"1LQ3Vvsf4bUw2FrbULY1CHAVsPWiHb9sc","СОП004.24-01МО Эксплуатация механического поршневого дозатора.pdf");
+        putDriveName(m,"19PHJJFU-j7jH7VQKlC9vK-0UuS2-04c4","СОП005_25-01ЛП Выполнение исследования «Определение антигена гепатита В (HbsAg) в крови (экспресс-тест)» с использованием иммунохроматографических тест-систем.pdf");
+        putDriveName(m,"1vPGB3c8f99Jt4T2seOpwUD37-X3n5yUC","СОП006.24-01МО Порядок работы медицинской сестры при промывании нёбных миндалин аппаратом ТОНЗИЛЛОР-ММ.pdf");
+        putDriveName(m,"1uUJAP0q0yZjIaTtcsPjv3qDf0UBfi3My","СОП007.24-01МО Порядок работы медицинской сестры при проведении манипуляций в условиях перевязочной АКО.pdf");
+        putDriveName(m,"1q1FzL-fOrUuXGbSzhVdB8Csxgru1SU2x","СОП008.24-01ИВ Взятие мазков на степень чистоты влагалища.pdf");
+        putDriveName(m,"1GQyGZOUQLnN0-_ZHHXCrUmU75VCpDW93","СОП009.25-01МО Алгоритм обработки видеоэндоскопов «PENTAX» EG-2990K, ED-3490TK, ED-34i10T, ЕС-3890FK, EC-38-i10L, ЕВ19-J10».pdf");
+        putDriveName(m,"1zCkHPWuGOPvDwgoIBtTGNlTtjwy98XEJ","СОП010.24-01ИВ Инстилляция мочевого пузыря.pdf");
+        putDriveName(m,"1FkU5OVPeu16diNEEuHwexrJ73APSRA8d","СОП011.24-01МСУ Порядок надевания и снятия памперса взрослому пациенту в положении лежа.pdf");
+        putDriveName(m,"1okou4A9dziilD9SYE9Z8WTGeBo6451Yg","СОП012.24-01ЭБ Лабораторная диагностика малярии.pdf");
+        putDriveName(m,"1OWZzTw1PLwJAlyogCaOxIudCgGETJtRP","СОП014.22-01ЭБ.pdf");
+        putDriveName(m,"1bacY3yNb1T18gwbjnZri---VMhGG_C2e","СОП017.25-03ПК Регистрация донора.pdf");
+        putDriveName(m,"1ME0oRtPMHBk-hYCpieWoIlWn6r2ak74K","СОП018.25-03ПК Первичное лабораторное обследование донора крови, плазмы и клеток.pdf");
+        putDriveName(m,"1gSYgM_0cJFmrzvUU8_XjvmFbuAGbB26v","СОП019.25-01ПКОпределение группы крови, резус-фактора и антигена К  у доноров моноклональными антителами (цоликлонами).pdf");
+        putDriveName(m,"1YYCJJB7ZmbUC7ywjhN6vCpyvmknFghHI","СОП020.24-01ИВ Взятие капиллярной крови для определения глюкозы на анализаторах “BIOSEN”.pdf");
+        putDriveName(m,"1IS90OwGdWjfUuQYNIPQFIcMCioB1K2Ng","СОП020.25-03ПКОпределение уровня гемоглобина в крови донора на портативном гематологическом анализаторе «Hemo Control».pdf");
+        putDriveName(m,"1lN4za78rTozmXMroFr5uhjETAFL7M46B","СОП021..24-01ЛБ Порядок закупки лекарственных препаратов (2).pdf");
+        putDriveName(m,"1UbpRw30iLlux4taMo2t_Us50YbNhRaDf","СОП021.25-01ПК Внутрилабораторный контроль качества моноклональных антител (цоликлонов).pdf");
+        putDriveName(m,"1uaUkgRq3rKeXnNvzOvRXywEu9NJN9sIs","СОП022.25-01ПК Постановка контроля качества на портативном гематологическом анализаторе «Hemo Control».pdf");
+        putDriveName(m,"1T7KLDgXNvCfy-z7ezFziGRvqfg3v2Ueb","СОП023.25-03ПК Определение белковых фракций на анализаторе акустическом АКБа-01 БИОМ.pdf");
+        putDriveName(m,"1KwC8tOe1PziFddHlgMg7B0IffqaklrOO","СОП024.25-01ПК Контроль качества гематологических исследований, выполняемых на анализаторе Medonic M-Series.pdf");
+        putDriveName(m,"1T0QbpXpBx7Ovxc56IlefV_qbdgsfu4Fy","СОП025.25-03ПК Определение клинического анализа крови на гематологическом анализаторе Medonic M-Series.pdf");
+        putDriveName(m,"1B4DWqNY3cCxkInPSxfIRluykLkCE0dLN","СОП026.25-03ПК Прием доноров врачом-трансфузиологом.pdf");
+        putDriveName(m,"10l9A5XE7Jr3WDybKx72Tv0BQT5_bHPEz","СОП028.25-01ПК Подготовка и проведение процедуры донации.pdf");
+        putDriveName(m,"16KTFaut1GHWM3eCrHpKyrDZRRJdUzi2j","СОП029.25-03ПК Производство эритроцитной взвеси, с удаленным лейкотромбослоем (без ЛТС) и плазмы из дозы консервированной крови, заготовленной в счетверенные гемоконтейнеры производства Terumo.pdf");
+        putDriveName(m,"1Rxb5GYPKCxFHyJsDlFh3V7R2MAyqWubO","СОП030.25-03ПК Производство фильтрованной эритроцитной взвеси и фильтрованной плазмы из дозы консервированной крови, заготовленной в счетверенные гемоконтейнеры производства Macopharma.pdf");
+        putDriveName(m,"1y7G3nn-hOONqEoiVeykubZPTpfroMbrx","СОП031.25-01ПК Алгоритм действий персонала при разрыве гемакона с кровью во время центрифугирования.pdf");
+        putDriveName(m,"1DZILqNaFILuUAeljhc3abY5XQ2MOhBOv","СОП032.25-03ПК Выполнение процедуры сбора тромбоцитного концентрата аферезного фильтрованного на аппарате Trima Accel.pdf");
+        putDriveName(m,"1cnhI1CPYEObGDTiTXEYFxjq2_p4cc7eK","СОП033.25-03ПК Выполнение процедуры вирусинактивации тромбоцитного концентрата в добавочном растворе в камере светового облучения Mirasol.pdf");
+        putDriveName(m,"1hf50GFoKDAKejARUBQkwpYejs7sE1NKB","СОП034.25-03ПК Выполнение процедуры сбора плазмы на аппарате PCS-2.pdf");
+        putDriveName(m,"1RxcLcpcgo4erof4No6obNp0TbrKs5QUk","СОП035.25-03ПК Выполнение процедуры сбора двойной дозы эритроцитов на аппарате MCS+.pdf");
+        putDriveName(m,"1TZ8HToQtQ-67p9B9ppEDuiGXSMPxuJ48","СОП036.25-03ПК Выполнение процедуры сбора плазмы на аппарате Autopheresis-C (Вахter).pdf");
+        putDriveName(m,"1e6n5bS_P8TdL1spp-v-mm6cJ-QC6SiFD","СОП037.25-03ПК Выполнение процедуры вирусинактивации свежезамороженой плазмы на аппарате Macotronic-B2.pdf");
+        putDriveName(m,"1p0unDh5o_e8WuXN-XilvrKpNWoefLI7w","СОП039.25-03ПК Получение отмытых эритроцитов на аппарате Haemonetics ACP 215.pdf");
+        putDriveName(m,"1jRa_fcurTqnEqqrcoROEzWJG9zZwf-P4","СОП040.25-03ПК Глицеролизация эритроцитов на аппарате Haemonetics ACP 215.pdf");
+        putDriveName(m,"1XOO5BotPi0_yCFuR5YivVqDpZMfLXIAb","СОП041.25-03ПК Деглицеролизация эритроцитов на аппарате Haemonetics ACP 215.pdf");
+        putDriveName(m,"1DdGcvoPZFc_MvswJtaeJ-H9sZ86Eh3eB","СОП043.25-01ПК Изготовление криопреципитата из дозы плазмы.pdf");
+        putDriveName(m,"1dy7BimdI-ufTi5DzU4g6mo0UVaNaJ2nk","СОП044.25-01ПК Работа на аппарате для стерильного соединения пластиковых магистралей.pdf");
+        putDriveName(m,"1-O-M0JCztBVBdWDIqd_zn7U0w5PT2T4v","СОП045.25-01ПК Работа с запаивателем пластиковых магистралей.pdf");
+        putDriveName(m,"1Uomm9aGOXKh1MdXyJmzamzS5Ha1_0zTD","СОП046.25-01ПК Оказание помощи донору, в случае возникновения реакции или осложнения.pdf");
+        putDriveName(m,"1vliP9iP4S2A8lmphyz0HaXaVDnYshU7R","СОП047.25-01ПК Отбор образцов компонентов крови для проведения исследований по контролю качества.pdf");
+        putDriveName(m,"1kdJtj7BAsSiCy_ec2EUi49QlhqFJrt2C","СОП049.25-01ПК Работа с дистиллятором для получения воды очищенной (дистиллированной), используемой в лабораторных процессах.pdf");
+        putDriveName(m,"1wJ8YsYXA2x6BRxaMi2LmJ5buSpM5AWDb","СОП050.2501ПК Подсчёт лейкоцитов на гематологическом анализаторе «Адам».pdf");
+        putDriveName(m,"1yeZKNFhcxULenpWZtKQnzkpH0zbCMF04","СОП051.25-03ПК Определение группы крови и резус-фактора у доноров с применением моноклональных антител и стандартных эритроцитов.pdf");
+        putDriveName(m,"1aNeCQvPFnYo5ApzrH9-ygaUX7fgc6Bl7","СОП052.25-03ПК Фенотипирование крови человека (донора) по групповым системам Резус, Келл (цоликлонами).pdf");
+        putDriveName(m,"18s-BC98YHcSeUGCdqDsNZS2yNzi-jZIR","СОП053.25-03ПК Определение иммунных антиэритроцитарных антител (скрининг антител) доноров.pdf");
+        putDriveName(m,"1Yi_gBM1L_xV8Eh6tMU9G0R1nY-3iC7Ab","СОП054.25-01ПК Определение группы крови и резус-фактора методом колоночной агглютинации (перекрестный метод) доноров.pdf");
+        putDriveName(m,"14v1qG5xMnQPm9d_K-aZ-RQKNqPomn5WP","СОП055.25-03ПК Фенотипирование крови человека по групповым системам Резус, Келл (метод колоночной агглютинации) доноров.pdf");
+        putDriveName(m,"1I9NE6dDDeGB1KNiHr6qgUNNyIsZtnTrC","СОП056.25-01ПК Определение иммунных антиэритроцитарных антител (идентификация антител) доноров.pdf");
+        putDriveName(m,"1ryqhNFulr7v-SQEG4vrGPu3wWFCAAoX1","СОП057.25-01ПК Определение слабого,вариантного антигена D  в реакции   непрямой пробы Кумбса (НАГТ) доноров.pdf");
+        putDriveName(m,"1I61zk2HU4o9BavvDRv-UftN6-FkU0DgX","СОП058.25-01ПК Иммуногематологическое обследование крови доноров на автоматизированном иммуногематологическом анализаторе.pdf");
+        putDriveName(m,"1gPoz0mVGmTkA7rJ1CKn1uLD6bbaTdqLB","СОП059.25-01ПК Алгоритм действий персонала в случае повреждения пробирок с кровью в процессе центрифугирования.pdf");
+        putDriveName(m,"17FEAPoxPtD4Nf1wNLC4Ei4godE6CWjIq","СОП060.25-01ПК Определение активности фактора VIII на полуавтоматическом коагулометре «Technology Solution 4».pdf");
+        putDriveName(m,"1E6ZxAGUJWzFKsO-bq3D771BEGcSr7AmV","СОП061.25-01ПК Определение концентрации фибриногена на полуавтоматическом коагулометре «Technology Solution 4».pdf");
+        putDriveName(m,"1QZAUWIDNW8yvbqFzZqyA-8J_cFOsylFC","СОП062.25-01ПК Первичное определение группы крови и резус-фактора пациентов с применением моноклональных антител.pdf");
+        putDriveName(m,"19uNp6TOUpZ8Lxq4AOje-Jlz0yq97l-aE","СОП063.25-01ПК Подтверждающее определение группы крови и резус-фактора пациентов с применением моноклональных антител и стандартных эритроцитов.pdf");
+        putDriveName(m,"12Zhgg3Zb8EkxY2LklN_CSiVk3JBxuR_l","СОП064.25-01ПК Определение группы крови и резус-фактора методом колоночной агглютинации (перекрестный метод) пациентов.pdf");
+        putDriveName(m,"1Wmb7Fhcr6osEv3TS-BQrXD9ijqrqd2D1","СОП065.25-01ПК Фенотипирование крови человека (пациента) по групповым системам Резус, Келл (цоликлонами).pdf");
+        putDriveName(m,"1tq59Lh2xs6406HXS7CP4OoQuxcm92jfp","СОП066.25-01ПК Фенотипирование крови человека по групповым системам Резус, Келл (метод колоночной агглютинации) пациентов.pdf");
+        putDriveName(m,"17eRJlQhKBgDj-bIseMBpAOTFIDQh-jTc","СОП067.25-01ПК Определение иммунных антиэритроцитарных антител    (скрининг антител) пациентов.pdf");
+        putDriveName(m,"1JvJUSjab3h5dJ56go-r6z41dBTDcCggR","СОП068.25-01ПК Определение иммунных антиэритроцитарных антител (идентификация антител) пациентов.pdf");
+        putDriveName(m,"1_NSYG870NnbhuhQsH0rX_RhwyxFy6-j_","СОП069.25-01ПК Иммуногематологическое обследование крови пациентов на автоматизированном иммуногематологическом анализаторе.pdf");
+        putDriveName(m,"1RDgeK0uOL_ok4WvRgkwv-ZNxU7mRfeai","СОП070.25-01ПК Проведение проб на совместимость крови донора и реципиента.pdf");
+        putDriveName(m,"1lGrqyySF1Js_o6yejA_WHkh0102F1qr3","СОП071.25-01ПК Проведение проб на индивидуальную совместимость крови донора и реципиента.pdf");
+        putDriveName(m,"1rUORWyXe2VHxz8f4psNiX2_MthdgVR0O","СОП072.25-03ПК Проведение внутрилабораторного контроля качества иммуногематологических исследований.pdf");
+        putDriveName(m,"1C27FgwXWIWFCFtgxyqyKK5vo2v2cFfUx","СОП073.25-03ПК Карантинизация свежезамороженной плазмы.pdf");
+        putDriveName(m,"1JuA7B3ipBPs3IHEArC4vofSwHK1v6XTe","СОП075.25-01ПК Транспортировка донорской крови и её компонентов между медицинскими учреждениями с помощью термоконтейнеров.pdf");
+        putDriveName(m,"1hEai6AcbXvsMNJijs-AfSD4MRni7TKxl","СОП076.25-01ПК Расчет планового запаса компонентов донорской крови.pdf");
+        putDriveName(m,"1N0AawA-Y66pOodb4Jxz4W3ZVieb1D6g1","СОП077.25-01ПК Плановое обеспечение компонентами донорской крови.pdf");
+        putDriveName(m,"1T0yYjXIBSQMAcy6Av3LmQ80CrkH5-6Wh","СОП078.25-01ПК Экстренное обеспечение компонентами донорской крови.pdf");
+        putDriveName(m,"116pvoRGsdABRxjQhmpxwQ91-GODbsvje","СОП079.25-03ПК Заказ и выдача продукции в экспедиции отделения переливания крови.pdf");
+        putDriveName(m,"1iaW5tREmGyHyR_ac_J-18RwoK1P8Ewxw","СОП080.25-01ПК Хранение компонентов крови в экспедиции отделения переливания крови.pdf");
+        putDriveName(m,"1_BqCxr2o6PvzCpHaUNJS9qh5L4LAnVg8","СОП081.25-03ПК Выпуск готовой продукции, с дальнейшей передачей компонентов крови для хранения в экспедицию или на карантинное хранение.pdf");
+        putDriveName(m,"1Scc1hIQ0dXNPpryrKD7Pv80xZbU0IxO6","СОП082.25-01ПК Обеспечение прослеживаемости и идентификации компонента донорской крови.pdf");
+        putDriveName(m,"1DBXnyp1uyCdjRgXQ6nbr-SrB0qmQPKt7","СОП083.25-01ПК Макроскопическая оценка компонентов донорской крови.pdf");
+        putDriveName(m,"1KkJVmRl-1tTLa05wFKF7dKmWyMXcJh--","СОП084.25-03ПК Подготовка компонентов донорской крови с использованием аппарата для быстрого размораживания, подогрева и хранения в теплом виде плазмы, крови и инфузионных растворов.pdf");
+        putDriveName(m,"1vMwXf00ZD0Dl1c8I1o1f59Z1xa3liqV6","СОП085.25-03ПК Возврат компонентов донорской крови в экспедицию.pdf");
+        putDriveName(m,"1XOjdWII1ijcDa2ufSYL7wJDkM6hMTSwt","№002 Дезинфекция предметных стекол.pdf");
+        putDriveName(m,"1RaUtWI2gXbVQjaUHcU1DOh-PfJuuIdKZ","№003 Техника паразитологической (микроскопической) диагностики малярии. Подготовка предметных стекол..pdf");
+        putDriveName(m,"1_-VR1Ys9paNAiGE9Vy3ncwd_BdNYDoL7","№004 Дезинфекция капилляров Панченкова.pdf");
+        putDriveName(m,"1SI_SzCIpVQgxvL5_9Mg4AHlgWgU1sssY","№005 Обеззараживание биологического материала и изделий медицинского назначения, контаминированных микроорганизмами II-IV групп патогенности с использованием стерилизатора парового автоматического с во.pdf");
+        putDriveName(m,"1RJyjES8q9Ki9yoX_9PM4wmpQ_TDc5zQw","№006 Эпидемиологическая безопасность при эксплуатации пневматической почты.pdf");
+        putDriveName(m,"1BWvTkQ7REDg6md6lPh4WDcIEJNi7umkm","№007 Применение системы безведерной уборки СВЕП на базе комплексных тележек ОРИГО 2 от Vileda Professional (Германия) для проведения влажной текущей и генеральной уборок, а также дезинфекции.pdf");
+        putDriveName(m,"11iLVa81U9WD-nRJuN_rtXiefmH4DRdnp","№008 Обращение с отходами класса В в клинико-диагностической лаборатории.pdf");
+        putDriveName(m,"1eqDmGj-Bxz4CJL_OrqbmYVtJ5SE0rV-i","№009 Обращение с отходами класса Б в клинико-диагностической лаборатории.pdf");
+        putDriveName(m,"1oPvjzmVgE03y007zU6AgbbA-CnUj0b-X","№014 Выполнение исследования Качественное выявление антигена коронавируса SARS-CoV-2 в мазках из носоглотки или ротоглотки человека с использованием иммунохроматографических тест-систем.pdf");
+        putDriveName(m,"1Xg4WuQwAe0OtuHz96SPffQjZy2_FF_Od","№015 Порядок преаналитического этапа при заборе материала для диагностики  коронавирусной инфекции COVID-19 методом ПЦР.pdf");
+        putDriveName(m,"1jATxSUROR1FYJ2uQHAMjHdTnOuHmNHXJ","№253.pdf");
+        putDriveName(m,"1jFWFM_qSatMCz9oQ2xnbmQ7qJlIdWJ9B","№361.pdf");
+        putDriveName(m,"1SGTrtClGxFRy7pLwyOMNu3XHlRng2QcH","№553 Обработка аппаратов искусственной вентиляции легких  Datex-Ohmeda Engstrom Pro, CARESCAPE R860, Engstrom Carestation.pdf");
+        putDriveName(m,"1_EJ1E4qdwcSEejs1g9jbX7updeTTUXjv","№553 Обработка наркозно-дыхательного аппарата GE Carestation 620 A1.pdf");
+        putDriveName(m,"1v89gMxNXfcuvXUM3P1fkS2xwWMg6zhlw","№553 Обработка портативных аппаратов искусственной вентиляции легких Drager Carina.pdf");
+        putDriveName(m,"1C3RaC3DGMDY8fmRX44dITil9583qoYAi","№553 Обработка портативных аппаратов искусственной вентиляции легких Drager Oxylog 3000 plus.pdf");
+        putDriveName(m,"17IownyqQgYLCDtFMbn1N_a32MWfzscV_","№553 Drager Savina, Drager Savina 300, Evita V300.pdf");
+        putDriveName(m,"1n9v0PSxhZYX1pURGfftGyLl6hIFBGv5O","№А-1-ПР-1.26 Алгоритм маршрутизации пациента с подозрением на внебольничную пневмонию и острое нарушение мозгового кровообращения.pdf");
+        putDriveName(m,"1Mbl-_YlJfuJqODTmCYnKUpwWcAlTvBhR","№А-1-ПР-2.26 Алгоритм маршрутизации пациента с подозрением на острый коронарный синдром и внебольничную пневмонию.pdf");
+        putDriveName(m,"19vPYwx1EAa6HDQTvJs0BoKZZ0YIWvC6U","№А-1-ПР-3.26 Алгоритм маршрутизации пациента с подозрением на инфекционный гастроэнтероколит_ОРВИ_COVID-19.pdf");
+        return m;
+    }
+
+    private static void putDriveName(Map<String,String> m,String driveId,String fileName){
+        m.put(canonFileName(fileName),driveId);
+    }
+
+    private static String canonFileName(String s){
+        String n=SopClassifier.norm(s==null?"":s).replace('_',' ');
+        n=n.replaceFirst("\\.(pdf|docx?|rtf)$","");
+        return n.replaceAll("\\s+"," ").trim();
+    }
+
     static boolean matches(SopDocument d,String group){
         if(d==null||group==null)return true;
         Set<String> set;
@@ -1407,6 +1618,8 @@ class SopPersonnelIndex {
             default:return true;
         }
         if(set.contains(d.key))return true;
+        String mappedDriveId=DRIVE_ID_BY_NAME.get(canonFileName(d.fileName));
+        if(mappedDriveId!=null&&set.contains(mappedDriveId))return true;
 
         // Safe fallback for newly added documents whose title itself explicitly
         // contains the personnel group. Current files are indexed by Drive ID.
