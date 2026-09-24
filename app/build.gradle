@@ -33,6 +33,7 @@ android {
     buildTypes {
         debug {
             versionNameSuffix "-test"
+            debuggable false
             if (keystorePath) signingConfig signingConfigs.release
         }
         release {
