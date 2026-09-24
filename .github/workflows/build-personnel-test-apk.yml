@@ -41,6 +41,8 @@ jobs:
 
       - name: Re-sign APK with v1 signature for artifact transport
         run: |
+          mkdir -p "$HOME/.android"
+          keytool -genkeypair -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
           "$APKSIGNER" sign             --v1-signing-enabled true             --v2-signing-enabled false             --v3-signing-enabled false             --ks "$HOME/.android/debug.keystore"             --ks-key-alias androiddebugkey             --ks-pass pass:android             --key-pass pass:android             --out /tmp/personnel-v1.apk             app/build/outputs/apk/debug/app-debug.apk
           "$APKSIGNER" verify --verbose --print-certs /tmp/personnel-v1.apk
