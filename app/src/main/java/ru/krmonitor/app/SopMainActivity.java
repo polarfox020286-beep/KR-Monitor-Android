@@ -46,6 +46,8 @@ public class SopMainActivity extends Activity {
     private SopDocument pendingDownload;
     private TextView status,source,recentList;
     private EditText search;
+    private String personnelFilter=null;
+    private final LinkedHashMap<String,TextView> personnelChipViews=new LinkedHashMap<>();
     private FrameLayout contentHost;
     private LinearLayout bottomNav;
     private TextView navAll,navGroups,navHistory;
@@ -254,6 +256,29 @@ public class SopMainActivity extends Activity {
         searchBox.addView(search,new LinearLayout.LayoutParams(0,dp(44),1));
         root.addView(searchBox,new LinearLayout.LayoutParams(-1,dp(46)));
 
+        HorizontalScrollView personnelScroll=new HorizontalScrollView(this);
+        personnelScroll.setHorizontalScrollBarEnabled(false);
+        personnelScroll.setFillViewport(false);
+        LinearLayout personnelRow=new LinearLayout(this);
+        personnelRow.setOrientation(LinearLayout.HORIZONTAL);
+        personnelRow.setGravity(Gravity.CENTER_VERTICAL);
+        personnelRow.setPadding(0,dp(5),dp(4),dp(1));
+
+        String[] personnelOptions={
+                "Врачи",
+                "Средний медицинский персонал",
+                "Младший медицинский персонал",
+                "Немедицинский персонал",
+                "Весь персонал"
+        };
+        for(String option:personnelOptions){
+            TextView chip=personnelChip(option);
+            personnelChipViews.put(option,chip);
+            personnelRow.addView(chip);
+        }
+        personnelScroll.addView(personnelRow,new HorizontalScrollView.LayoutParams(-2,dp(39)));
+        root.addView(personnelScroll,new LinearLayout.LayoutParams(-1,dp(42)));
+
         contentHost=new FrameLayout(this);
         LinearLayout.LayoutParams contentLp=new LinearLayout.LayoutParams(-1,0,1);
         contentLp.setMargins(0,dp(6),0,dp(7));
@@ -282,15 +307,14 @@ public class SopMainActivity extends Activity {
         });
         source.setOnClickListener(v -> chooseFolder());
 
-        navAll.setOnClickListener(v->{selectedCategory=null;currentPage=PAGE_ALL;renderCurrentPage(0);});
-        navGroups.setOnClickListener(v->{selectedCategory=null;currentPage=PAGE_GROUPS;renderCurrentPage(0);});
-        navHistory.setOnClickListener(v->{selectedCategory=null;currentPage=PAGE_HISTORY;renderCurrentPage(0);});
+        navAll.setOnClickListener(v->{personnelFilter=null;updatePersonnelChips();selectedCategory=null;currentPage=PAGE_ALL;renderCurrentPage(0);});
+        navGroups.setOnClickListener(v->{personnelFilter=null;updatePersonnelChips();selectedCategory=null;currentPage=PAGE_GROUPS;renderCurrentPage(0);});
+        navHistory.setOnClickListener(v->{personnelFilter=null;updatePersonnelChips();selectedCategory=null;currentPage=PAGE_HISTORY;renderCurrentPage(0);});
 
         search.addTextChangedListener(new TextWatcher(){
             public void beforeTextChanged(CharSequence s,int st,int c,int a){}
             public void onTextChanged(CharSequence s,int st,int b,int c){
-                String q=s.toString().trim();
-                if(q.isEmpty())renderCurrentPage(0); else renderSearch(q);
+                applySearchFilters();
             }
             public void afterTextChanged(Editable e){}
         });
@@ -302,6 +326,46 @@ public class SopMainActivity extends Activity {
         t.setClickable(true);t.setFocusable(true);
         t.setBackground(rounded(Color.TRANSPARENT,Color.TRANSPARENT,14));
         return t;
+    }
+
+    private TextView personnelChip(String label){
+        TextView t=text(label,11.2f,BLUE_DARK,true);
+        t.setGravity(Gravity.CENTER);
+        t.setSingleLine(true);
+        t.setPadding(dp(12),0,dp(12),0);
+        t.setBackground(rounded(BLUE_PALE,LINE,14));
+        t.setClickable(true);
+        t.setFocusable(true);
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,dp(32));
+        lp.setMargins(0,0,dp(6),0);
+        t.setLayoutParams(lp);
+        t.setOnClickListener(v -> {
+            personnelFilter=label.equals(personnelFilter)?null:label;
+            selectedCategory=null;
+            currentPage=PAGE_ALL;
+            updatePersonnelChips();
+            applySearchFilters();
+        });
+        return t;
+    }
+
+    private void updatePersonnelChips(){
+        for(Map.Entry<String,TextView> e:personnelChipViews.entrySet()){
+            boolean active=e.getKey().equals(personnelFilter);
+            TextView t=e.getValue();
+            t.setTextColor(active?Color.WHITE:BLUE_DARK);
+            t.setBackground(active?gradient(BLUE,CYAN,14):rounded(BLUE_PALE,LINE,14));
+        }
+    }
+
+    private void applySearchFilters(){
+        if(search==null)return;
+        String q=search.getText().toString().trim();
+        if(q.isEmpty()&&personnelFilter==null){
+            renderCurrentPage(0);
+        }else{
+            renderSearch(q);
+        }
     }
 
     private void updateBottomNav(){
@@ -387,8 +451,7 @@ public class SopMainActivity extends Activity {
             source.setBackground(rounded(WARN_BG,Color.TRANSPARENT,12));
         }
         renderRecent();
-        String q=search==null?"":search.getText().toString().trim();
-        if(q.isEmpty())renderCurrentPage(0); else renderSearch(q);
+        applySearchFilters();
     }
 
     private void renderRecent(){
@@ -1143,13 +1206,17 @@ public class SopMainActivity extends Activity {
     }
 
     private void renderSearch(String query){
-        String q=SopClassifier.norm(query);
+        String q=SopClassifier.norm(query==null?"":query);
         ArrayList<SopDocument> found=new ArrayList<>();
         for(SopDocument d:all){
             String hay=SopClassifier.norm(d.title+" "+d.fileName+" "+d.category+" "+d.type+" "+d.keywords);
-            if(hay.contains(q))found.add(d);
+            boolean textOk=q.isEmpty()||hay.contains(q);
+            boolean personnelOk=personnelFilter==null||SopPersonnelIndex.matches(d,personnelFilter);
+            if(textOk&&personnelOk)found.add(d);
         }
-        showContent(makeListPage("Поиск · "+found.size(),found,false),0);
+        String title=personnelFilter==null?"Поиск":"По персоналу · "+personnelFilter;
+        if(!q.isEmpty()&&personnelFilter!=null)title+=" · поиск";
+        showContent(makeListPage(title,found,false),0);
     }
 
     private Map<String,List<SopDocument>> group(List<SopDocument> docs){
@@ -1318,6 +1385,37 @@ class SopDocument {
     SopDocument(String key,String fileName,String title,String category,String type,String keywords,String uri,String mime,long lastModified,long size){
         this.key=key;this.fileName=fileName;this.title=title;this.category=category;this.type=type;this.keywords=keywords;
         this.uri=uri;this.mime=mime;this.lastModified=lastModified;this.size=size;
+    }
+}
+
+class SopPersonnelIndex {
+    static final Set<String> DOCTORS=new HashSet<>(Arrays.asList("10jVUQJxKWE8NK4grtpxd7_t5kHxZ94ap","1Mbl-_YlJfuJqODTmCYnKUpwWcAlTvBhR","19vPYwx1EAa6HDQTvJs0BoKZZ0YIWvC6U","1_AgiLn8IQshQB6rab7XshTznofBs-RB0","1n9v0PSxhZYX1pURGfftGyLl6hIFBGv5O","1saFkG3Hfloljs74iGRspFlD1FuP4kcau","1QRo3CcNL3w6_4liBJxmXhD3klnJLkixW","1xw0P3tnQUCUG907MIJ9Qq_XXEIVMijDR","1fnUks7L2ENAUPKC7vI9J2p_A6L-Mgg8-","19-BZ6Zt3j_FAF9O_UvGVDCIW7rZSidCo","19Icj4YH1umX1599ESuE7foac9p1I10ym","1xdwULVm7l7HORoyxn4WPqqqx-qG1_WD2","1ahL4PHn9C3G2Sve18e-Md2Tv_5rJh2hK","1T5rb7rO25F2mWyyGdNnAjdPjv1FD1k_Y","1Ze-9aEHDhHXg0C1eOWMPV1_7gEskCbjI","1-AG_kI3g0Xzv7zfMUSFDW_93H8-ZEVQI","1X5tp_-CTB_v1nC83PTEFhBBkR9G8Llbo","1CHdmK7_h6vswLhe_QXVydmfwuNgyBhms","1xp3mI_-ie9AJWecz9DYSgK6VPWCe7SlL","1rhQG3QynJq-r2asLRBfEnN0hq8RDicjo","19ndj-H87wTn8eWI9CdsaovUlWvkF3IG7","1uxv4YCRmgQUcDX3v5wKDDVu2wSDKhrJ6","1CdJazrMPA6byxcnBMqCtjpri7Ds_uEUG","1Go3PFjEOjXUhTiaiBzO3WU3YGHS7Ne7v","1Udvl5Z7hKNw40JQgcM40Qwuy2Q1NNpDg","1msb8YgO5gkbhqHJZ-N6WL7knUJ9Feyxg","1PejvKQ7HjvqfRAghipehMCBObsAZFoBE","1APUEBo1xfDOCfvcmMQnsY9YVKuHeA62m","1oXkNgEZOxGJP9BnamWgsq2OdNsSoUp9-","1TYACh-cW5fxdEFp-Stx8ynSpOPrF3UpP","1YwsAAOq516Hy-vh0_bQcBWvFJ-QidV-2","1Q8Lzm1Kk27nu9B6n01BTJyRk8S6IZMXE","116-_4MvlOOU7UQfiiLuptCcXx9wlFeeU","1WTrtG_t3ebM4QXl8rHFc4nkgKaSFYMUp","16x7ywxJ6NxFbwjQ-aI8uxeqtkqnL7te8","1apcC8niUNQeO2EQJWAcHsYIlyMXWLld8","14UThS3AsUUcIPr4qKpjse-FxoO0j0KXY","17pHsm8Z1Jsg0P_QSJiw9bazhegjrYeM5","1vliP9iP4S2A8lmphyz0HaXaVDnYshU7R","17dy1pF_BphYGqBWr9UtHF8AvafAj3Lzy","1g4g0GBXPTTfMMrpEA5TlnPY6mfQ5WZ4o","1tlvxPtx1H45bctZYdodThwO3xUgWqw9T","1ykVuVlLXcNYnyiN5-qKxpapyDdDfaA-Y","12IrqeMvKVtBlC-hiEyzPckSPR83L2jRg","1VYW6s1vJRdlLJ8pOxS8CP7QcaBuri388","1rIKLee_yLIx_hgm2aphsa4_FC5VhsiQU","1RKgxkIH_q_ALTw--SP3L38SXSRCCL8Vm","1nf3xSdrh3HxSrUP20oZJaU7hby_2a68T","1MBjFGSn1EdPfvWZ0lNIUYDxROkRJkCY6","1eqDmGj-Bxz4CJL_OrqbmYVtJ5SE0rV-i","1DBXnyp1uyCdjRgXQ6nbr-SrB0qmQPKt7","1YkisJ-BSxETgZ8KVJhKoVnIzzHwH3ANt","1kdJtj7BAsSiCy_ec2EUi49QlhqFJrt2C","14HTXw0QDfU1U7kSlngYusWgkb1sAhP3x","1EYcsjMpAVdV6ycvurtuFnyCX2zjLhQit","1AV6yUgH-fRImkFUX9fiBBVckjunl1aoK","1nv1jy-TxKNzGhuUewXIuuY5idcqdIUZ5","1lsb8UUhBnBIhH1xzcf0Usbc8BiY4Qhxd","19jzI5j8EggcD2EsacXIGlemqvE-B3En5","1wBu7PVX-b5fKfjlr_SG8sepAAJB4PtCQ","1GL4BFSu1cLrlf_TnBtsNJh0hYPj7ySg-","1q7YH-vb9B7ektHtgbf8qLYwycjtHjBtE","1C27FgwXWIWFCFtgxyqyKK5vo2v2cFfUx","1QFV3O4MqH1zegPqvYFLFBtCJchou18St","1vPGB3c8f99Jt4T2seOpwUD37-X3n5yUC","1dElNpZp9sr9t8nU7JI4PpN3guRyy9z6v","1PfRDfmzjyCbpdJF7iLHpudA6hbhD3Un8","1viEy6njVrvWEqgT0Y1I9zZmy_RXmUjDN","1jATxSUROR1FYJ2uQHAMjHdTnOuHmNHXJ","1gPoz0mVGmTkA7rJ1CKn1uLD6bbaTdqLB","1BWvTkQ7REDg6md6lPh4WDcIEJNi7umkm","1l_QjMShSztch30BSlwTz0maDQDX9KVg_","1_EJ1E4qdwcSEejs1g9jbX7updeTTUXjv","1Uomm9aGOXKh1MdXyJmzamzS5Ha1_0zTD","1-GDZocbcxLeZxcQCeYE97vTKPoHyvkBy","1kt18I4o2NhWWel4a-SHmW_8J5fhL_zke","1_IVa9VjzaFHuebh4jX7_EYSLAxQUUMJ5","1RDgeK0uOL_ok4WvRgkwv-ZNxU7mRfeai","1lGrqyySF1Js_o6yejA_WHkh0102F1qr3","1B4DWqNY3cCxkInPSxfIRluykLkCE0dLN","1CDma0NrnUSLpn1pDzUBtySKluGgyLMpB","1NUJVRpbEM5fNDxq7JcGN-yDd3TZQP9nl","17IownyqQgYLCDtFMbn1N_a32MWfzscV_","1SGTrtClGxFRy7pLwyOMNu3XHlRng2QcH","1C3RaC3DGMDY8fmRX44dITil9583qoYAi","1v89gMxNXfcuvXUM3P1fkS2xwWMg6zhlw","1EDQzBzrxdVu2YiWzIn9O2gra-3NuhS0v","1aQr5uKJa3zNIcpM0IfCXmobZircqY7gz","1g1MSpZ77VFFvJBA3oThb-awc_UDuhqCE","1Msqi_2fEjO77CYgosTFEt0BK2JDXvo15","1I61zk2HU4o9BavvDRv-UftN6-FkU0DgX","17FEAPoxPtD4Nf1wNLC4Ei4godE6CWjIq","19uNp6TOUpZ8Lxq4AOje-Jlz0yq97l-aE","1E6ZxAGUJWzFKsO-bq3D771BEGcSr7AmV","1I9NE6dDDeGB1KNiHr6qgUNNyIsZtnTrC","1ryqhNFulr7v-SQEG4vrGPu3wWFCAAoX1","1QZAUWIDNW8yvbqFzZqyA-8J_cFOsylFC","12Zhgg3Zb8EkxY2LklN_CSiVk3JBxuR_l","1wJ8YsYXA2x6BRxaMi2LmJ5buSpM5AWDb","1JvJUSjab3h5dJ56go-r6z41dBTDcCggR","1tq59Lh2xs6406HXS7CP4OoQuxcm92jfp","1yeZKNFhcxULenpWZtKQnzkpH0zbCMF04","18s-BC98YHcSeUGCdqDsNZS2yNzi-jZIR","1Yi_gBM1L_xV8Eh6tMU9G0R1nY-3iC7Ab","1_NSYG870NnbhuhQsH0rX_RhwyxFy6-j_","1rUORWyXe2VHxz8f4psNiX2_MthdgVR0O","17eRJlQhKBgDj-bIseMBpAOTFIDQh-jTc","1N0AawA-Y66pOodb4Jxz4W3ZVieb1D6g1","1aNeCQvPFnYo5ApzrH9-ygaUX7fgc6Bl7","1iaW5tREmGyHyR_ac_J-18RwoK1P8Ewxw","1KkJVmRl-1tTLa05wFKF7dKmWyMXcJh--","1T0yYjXIBSQMAcy6Av3LmQ80CrkH5-6Wh","1_BqCxr2o6PvzCpHaUNJS9qh5L4LAnVg8","14v1qG5xMnQPm9d_K-aZ-RQKNqPomn5WP","12VTNZCuLP6pz4X0mLj9czl8Q-0EwucYF","1T0QbpXpBx7Ovxc56IlefV_qbdgsfu4Fy","1T7KLDgXNvCfy-z7ezFziGRvqfg3v2Ueb","1KwC8tOe1PziFddHlgMg7B0IffqaklrOO","1bacY3yNb1T18gwbjnZri---VMhGG_C2e","10zwTAeJexX0YTSHEk6eaxht2izJdQ-BA","1DzBXGy9d59iaESJEm-izzWNI2JGDmQh0","1pN9haEWv-SBwuQtMxAujaB3ZpLXS1dWu","1LQ3Vvsf4bUw2FrbULY1CHAVsPWiHb9sc","16DcVwU2txtOkXu4f7To6_38HeeP5KwwG","1QOi3nNoGLt4fFUX3GmPvRwg1nNm8L-gR","1RaUtWI2gXbVQjaUHcU1DOh-PfJuuIdKZ","1Scc1hIQ0dXNPpryrKD7Pv80xZbU0IxO6","1vMwXf00ZD0Dl1c8I1o1f59Z1xa3liqV6","1Xg4WuQwAe0OtuHz96SPffQjZy2_FF_Od","1EDF-L4fET_bzDBHpynGvn4r3EqVSp59z","1SPEDjJODvPueTT7L716bUwNoZfP0BiqU","116pvoRGsdABRxjQhmpxwQ91-GODbsvje","1zCkHPWuGOPvDwgoIBtTGNlTtjwy98XEJ","1GQyGZOUQLnN0-_ZHHXCrUmU75VCpDW93","1FI-HPXm4hpOXlmbb0vy125Bp7MuiPN1f","1Wmb7Fhcr6osEv3TS-BQrXD9ijqrqd2D1","1JuA7B3ipBPs3IHEArC4vofSwHK1v6XTe","1ME0oRtPMHBk-hYCpieWoIlWn6r2ak74K","1gSYgM_0cJFmrzvUU8_XjvmFbuAGbB26v","1uaUkgRq3rKeXnNvzOvRXywEu9NJN9sIs","1UbpRw30iLlux4taMo2t_Us50YbNhRaDf","1IS90OwGdWjfUuQYNIPQFIcMCioB1K2Ng","1jSNF42cyWfgRr8P78QNUoXAG05EXaVCI","15lRshIzPOXlAX8UPEcY6oO0XNldLOMWY","1EMk8iWS-UMLxV5ptRgoqTnBo0al17-o1","1XOjdWII1ijcDa2ufSYL7wJDkM6hMTSwt","1OWZzTw1PLwJAlyogCaOxIudCgGETJtRP","16c-BEZwCpRjOJF367r98dckKxWH9aiyH","1DdGcvoPZFc_MvswJtaeJ-H9sZ86Eh3eB","1uUJAP0q0yZjIaTtcsPjv3qDf0UBfi3My","1FkU5OVPeu16diNEEuHwexrJ73APSRA8d","1q1FzL-fOrUuXGbSzhVdB8Csxgru1SU2x","19PHJJFU-j7jH7VQKlC9vK-0UuS2-04c4","1AHT75T6zJVqMIs_QjozP2KiCiKALgznv","1sEw8QuM93Mp8a6tYWRHjos_pycIxtpCf","1YYCJJB7ZmbUC7ywjhN6vCpyvmknFghHI","1lN4za78rTozmXMroFr5uhjETAFL7M46B","1_-E-g0aF5zo-TcWtwPeBW7YzJARh6LwR","1SI_SzCIpVQgxvL5_9Mg4AHlgWgU1sssY","13hMWS5xVAVISDsI55ZehSUzzwMn8PaZo","1RxcLcpcgo4erof4No6obNp0TbrKs5QUk","1XOO5BotPi0_yCFuR5YivVqDpZMfLXIAb","1dy7BimdI-ufTi5DzU4g6mo0UVaNaJ2nk","1hEai6AcbXvsMNJijs-AfSD4MRni7TKxl","1-O-M0JCztBVBdWDIqd_zn7U0w5PT2T4v","1DZILqNaFILuUAeljhc3abY5XQ2MOhBOv","1Rxb5GYPKCxFHyJsDlFh3V7R2MAyqWubO","1cnhI1CPYEObGDTiTXEYFxjq2_p4cc7eK","1hf50GFoKDAKejARUBQkwpYejs7sE1NKB","1y7G3nn-hOONqEoiVeykubZPTpfroMbrx","1e6n5bS_P8TdL1spp-v-mm6cJ-QC6SiFD","1TZ8HToQtQ-67p9B9ppEDuiGXSMPxuJ48","1p0unDh5o_e8WuXN-XilvrKpNWoefLI7w","1jRa_fcurTqnEqqrcoROEzWJG9zZwf-P4","16KTFaut1GHWM3eCrHpKyrDZRRJdUzi2j","10l9A5XE7Jr3WDybKx72Tv0BQT5_bHPEz","17AWlbFHeoS4nF9BINMU-dIdUnIYpjb-V","1_gSMkr_xh6dcydXOxIxAOYjM9CvCwTue","1_-VR1Ys9paNAiGE9Vy3ncwd_BdNYDoL7","1RJyjES8q9Ki9yoX_9PM4wmpQ_TDc5zQw","11iLVa81U9WD-nRJuN_rtXiefmH4DRdnp","1vtCo5dfLp5LmZpJSVjRQLtgzzSYhcEUD","1oPvjzmVgE03y007zU6AgbbA-CnUj0b-X","1okou4A9dziilD9SYE9Z8WTGeBo6451Yg","1_PHqbULCGIahO2tdeu-7gSdfRYaP0Kyd","1OCUA8wiJWAzQNSo-U3qufRvOypX-fuLn","1jFWFM_qSatMCz9oQ2xnbmQ7qJlIdWJ9B","17fDnwyBqQCcYbNbww-M4Qg_DZyAsepHR"));
+    static final Set<String> NURSES=new HashSet<>(Arrays.asList("1viEy6njVrvWEqgT0Y1I9zZmy_RXmUjDN","1YkisJ-BSxETgZ8KVJhKoVnIzzHwH3ANt","1AV6yUgH-fRImkFUX9fiBBVckjunl1aoK","1PejvKQ7HjvqfRAghipehMCBObsAZFoBE","116-_4MvlOOU7UQfiiLuptCcXx9wlFeeU","1l_QjMShSztch30BSlwTz0maDQDX9KVg_","1Mbl-_YlJfuJqODTmCYnKUpwWcAlTvBhR","19vPYwx1EAa6HDQTvJs0BoKZZ0YIWvC6U","1n9v0PSxhZYX1pURGfftGyLl6hIFBGv5O","14UThS3AsUUcIPr4qKpjse-FxoO0j0KXY","1Xg4WuQwAe0OtuHz96SPffQjZy2_FF_Od"));
+    static final Set<String> JUNIOR=new HashSet<>(Arrays.asList("116-_4MvlOOU7UQfiiLuptCcXx9wlFeeU","1Mbl-_YlJfuJqODTmCYnKUpwWcAlTvBhR","19vPYwx1EAa6HDQTvJs0BoKZZ0YIWvC6U","1n9v0PSxhZYX1pURGfftGyLl6hIFBGv5O","1PejvKQ7HjvqfRAghipehMCBObsAZFoBE","1q7YH-vb9B7ektHtgbf8qLYwycjtHjBtE"));
+    static final Set<String> NONMED=new HashSet<>(Arrays.asList("1saFkG3Hfloljs74iGRspFlD1FuP4kcau","116-_4MvlOOU7UQfiiLuptCcXx9wlFeeU","1xdwULVm7l7HORoyxn4WPqqqx-qG1_WD2","14UThS3AsUUcIPr4qKpjse-FxoO0j0KXY","1YwsAAOq516Hy-vh0_bQcBWvFJ-QidV-2","1APUEBo1xfDOCfvcmMQnsY9YVKuHeA62m","19ndj-H87wTn8eWI9CdsaovUlWvkF3IG7","17dy1pF_BphYGqBWr9UtHF8AvafAj3Lzy","1Udvl5Z7hKNw40JQgcM40Qwuy2Q1NNpDg","1-GDZocbcxLeZxcQCeYE97vTKPoHyvkBy"));
+    static final Set<String> ALL_STAFF=new HashSet<>(Arrays.asList("1GL4BFSu1cLrlf_TnBtsNJh0hYPj7ySg-","1EDQzBzrxdVu2YiWzIn9O2gra-3NuhS0v","1rIKLee_yLIx_hgm2aphsa4_FC5VhsiQU","116-_4MvlOOU7UQfiiLuptCcXx9wlFeeU","1OCUA8wiJWAzQNSo-U3qufRvOypX-fuLn","1PfRDfmzjyCbpdJF7iLHpudA6hbhD3Un8","1FI-HPXm4hpOXlmbb0vy125Bp7MuiPN1f","1nv1jy-TxKNzGhuUewXIuuY5idcqdIUZ5","1xdwULVm7l7HORoyxn4WPqqqx-qG1_WD2","1PejvKQ7HjvqfRAghipehMCBObsAZFoBE","14UThS3AsUUcIPr4qKpjse-FxoO0j0KXY","1YwsAAOq516Hy-vh0_bQcBWvFJ-QidV-2","1APUEBo1xfDOCfvcmMQnsY9YVKuHeA62m","1lN4za78rTozmXMroFr5uhjETAFL7M46B","1BWvTkQ7REDg6md6lPh4WDcIEJNi7umkm","1Bta2ALJ8VUKtPLm2BeM0QkpQVpEpry2B","1q7YH-vb9B7ektHtgbf8qLYwycjtHjBtE","19jzI5j8EggcD2EsacXIGlemqvE-B3En5"));
+
+    static boolean matches(SopDocument d,String group){
+        if(d==null||group==null)return true;
+        Set<String> set;
+        switch(group){
+            case "Врачи": set=DOCTORS; break;
+            case "Средний медицинский персонал": set=NURSES; break;
+            case "Младший медицинский персонал": set=JUNIOR; break;
+            case "Немедицинский персонал": set=NONMED; break;
+            case "Весь персонал": set=ALL_STAFF; break;
+            default:return true;
+        }
+        if(set.contains(d.key))return true;
+
+        // Safe fallback for newly added documents whose title itself explicitly
+        // contains the personnel group. Current files are indexed by Drive ID.
+        String hay=SopClassifier.norm(d.title+" "+d.fileName+" "+d.keywords);
+        String needle=SopClassifier.norm(group);
+        if(hay.contains(needle))return true;
+        if("Врачи".equals(group)&&(hay.contains("врач")||hay.contains("врачеб")))return true;
+        if("Весь персонал".equals(group)&&(hay.contains("весь персонал")||hay.contains("все сотрудники")||hay.contains("все работники")))return true;
+        return false;
     }
 }
 
