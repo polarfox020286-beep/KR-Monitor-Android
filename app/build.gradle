@@ -12,9 +12,9 @@ android {
     compileSdk 35
 
     defaultConfig {
-        applicationId 'ru.sopnavigator.app'
+        applicationId 'ru.sopnavigator.personnelfiltertest'
         minSdk 26
-        targetSdk 28
+        targetSdk 35
         versionCode Integer.parseInt(envVersionCode)
         versionName envVersionName
     }
@@ -32,8 +32,8 @@ android {
 
     buildTypes {
         debug {
-            applicationIdSuffix ".test"
             versionNameSuffix "-test"
+            if (keystorePath) signingConfig signingConfigs.release
         }
         release {
             minifyEnabled false
