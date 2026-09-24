@@ -26,6 +26,11 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Prepare fixed test signing key
+        run: |
+          echo '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' | base64 -d > /tmp/sop-test-fixed.keystore
+          keytool -list -keystore /tmp/sop-test-fixed.keystore -storepass soptest123 -alias soptest >/dev/null
+
       - name: Prepare splash asset
         run: |
           mkdir -p app/src/main/assets
@@ -34,9 +39,13 @@ jobs:
       - name: Build test APK
         env:
           RUN_NUM: ${{ github.run_number }}
+          KR_KEYSTORE_FILE: /tmp/sop-test-fixed.keystore
+          KR_KEYSTORE_PASSWORD: soptest123
+          KR_KEY_ALIAS: soptest
+          KR_KEY_PASSWORD: soptest123
         run: |
-          export KR_VERSION_CODE=$((20000 + RUN_NUM))
-          export KR_VERSION_NAME="test-${RUN_NUM}"
+          export KR_VERSION_CODE=$((30000 + RUN_NUM))
+          export KR_VERSION_NAME="personnel-test-${RUN_NUM}"
           gradle :app:assembleDebug --stacktrace
 
       - name: Verify APK
@@ -45,26 +54,28 @@ jobs:
           test -f "$APK"
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
           "$APKSIGNER" verify --verbose --print-certs "$APK"
+          AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)
+          "$AAPT" dump badging "$APK" | head -n 5
 
       - name: Prepare raw APK artifact
         run: |
           mkdir -p artifact
-          cp app/build/outputs/apk/debug/app-debug.apk artifact/SOP-Navigator-personnel-filter-test.apk
+          cp app/build/outputs/apk/debug/app-debug.apk artifact/SOP-Navigator-personnel-filter-stable-test.apk
 
       - name: Upload raw APK file
         uses: actions/upload-artifact@v4
         with:
-          name: SOP-Navigator-personnel-filter-raw-apk
-          path: artifact/SOP-Navigator-personnel-filter-test.apk
+          name: SOP-Navigator-personnel-filter-stable-raw-apk
+          path: artifact/SOP-Navigator-personnel-filter-stable-test.apk
           compression-level: 0
           if-no-files-found: error
 
       - name: Publish ordinary APK to branch
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/debug/app-debug.apk dist/SOP-Navigator-personnel-filter-test.apk
+          cp app/build/outputs/apk/debug/app-debug.apk dist/SOP-Navigator-personnel-filter-stable-test.apk
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add dist/SOP-Navigator-personnel-filter-test.apk
-          git commit -m "Publish personnel filter test APK [skip ci]" || exit 0
+          git add dist/SOP-Navigator-personnel-filter-stable-test.apk
+          git commit -m "Publish stable-signed personnel filter test APK [skip ci]" || exit 0
           git push
