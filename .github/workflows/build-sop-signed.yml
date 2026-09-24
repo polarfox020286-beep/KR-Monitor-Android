@@ -2,8 +2,6 @@ name: Build signed SOP Navigator APK
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ sop-navigator-v1 ]
 
 jobs:
   build:
