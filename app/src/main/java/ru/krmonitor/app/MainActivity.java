@@ -1085,6 +1085,50 @@ public class MainActivity extends Activity {
         return outer;
     }
 
+    private void closeSearchToProfiles() {
+        selectedProfile=null;
+        currentPage=PAGE_PROFILES;
+        if(search!=null && search.getText()!=null && search.getText().length()>0) {
+            search.setText("");
+        } else {
+            renderCurrentPage(0);
+        }
+    }
+
+    private View makeSearchResultsPage(String heading,List<Recommendation> recs) {
+        LinearLayout outer=new LinearLayout(this);
+        outer.setOrientation(LinearLayout.VERTICAL);
+
+        LinearLayout head=new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView back=text("‹ Профили",compactSinglePaneUi()?10:11,BLUE,true);
+        back.setGravity(Gravity.CENTER);
+        back.setPadding(dp(compactSinglePaneUi()?6:8),dp(5),dp(compactSinglePaneUi()?6:8),dp(5));
+        back.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,11));
+        back.setClickable(true);
+        back.setFocusable(true);
+        back.setOnClickListener(v -> closeSearchToProfiles());
+        LinearLayout.LayoutParams backLp=new LinearLayout.LayoutParams(-2,-2);
+        backLp.setMargins(0,0,dp(7),0);
+        head.addView(back,backLp);
+
+        TextView title=pageTitle(heading);
+        title.setSingleLine(true);
+        title.setEllipsize(TextUtils.TruncateAt.END);
+        title.setPadding(0,dp(7),dp(5),dp(7));
+        head.addView(title,new LinearLayout.LayoutParams(0,-2,1));
+
+        TextView count=text(recs.size()+" КР",compactSinglePaneUi()?10:12,MUTED,false);
+        count.setSingleLine(true);
+        head.addView(count);
+
+        outer.addView(head);
+        addRecommendationList(outer,recs);
+        return outer;
+    }
+
     private void renderSearch(String q) {
         String raw=q==null?"":q.trim();
         boolean idQuery=raw.matches("\\d+(?:_\\d+)?");
@@ -1148,7 +1192,7 @@ public class MainActivity extends Activity {
         else if(aliasQuery || acronymQuery) heading="Результаты: "+raw.toUpperCase(Locale.ROOT);
         else heading="Результаты поиска";
 
-        showContent(makeListPage(heading,results),0);
+        showContent(makeSearchResultsPage(heading,results),0);
     }
 
     private void addRecommendationList(LinearLayout outer,List<Recommendation> recs) {
@@ -1629,6 +1673,10 @@ public class MainActivity extends Activity {
     }
 
     @Override public void onBackPressed() {
+        if(search!=null && search.getText()!=null && search.getText().toString().trim().length()>0) {
+            closeSearchToProfiles();
+            return;
+        }
         showExitDialog();
     }
 
