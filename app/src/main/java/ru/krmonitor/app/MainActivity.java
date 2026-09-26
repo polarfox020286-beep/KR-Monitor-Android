@@ -310,6 +310,59 @@ public class MainActivity extends Activity {
         else showContent(makeProfilesPage(),direction);
     }
 
+    private Set<String> effectiveGroups(Recommendation r) {
+        LinkedHashSet<String> out=new LinkedHashSet<>(ProfileClassifier.groupsFor(r));
+        DbHelper.ProfileRule rule=db==null?null:db.getProfileRule(r.baseId);
+        if(rule==null) return out;
+
+        LinkedHashSet<String> valid=new LinkedHashSet<>();
+        for(String p:rule.profiles) if(ProfileClassifier.PROFILES.contains(p)) valid.add(p);
+        if("REPLACE".equals(rule.mode)) {
+            if(!valid.isEmpty()) return valid;
+            return out;
+        }
+        out.addAll(valid);
+        return out;
+    }
+
+    private LinkedHashMap<String,List<Recommendation>> groupWithUserProfiles(List<Recommendation> recs) {
+        LinkedHashMap<String,List<Recommendation>> out=new LinkedHashMap<>();
+        for(String p:ProfileClassifier.PROFILES) out.put(p,new ArrayList<>());
+
+        Map<String,DbHelper.ProfileRule> rules=db==null?Collections.emptyMap():db.allProfileRules();
+        for(Recommendation r:recs) {
+            LinkedHashSet<String> groups=new LinkedHashSet<>(ProfileClassifier.groupsFor(r));
+            DbHelper.ProfileRule rule=rules.get(r.baseId);
+            if(rule!=null) {
+                LinkedHashSet<String> valid=new LinkedHashSet<>();
+                for(String p:rule.profiles) if(ProfileClassifier.PROFILES.contains(p)) valid.add(p);
+                if("REPLACE".equals(rule.mode) && !valid.isEmpty()) groups=valid;
+                else groups.addAll(valid);
+            }
+            for(String p:groups) {
+                List<Recommendation> bucket=out.get(p);
+                if(bucket!=null) bucket.add(r);
+            }
+        }
+        return out;
+    }
+
+    private String joinProfiles(Collection<String> profiles) {
+        StringBuilder out=new StringBuilder();
+        if(profiles!=null) {
+            for(String p:profiles) {
+                if(out.length()>0) out.append(", ");
+                out.append(p);
+            }
+        }
+        return out.toString();
+    }
+
+    private void refreshAfterProfileChange() {
+        String q=search==null?"":search.getText().toString().trim();
+        if(q.isEmpty()) renderCurrentPage(0); else renderSearch(q);
+    }
+
     private View makeProfilesPage() {
         LinearLayout outer=new LinearLayout(this);
         outer.setOrientation(LinearLayout.VERTICAL);
@@ -322,7 +375,7 @@ public class MainActivity extends Activity {
         pageHead.addView(hint);
         outer.addView(pageHead);
 
-        LinkedHashMap<String,List<Recommendation>> groups=ProfileClassifier.group(all);
+        LinkedHashMap<String,List<Recommendation>> groups=groupWithUserProfiles(all);
         ScrollView scroll=new ScrollView(this);
         scroll.setFillViewport(true);
         scroll.setVerticalScrollBarEnabled(false);
@@ -445,7 +498,7 @@ public class MainActivity extends Activity {
     }
 
     private View makeProfileListPage(String profile) {
-        List<Recommendation> recs=ProfileClassifier.group(all).get(profile);
+        List<Recommendation> recs=groupWithUserProfiles(all).get(profile);
         LinearLayout outer=new LinearLayout(this);
         outer.setOrientation(LinearLayout.VERTICAL);
 
@@ -539,6 +592,7 @@ public class MainActivity extends Activity {
     }
 
     private void addRecommendationList(LinearLayout outer,List<Recommendation> recs) {
+        final Map<String,DbHelper.ProfileRule> profileRules=db.allProfileRules();
         ListView list=new ListView(this);
         list.setDivider(null);
         list.setDividerHeight(0);
@@ -565,6 +619,7 @@ public class MainActivity extends Activity {
                 TextView name=text(r.title,responsive(13,14,15),TEXT,false);
                 name.setMaxLines(3);
                 String metaText="КР "+r.id+(PdfManager.isPdf(PdfManager.file(MainActivity.this,r))?"  •  PDF скачан":"");
+                if(profileRules.containsKey(r.baseId)) metaText += "  •  ✎ профиль настроен";
                 if(searchShowsMkb && r.mkbCodes!=null && !r.mkbCodes.isEmpty()) metaText += "  •  МКБ-10: "+r.mkbCodes;
                 TextView meta=text(metaText,responsive(10,11,12),MUTED,false);
                 meta.setPadding(0,dp(4),0,0);
@@ -572,15 +627,256 @@ public class MainActivity extends Activity {
                 labels.addView(meta);
                 row.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
 
-                TextView arrow=text("›",23,Color.rgb(170,179,192),false);
-                arrow.setGravity(Gravity.CENTER);
-                row.addView(arrow,new LinearLayout.LayoutParams(dp(22),-1));
+                TextView menu=text("⋮",24,Color.rgb(125,139,157),true);
+                menu.setGravity(Gravity.CENTER);
+                menu.setClickable(true);
+                menu.setFocusable(false);
+                menu.setContentDescription("Настроить профиль КР");
+                menu.setOnClickListener(v -> showRecommendationOptions(r));
+                row.addView(menu,new LinearLayout.LayoutParams(dp(38),dp(48)));
                 wrap.addView(row,new LinearLayout.LayoutParams(-1,-2));
                 return wrap;
             }
         });
         list.setOnItemClickListener((p,v,pos,id)->downloadOrOpen(recs.get(pos)));
+        list.setOnItemLongClickListener((p,v,pos,id) -> {
+            showRecommendationOptions(recs.get(pos));
+            return true;
+        });
         outer.addView(list,new LinearLayout.LayoutParams(-1,0,1));
+    }
+
+    private TextView dialogAction(String label,boolean primary) {
+        TextView v=text(label,responsive(13,14,15),primary?Color.WHITE:TEXT,true);
+        v.setGravity(Gravity.CENTER_VERTICAL);
+        v.setPadding(dp(14),dp(12),dp(14),dp(12));
+        v.setBackground(rounded(primary?BLUE:CARD,primary?Color.TRANSPARENT:LINE,14));
+        v.setClickable(true);
+        return v;
+    }
+
+    private void showRecommendationOptions(Recommendation r) {
+        final Dialog dialog=new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setCancelable(true);
+
+        LinearLayout card=new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(18),dp(16),dp(18),dp(14));
+        card.setBackground(rounded(CARD,LINE,20));
+
+        TextView badge=text("КР "+r.id,11,BLUE,true);
+        badge.setGravity(Gravity.CENTER);
+        badge.setPadding(dp(10),dp(6),dp(10),dp(6));
+        badge.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,12));
+        card.addView(badge,new LinearLayout.LayoutParams(-2,dp(34)));
+
+        TextView title=text("Настроить профиль КР",responsive(18,20,21),TEXT,true);
+        title.setPadding(0,dp(12),0,dp(5));
+        card.addView(title);
+
+        TextView recTitle=text(r.title,responsive(12,13,14),TEXT,false);
+        recTitle.setMaxLines(4);
+        recTitle.setPadding(0,0,0,dp(10));
+        card.addView(recTitle);
+
+        Set<String> auto=ProfileClassifier.groupsFor(r);
+        Set<String> effective=effectiveGroups(r);
+        DbHelper.ProfileRule rule=db.getProfileRule(r.baseId);
+
+        TextView current=text("Сейчас: "+joinProfiles(effective),responsive(11,12,13),MUTED,false);
+        current.setLineSpacing(dp(2),1f);
+        current.setPadding(0,0,0,dp(3));
+        card.addView(current);
+
+        TextView original=text("Автоматически: "+joinProfiles(auto),responsive(10,11,12),MUTED,false);
+        original.setLineSpacing(dp(2),1f);
+        original.setPadding(0,0,0,dp(14));
+        card.addView(original);
+
+        TextView move=dialogAction("Переместить в другой профиль",true);
+        card.addView(move,new LinearLayout.LayoutParams(-1,dp(48)));
+        ((LinearLayout.LayoutParams)move.getLayoutParams()).setMargins(0,0,0,dp(8));
+
+        TextView add=dialogAction("Добавить ещё в профиль",false);
+        card.addView(add,new LinearLayout.LayoutParams(-1,dp(48)));
+        ((LinearLayout.LayoutParams)add.getLayoutParams()).setMargins(0,0,0,dp(8));
+
+        TextView reset=null;
+        if(rule!=null) {
+            reset=dialogAction("Вернуть исходное распределение",false);
+            card.addView(reset,new LinearLayout.LayoutParams(-1,dp(48)));
+            ((LinearLayout.LayoutParams)reset.getLayoutParams()).setMargins(0,0,0,dp(8));
+        }
+
+        TextView cancel=dialogAction("Отмена",false);
+        cancel.setGravity(Gravity.CENTER);
+        card.addView(cancel,new LinearLayout.LayoutParams(-1,dp(46)));
+
+        move.setOnClickListener(v -> {
+            dialog.dismiss();
+            showProfilePicker(r,true);
+        });
+        add.setOnClickListener(v -> {
+            dialog.dismiss();
+            showProfilePicker(r,false);
+        });
+        if(reset!=null) {
+            reset.setOnClickListener(v -> {
+                db.clearProfileRule(r.baseId);
+                dialog.dismiss();
+                Toast.makeText(this,"Исходное распределение восстановлено",Toast.LENGTH_SHORT).show();
+                refreshAfterProfileChange();
+            });
+        }
+        cancel.setOnClickListener(v -> dialog.dismiss());
+
+        dialog.setContentView(card);
+        Window w=dialog.getWindow();
+        dialog.show();
+        if(w!=null) {
+            w.setBackgroundDrawableResource(android.R.color.transparent);
+            w.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            WindowManager.LayoutParams lp=w.getAttributes();
+            lp.width=dialogWidthPx();
+            lp.height=WindowManager.LayoutParams.WRAP_CONTENT;
+            lp.dimAmount=0.38f;
+            w.setAttributes(lp);
+            w.setGravity(Gravity.CENTER);
+        }
+    }
+
+    private void showProfilePicker(Recommendation r,boolean replaceMode) {
+        final Dialog dialog=new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setCancelable(true);
+
+        LinearLayout card=new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(16),dp(15),dp(16),dp(14));
+        card.setBackground(rounded(CARD,LINE,20));
+
+        TextView title=text(replaceMode?"Переместить КР":"Добавить в профиль",responsive(18,20,21),TEXT,true);
+        card.addView(title);
+
+        TextView caption=text(
+                replaceMode?"Выберите новый профиль. КР будет показана только в выбранном профиле."
+                           :"Можно выбрать один или несколько дополнительных профилей.",
+                responsive(11,12,13),MUTED,false);
+        caption.setPadding(0,dp(4),0,dp(10));
+        caption.setLineSpacing(dp(2),1f);
+        card.addView(caption);
+
+        final Set<String> effective=effectiveGroups(r);
+        final LinkedHashSet<String> selected=new LinkedHashSet<>();
+        final String[] selectedSingle=new String[]{effective.size()==1?effective.iterator().next():null};
+
+        ScrollView scroll=new ScrollView(this);
+        scroll.setVerticalScrollBarEnabled(false);
+        LinearLayout choices=new LinearLayout(this);
+        choices.setOrientation(LinearLayout.VERTICAL);
+        scroll.addView(choices,new ScrollView.LayoutParams(-1,-2));
+
+        ArrayList<TextView> rows=new ArrayList<>();
+        for(String profile:ProfileClassifier.PROFILES) {
+            boolean already=effective.contains(profile);
+            String prefix=replaceMode
+                    ? (profile.equals(selectedSingle[0])?"●  ":"○  ")
+                    : (already?"✓  ":"○  ");
+            TextView row=text(prefix+profile,responsive(12,13,14),already&&!replaceMode?MUTED:TEXT,false);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(12),dp(10),dp(10),dp(10));
+            row.setBackground(rounded(already?BLUE_SOFT:CARD,LINE,12));
+            LinearLayout.LayoutParams rowLp=new LinearLayout.LayoutParams(-1,-2);
+            rowLp.setMargins(0,dp(3),0,dp(3));
+            choices.addView(row,rowLp);
+            rows.add(row);
+
+            if(replaceMode) {
+                row.setOnClickListener(v -> {
+                    selectedSingle[0]=profile;
+                    for(int i=0;i<rows.size();i++) {
+                        String p=ProfileClassifier.PROFILES.get(i);
+                        TextView rv=rows.get(i);
+                        boolean on=p.equals(selectedSingle[0]);
+                        rv.setText((on?"●  ":"○  ")+p);
+                        rv.setBackground(rounded(on?BLUE_SOFT:CARD,LINE,12));
+                    }
+                });
+            } else if(!already) {
+                row.setOnClickListener(v -> {
+                    if(selected.contains(profile)) selected.remove(profile); else selected.add(profile);
+                    boolean on=selected.contains(profile);
+                    row.setText((on?"●  ":"○  ")+profile);
+                    row.setBackground(rounded(on?BLUE_SOFT:CARD,LINE,12));
+                });
+            }
+        }
+
+        LinearLayout.LayoutParams scrollLp=new LinearLayout.LayoutParams(-1,0,1);
+        card.addView(scroll,scrollLp);
+
+        LinearLayout buttons=new LinearLayout(this);
+        buttons.setOrientation(LinearLayout.HORIZONTAL);
+        buttons.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams buttonsLp=new LinearLayout.LayoutParams(-1,-2);
+        buttonsLp.setMargins(0,dp(10),0,0);
+        card.addView(buttons,buttonsLp);
+
+        TextView cancel=dialogAction("Отмена",false);
+        cancel.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams cancelLp=new LinearLayout.LayoutParams(0,dp(46),1);
+        cancelLp.setMargins(0,0,dp(5),0);
+        buttons.addView(cancel,cancelLp);
+
+        TextView save=dialogAction(replaceMode?"Переместить":"Добавить",true);
+        save.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams saveLp=new LinearLayout.LayoutParams(0,dp(46),1);
+        saveLp.setMargins(dp(5),0,0,0);
+        buttons.addView(save,saveLp);
+
+        cancel.setOnClickListener(v -> dialog.dismiss());
+        save.setOnClickListener(v -> {
+            if(replaceMode) {
+                if(selectedSingle[0]==null) {
+                    Toast.makeText(this,"Выберите профиль",Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                db.saveProfileRule(r.baseId,"REPLACE",Collections.singleton(selectedSingle[0]));
+                Toast.makeText(this,"КР перемещена в профиль «"+selectedSingle[0]+"»",Toast.LENGTH_SHORT).show();
+            } else {
+                if(selected.isEmpty()) {
+                    Toast.makeText(this,"Выберите хотя бы один дополнительный профиль",Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                DbHelper.ProfileRule existing=db.getProfileRule(r.baseId);
+                LinkedHashSet<String> saveProfiles=new LinkedHashSet<>();
+                String mode="ADD";
+                if(existing!=null) {
+                    saveProfiles.addAll(existing.profiles);
+                    if("REPLACE".equals(existing.mode)) mode="REPLACE";
+                }
+                saveProfiles.addAll(selected);
+                db.saveProfileRule(r.baseId,mode,saveProfiles);
+                Toast.makeText(this,"Дополнительные профили добавлены",Toast.LENGTH_SHORT).show();
+            }
+            dialog.dismiss();
+            refreshAfterProfileChange();
+        });
+
+        dialog.setContentView(card);
+        Window w=dialog.getWindow();
+        dialog.show();
+        if(w!=null) {
+            w.setBackgroundDrawableResource(android.R.color.transparent);
+            w.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            WindowManager.LayoutParams lp=w.getAttributes();
+            lp.width=dialogWidthPx();
+            lp.height=Math.min(getResources().getDisplayMetrics().heightPixels-dp(48),dp(680));
+            lp.dimAmount=0.38f;
+            w.setAttributes(lp);
+            w.setGravity(Gravity.CENTER);
+        }
     }
 
     private TextView pageTitle(String value) {
