@@ -41,6 +41,7 @@ public class MainActivity extends Activity {
     private float swipeX,swipeY;
     private boolean swipeTracking=false;
     private boolean searchShowsMkb=false;
+    private volatile boolean syncInProgress=false;
 
     private static final int BG=Color.rgb(247,249,252);
     private static final int CARD=Color.WHITE;
@@ -61,6 +62,7 @@ public class MainActivity extends Activity {
         requestExactAlarmPermission();
         buildUi();
         reload();
+        if(b==null) runStartupSyncSilently();
     }
 
     private int dp(int v){ return (int)(v*getResources().getDisplayMetrics().density+0.5f); }
@@ -210,7 +212,7 @@ public class MainActivity extends Activity {
         LinearLayout heading=new LinearLayout(this);
         heading.setOrientation(LinearLayout.VERTICAL);
         TextView title=text("КР Навигатор",responsive(21,23,26),TEXT,true);
-        TextView subtitle=text("Автоматическая проверка новых и обновлённых КР в 07:00",responsive(11,12,13),MUTED,false);
+        TextView subtitle=text("Клинические рекомендации",responsive(11,12,13),MUTED,false);
         subtitle.setPadding(0,dp(2),0,0);
         subtitle.setMaxLines(2);
         heading.addView(title);
@@ -678,12 +680,11 @@ public class MainActivity extends Activity {
     private void reload() {
         all=db.all();
         String last=getSharedPreferences("prefs",MODE_PRIVATE).getString("last_sync","ещё не выполнялась");
-        long next=getSharedPreferences("prefs",MODE_PRIVATE).getLong("next_alarm",AlarmScheduler.nextWeekday7());
         String notifyNote=notificationsEnabled()?"":"\n⚠ Уведомления Android отключены";
         if(compactChromeUi()) {
             status.setText(all.size()+" КР  •  проверено: "+last+(notificationsEnabled()?"":"  •  уведомления выкл."));
         } else {
-            status.setText(all.size()+" КР  •  Последняя проверка: "+last+"\nСледующая: "+DateFormat.getDateTimeInstance(DateFormat.MEDIUM,DateFormat.SHORT).format(new Date(next))+notifyNote);
+            status.setText(all.size()+" КР  •  Последняя проверка: "+last+notifyNote);
         }
         renderRecent();
         String q=search==null?"":search.getText().toString().trim();
@@ -1086,29 +1087,62 @@ public class MainActivity extends Activity {
 
     private void renderSearch(String q) {
         String raw=q==null?"":q.trim();
-        String needle=norm(raw);
         boolean idQuery=raw.matches("\\d+(?:_\\d+)?");
         boolean mkbQuery=!idQuery && MkbUtils.looksLikeCode(raw);
+        boolean aliasQuery=!idQuery && !mkbQuery && SearchAliases.hasAlias(raw);
         searchShowsMkb=mkbQuery;
+
         ArrayList<Recommendation> results=new ArrayList<>();
 
         if(idQuery) {
             for(Recommendation r:all) {
                 if(raw.equalsIgnoreCase(r.id) || raw.equalsIgnoreCase(r.baseId)) results.add(r);
             }
-            // Only when there is no exact ID, allow prefix suggestions for an unfinished number.
             if(results.isEmpty()) {
                 for(Recommendation r:all) {
                     if(r.baseId!=null && r.baseId.startsWith(raw)) results.add(r);
                 }
             }
         } else {
+            final String direct=norm(raw);
+            final LinkedHashSet<String> variants=SearchAliases.variants(raw);
+            final LinkedHashMap<Recommendation,Integer> scored=new LinkedHashMap<>();
+
             for(Recommendation r:all) {
-                if(norm(r.title).contains(needle) || MkbUtils.matches(r.mkbCodes,raw)) results.add(r);
+                int score=0;
+                String title=norm(r.title);
+
+                if(!direct.isEmpty() && titleContainsVariant(title,direct)) score=Math.max(score,100);
+                if(MkbUtils.matches(r.mkbCodes,raw)) score=Math.max(score,95);
+
+                if(aliasQuery) {
+                    for(String variant:variants) {
+                        String v=norm(variant);
+                        if(v.equals(direct)) continue;
+                        if(titleContainsVariant(title,v)) {
+                            score=Math.max(score,70);
+                            break;
+                        }
+                    }
+                }
+
+                if(score>0) scored.put(r,score);
             }
+
+            results.addAll(scored.keySet());
+            results.sort((a,b) -> {
+                int sa=scored.get(a), sb=scored.get(b);
+                if(sa!=sb) return Integer.compare(sb,sa);
+                return a.title.compareToIgnoreCase(b.title);
+            });
         }
 
-        String heading=idQuery ? "КР "+raw : (mkbQuery ? "МКБ-10: "+raw.toUpperCase(Locale.ROOT) : "Результаты поиска");
+        String heading;
+        if(idQuery) heading="КР "+raw;
+        else if(mkbQuery) heading="МКБ-10: "+raw.toUpperCase(Locale.ROOT);
+        else if(aliasQuery) heading="Результаты: "+raw.toUpperCase(Locale.ROOT);
+        else heading="Результаты поиска";
+
         showContent(makeListPage(heading,results),0);
     }
 
@@ -1444,13 +1478,53 @@ public class MainActivity extends Activity {
     }
 
     private String norm(String s) {
-        return (s==null?"":s).toLowerCase(Locale.ROOT).replace('ё','е').trim();
+        if(s==null) return "";
+        return s.toLowerCase(Locale.ROOT)
+                .replace('ё','е')
+                .replace('–',' ')
+                .replace('—',' ')
+                .replace('-',' ')
+                .replaceAll("[^а-яa-z0-9. ]+"," ")
+                .replaceAll("\\s+"," ")
+                .trim();
+    }
+
+    private boolean titleContainsVariant(String normalizedTitle,String variant) {
+        String needle=norm(variant);
+        if(needle.isEmpty()) return false;
+        if(needle.length()<=3) return (" "+normalizedTitle+" ").contains(" "+needle+" ");
+        return normalizedTitle.contains(needle);
     }
 
     private String syncIdleLabel(){ return compactChromeUi()&&lowHeightUi()?"↻":"↻  Проверить"; }
     private String syncBusyLabel(){ return compactChromeUi()&&lowHeightUi()?"…":"↻  Проверяю…"; }
 
+    private void runStartupSyncSilently() {
+        if(syncInProgress) return;
+        syncInProgress=true;
+
+        executor.submit(() -> {
+            try {
+                SyncEngine.sync(getApplicationContext());
+            } catch(Throwable ignored) {
+            } finally {
+                syncInProgress=false;
+            }
+
+            runOnUiThread(() -> {
+                if(isFinishing() || isDestroyed()) return;
+                try { reload(); } catch(Exception ignored) {}
+            });
+        });
+    }
+
     private void runSync(TextView b) {
+        if(syncInProgress) {
+            Toast.makeText(this,"Проверка обновлений уже выполняется",Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        syncInProgress=true;
         b.setEnabled(false);
         b.setText(syncBusyLabel());
         status.setText("Проверяю обновления…");
@@ -1468,10 +1542,14 @@ public class MainActivity extends Activity {
             } catch(Throwable t) {
                 String m=t.getMessage()==null?t.getClass().getSimpleName():t.getMessage();
                 result=new SyncEngine.Result(0,0,0,0,0,"Ошибка проверки: "+m,Collections.emptyList(),Collections.emptyList());
+            } finally {
+                syncInProgress=false;
             }
+
             final SyncEngine.Result r=result;
             runOnUiThread(() -> {
                 try { if(progress.isShowing()) progress.dismiss(); } catch(Exception ignored) {}
+                if(isFinishing() || isDestroyed()) return;
                 b.setEnabled(true);
                 b.setText(syncIdleLabel());
                 try { reload(); } catch(Exception ignored) {}
