@@ -852,8 +852,9 @@ public class MainActivity extends Activity {
         });
         pageHead.addView(historyNav);
 
-        TextView aboutNav=text("О приложении",responsive(10,11,12),BLUE,true);
-        aboutNav.setPadding(dp(6),dp(5),0,dp(5));
+        TextView aboutNav=text("ⓘ",responsive(15,16,17),BLUE,true);
+        aboutNav.setContentDescription("О приложении");
+        aboutNav.setPadding(dp(7),dp(5),0,dp(5));
         aboutNav.setClickable(true);
         aboutNav.setOnClickListener(v -> {
             currentPage=PAGE_ABOUT;
@@ -926,7 +927,8 @@ public class MainActivity extends Activity {
         });
         head.addView(historyLink);
 
-        TextView aboutLink=text("О приложении",11,BLUE,true);
+        TextView aboutLink=text("ⓘ",16,BLUE,true);
+        aboutLink.setContentDescription("О приложении");
         aboutLink.setPadding(dp(8),dp(5),0,dp(5));
         aboutLink.setClickable(true);
         aboutLink.setOnClickListener(v -> {
@@ -1785,6 +1787,17 @@ public class MainActivity extends Activity {
     }
 
     private void showSyncResult(SyncEngine.Result r) {
+        if(r.message!=null && r.message.startsWith("Не удалось проверить обновления")) {
+            AlertDialog errorDialog=new AlertDialog.Builder(this)
+                    .setTitle("Проверка не выполнена")
+                    .setMessage(r.message)
+                    .setPositiveButton("ОК",null)
+                    .create();
+            errorDialog.setOnShowListener(d -> applyAdaptiveAlertWindow(errorDialog));
+            errorDialog.show();
+            return;
+        }
+
         List<DbHelper.ChangeEvent> recent=changesForLastScan(50);
         StringBuilder text=new StringBuilder();
         if(recent.isEmpty()) {
