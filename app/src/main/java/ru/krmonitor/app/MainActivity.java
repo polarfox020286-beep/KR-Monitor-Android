@@ -52,6 +52,7 @@ public class MainActivity extends Activity {
 
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
+        if(Build.VERSION.SDK_INT>=30) getWindow().setDecorFitsSystemWindows(false);
         db=new DbHelper(this);
         try { SeedImporter.ensureSeeded(this); } catch(Exception e) { Toast.makeText(this,"Ошибка исходного реестра: "+e.getMessage(),Toast.LENGTH_LONG).show(); }
         AlarmScheduler.scheduleNext(this);
@@ -118,6 +119,15 @@ public class MainActivity extends Activity {
 
         FrameLayout shell=new FrameLayout(this);
         shell.setBackgroundColor(BG);
+        if(Build.VERSION.SDK_INT>=30) {
+            shell.setOnApplyWindowInsetsListener((v,insets) -> {
+                android.graphics.Insets bars=insets.getInsets(
+                        WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout()
+                );
+                v.setPadding(bars.left,bars.top,bars.right,bars.bottom);
+                return insets;
+            });
+        }
 
         LinearLayout root=new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -202,6 +212,7 @@ public class MainActivity extends Activity {
         contentLp.setMargins(0,dp(6),0,0);
         root.addView(contentHost,contentLp);
         setContentView(shell);
+        if(Build.VERSION.SDK_INT>=30) shell.requestApplyInsets();
 
         sync.setOnClickListener(v -> runSync(sync));
         search.addTextChangedListener(new TextWatcher(){
@@ -324,7 +335,7 @@ public class MainActivity extends Activity {
         for(String p:ProfileClassifier.PROFILES) if(!groups.get(p).isEmpty()) visible.add(p);
         int columns=profileColumns();
         int gap=responsive(3,4,6);
-        int cardHeight=responsive(112,118,126);
+        int cardHeight=responsive(142,150,156);
         for(int i=0;i<visible.size();i+=columns) {
             LinearLayout row=new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
@@ -357,7 +368,7 @@ public class MainActivity extends Activity {
         card.setFocusable(true);
 
         ProfileIconView icon=new ProfileIconView(this,profile);
-        int iconSize=responsive(40,44,48);
+        int iconSize=responsive(36,40,46);
         LinearLayout.LayoutParams iconLp=new LinearLayout.LayoutParams(dp(iconSize),dp(iconSize));
         iconLp.setMargins(0,0,0,dp(6));
         card.addView(icon,iconLp);
@@ -367,7 +378,7 @@ public class MainActivity extends Activity {
         name.setGravity(Gravity.CENTER);
         name.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
         name.setIncludeFontPadding(false);
-        name.setMaxLines(4);
+        name.setMaxLines(5);
         name.setEllipsize(null);
         name.setHorizontallyScrolling(false);
         name.setLineSpacing(dp(1),1.0f);
@@ -375,7 +386,7 @@ public class MainActivity extends Activity {
             name.setBreakStrategy(Layout.BREAK_STRATEGY_SIMPLE);
             name.setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_NONE);
         }
-        card.addView(name,new LinearLayout.LayoutParams(-1,0,1));
+        card.addView(name,new LinearLayout.LayoutParams(-1,-2));
 
         TextView number=text(count+" КР",responsive(10,11,12),MUTED,false);
         number.setGravity(Gravity.CENTER);
@@ -393,7 +404,7 @@ public class MainActivity extends Activity {
         if(available<=0) return;
         float size=responsive(12,13,14);
         String[] words=value.split("\\s+");
-        float minimum=compactUi()?9f:10f;
+        float minimum=screenWidthDp()<380?9.5f:10.5f;
         while(size>minimum) {
             view.setTextSize(size);
             float widest=0f;
