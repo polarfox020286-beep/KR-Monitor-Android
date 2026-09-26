@@ -103,9 +103,52 @@ public class MainActivity extends Activity {
         return 4;
     }
 
+    private float systemFontScale(){ return getResources().getConfiguration().fontScale; }
+
+    private boolean dialogNeedsBoundedHeight(){
+        return lowHeightUi() || screenHeightDp()<650 || systemFontScale()>1.15f;
+    }
+
     private int dialogWidthPx() {
-        int available=getResources().getDisplayMetrics().widthPixels-dp(24);
-        return Math.min(available,dp(420));
+        int marginDp=lowHeightUi()?12:24;
+        int availableDp=Math.max(260,screenWidthDp()-marginDp);
+        int maxDp=expandedTwoPaneUi()?560:(useTwoPaneUi()?500:420);
+        return dp(Math.min(availableDp,maxDp));
+    }
+
+    private int dialogMaxHeightPx() {
+        int marginDp=lowHeightUi()?10:32;
+        int availableDp=Math.max(220,screenHeightDp()-marginDp);
+        int maxDp=expandedTwoPaneUi()?720:680;
+        return dp(Math.min(availableDp,maxDp));
+    }
+
+    private void applyAdaptiveDialogWindow(Dialog dialog,boolean boundedHeight) {
+        Window w=dialog.getWindow();
+        if(w==null) return;
+        w.setBackgroundDrawableResource(android.R.color.transparent);
+        w.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        WindowManager.LayoutParams lp=w.getAttributes();
+        lp.width=dialogWidthPx();
+        lp.height=boundedHeight?dialogMaxHeightPx():WindowManager.LayoutParams.WRAP_CONTENT;
+        lp.dimAmount=0.38f;
+        w.setAttributes(lp);
+        w.setGravity(Gravity.CENTER);
+    }
+
+    private void applyAdaptiveAlertWindow(AlertDialog dialog) {
+        Window w=dialog.getWindow();
+        if(w==null) return;
+        WindowManager.LayoutParams lp=w.getAttributes();
+        lp.width=dialogWidthPx();
+        lp.height=dialogNeedsBoundedHeight()?dialogMaxHeightPx():WindowManager.LayoutParams.WRAP_CONTENT;
+        w.setAttributes(lp);
+        w.setGravity(Gravity.CENTER);
+        TextView message=dialog.findViewById(android.R.id.message);
+        if(message!=null) {
+            message.setTextSize(lowHeightUi()?12:14);
+            message.setLineSpacing(dp(2),1f);
+        }
     }
 
     private GradientDrawable rounded(int fill,int stroke,int radius) {
@@ -588,11 +631,13 @@ public class MainActivity extends Activity {
                 }
             }
         }
-        new AlertDialog.Builder(this)
+        AlertDialog dialog=new AlertDialog.Builder(this)
                 .setTitle("Изменения за 48 часов")
                 .setMessage(sb.toString())
                 .setPositiveButton("ОК",null)
-                .show();
+                .create();
+        dialog.setOnShowListener(d -> applyAdaptiveAlertWindow(dialog));
+        dialog.show();
     }
 
     @Override public boolean dispatchTouchEvent(android.view.MotionEvent e) {
@@ -1126,9 +1171,13 @@ public class MainActivity extends Activity {
     }
 
     private TextView dialogAction(String label,boolean primary) {
-        TextView v=text(label,responsive(13,14,15),primary?Color.WHITE:TEXT,true);
+        float size=compactChromeUi()?(lowHeightUi()?12:13):responsive(13,14,15);
+        TextView v=text(label,size,primary?Color.WHITE:TEXT,true);
         v.setGravity(Gravity.CENTER_VERTICAL);
-        v.setPadding(dp(14),dp(12),dp(14),dp(12));
+        int hPad=lowHeightUi()?10:14;
+        int vPad=lowHeightUi()?8:12;
+        v.setPadding(dp(hPad),dp(vPad),dp(hPad),dp(vPad));
+        v.setMinHeight(dp(lowHeightUi()?40:46));
         v.setBackground(rounded(primary?BLUE:CARD,primary?Color.TRANSPARENT:LINE,14));
         v.setClickable(true);
         return v;
@@ -1139,58 +1188,78 @@ public class MainActivity extends Activity {
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
         dialog.setCancelable(true);
 
+        final boolean bounded=dialogNeedsBoundedHeight();
+        final boolean dense=lowHeightUi();
+
         LinearLayout card=new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(18),dp(16),dp(18),dp(14));
+        int pad=dense?11:18;
+        card.setPadding(dp(pad),dp(dense?9:16),dp(pad),dp(dense?9:14));
         card.setBackground(rounded(CARD,LINE,20));
 
-        TextView badge=text("КР "+r.id,11,BLUE,true);
+        ScrollView scroll=new ScrollView(this);
+        scroll.setVerticalScrollBarEnabled(false);
+        scroll.setFillViewport(false);
+
+        LinearLayout body=new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        scroll.addView(body,new ScrollView.LayoutParams(-1,-2));
+
+        TextView badge=text("КР "+r.id,dense?10:11,BLUE,true);
         badge.setGravity(Gravity.CENTER);
-        badge.setPadding(dp(10),dp(6),dp(10),dp(6));
+        badge.setPadding(dp(dense?8:10),dp(dense?4:6),dp(dense?8:10),dp(dense?4:6));
         badge.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,12));
-        card.addView(badge,new LinearLayout.LayoutParams(-2,dp(34)));
+        body.addView(badge,new LinearLayout.LayoutParams(-2,-2));
 
-        TextView title=text("Настроить профиль КР",responsive(18,20,21),TEXT,true);
-        title.setPadding(0,dp(12),0,dp(5));
-        card.addView(title);
+        TextView title=text("Настроить профиль КР",dense?16:responsive(18,20,21),TEXT,true);
+        title.setPadding(0,dp(dense?7:12),0,dp(dense?3:5));
+        body.addView(title);
 
-        TextView recTitle=text(r.title,responsive(12,13,14),TEXT,false);
-        recTitle.setMaxLines(4);
-        recTitle.setPadding(0,0,0,dp(10));
-        card.addView(recTitle);
+        TextView recTitle=text(r.title,dense?11:responsive(12,13,14),TEXT,false);
+        recTitle.setMaxLines(dense?2:4);
+        recTitle.setEllipsize(TextUtils.TruncateAt.END);
+        recTitle.setPadding(0,0,0,dp(dense?6:10));
+        body.addView(recTitle);
 
         Set<String> auto=ProfileClassifier.groupsFor(r);
         Set<String> effective=effectiveGroups(r);
         DbHelper.ProfileRule rule=db.getProfileRule(r.baseId);
 
-        TextView current=text("Сейчас: "+joinProfiles(effective),responsive(11,12,13),MUTED,false);
-        current.setLineSpacing(dp(2),1f);
-        current.setPadding(0,0,0,dp(3));
-        card.addView(current);
+        TextView current=text("Сейчас: "+joinProfiles(effective),dense?10:responsive(11,12,13),MUTED,false);
+        current.setLineSpacing(dp(1),1f);
+        current.setPadding(0,0,0,dp(2));
+        body.addView(current);
 
-        TextView original=text("Автоматически: "+joinProfiles(auto),responsive(10,11,12),MUTED,false);
-        original.setLineSpacing(dp(2),1f);
-        original.setPadding(0,0,0,dp(14));
-        card.addView(original);
+        TextView original=text("Автоматически: "+joinProfiles(auto),dense?9:responsive(10,11,12),MUTED,false);
+        original.setLineSpacing(dp(1),1f);
+        original.setPadding(0,0,0,dp(dense?7:12));
+        body.addView(original);
 
         TextView move=dialogAction("Переместить в другой профиль",true);
-        card.addView(move,new LinearLayout.LayoutParams(-1,dp(48)));
-        ((LinearLayout.LayoutParams)move.getLayoutParams()).setMargins(0,0,0,dp(8));
+        body.addView(move,new LinearLayout.LayoutParams(-1,-2));
+        ((LinearLayout.LayoutParams)move.getLayoutParams()).setMargins(0,0,0,dp(dense?5:8));
 
         TextView add=dialogAction("Добавить ещё в профиль",false);
-        card.addView(add,new LinearLayout.LayoutParams(-1,dp(48)));
-        ((LinearLayout.LayoutParams)add.getLayoutParams()).setMargins(0,0,0,dp(8));
+        body.addView(add,new LinearLayout.LayoutParams(-1,-2));
+        ((LinearLayout.LayoutParams)add.getLayoutParams()).setMargins(0,0,0,dp(dense?5:8));
 
         TextView reset=null;
         if(rule!=null) {
             reset=dialogAction("Вернуть исходное распределение",false);
-            card.addView(reset,new LinearLayout.LayoutParams(-1,dp(48)));
-            ((LinearLayout.LayoutParams)reset.getLayoutParams()).setMargins(0,0,0,dp(8));
+            body.addView(reset,new LinearLayout.LayoutParams(-1,-2));
+            ((LinearLayout.LayoutParams)reset.getLayoutParams()).setMargins(0,0,0,dp(dense?5:8));
         }
+
+        LinearLayout.LayoutParams scrollLp=bounded
+                ? new LinearLayout.LayoutParams(-1,0,1)
+                : new LinearLayout.LayoutParams(-1,-2);
+        card.addView(scroll,scrollLp);
 
         TextView cancel=dialogAction("Отмена",false);
         cancel.setGravity(Gravity.CENTER);
-        card.addView(cancel,new LinearLayout.LayoutParams(-1,dp(46)));
+        LinearLayout.LayoutParams cancelLp=new LinearLayout.LayoutParams(-1,-2);
+        cancelLp.setMargins(0,dp(dense?5:8),0,0);
+        card.addView(cancel,cancelLp);
 
         move.setOnClickListener(v -> {
             dialog.dismiss();
@@ -1211,18 +1280,8 @@ public class MainActivity extends Activity {
         cancel.setOnClickListener(v -> dialog.dismiss());
 
         dialog.setContentView(card);
-        Window w=dialog.getWindow();
         dialog.show();
-        if(w!=null) {
-            w.setBackgroundDrawableResource(android.R.color.transparent);
-            w.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-            WindowManager.LayoutParams lp=w.getAttributes();
-            lp.width=dialogWidthPx();
-            lp.height=WindowManager.LayoutParams.WRAP_CONTENT;
-            lp.dimAmount=0.38f;
-            w.setAttributes(lp);
-            w.setGravity(Gravity.CENTER);
-        }
+        applyAdaptiveDialogWindow(dialog,bounded);
     }
 
     private void showProfilePicker(Recommendation r,boolean replaceMode) {
@@ -1230,20 +1289,26 @@ public class MainActivity extends Activity {
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
         dialog.setCancelable(true);
 
+        final boolean dense=lowHeightUi();
+
         LinearLayout card=new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(16),dp(15),dp(16),dp(14));
+        card.setPadding(dp(dense?10:16),dp(dense?8:15),dp(dense?10:16),dp(dense?8:14));
         card.setBackground(rounded(CARD,LINE,20));
 
-        TextView title=text(replaceMode?"Переместить КР":"Добавить в профиль",responsive(18,20,21),TEXT,true);
+        TextView title=text(replaceMode?"Переместить КР":"Добавить в профиль",
+                dense?16:responsive(18,20,21),TEXT,true);
+        title.setSingleLine(false);
         card.addView(title);
 
         TextView caption=text(
                 replaceMode?"Выберите новый профиль. КР будет показана только в выбранном профиле."
                            :"Можно выбрать один или несколько дополнительных профилей.",
-                responsive(11,12,13),MUTED,false);
-        caption.setPadding(0,dp(4),0,dp(10));
-        caption.setLineSpacing(dp(2),1f);
+                dense?10:responsive(11,12,13),MUTED,false);
+        caption.setPadding(0,dp(dense?2:4),0,dp(dense?5:10));
+        caption.setLineSpacing(dp(1),1f);
+        caption.setMaxLines(dense?2:4);
+        caption.setEllipsize(TextUtils.TruncateAt.END);
         card.addView(caption);
 
         final Set<String> effective=effectiveGroups(r);
@@ -1252,6 +1317,7 @@ public class MainActivity extends Activity {
 
         ScrollView scroll=new ScrollView(this);
         scroll.setVerticalScrollBarEnabled(false);
+        scroll.setFillViewport(false);
         LinearLayout choices=new LinearLayout(this);
         choices.setOrientation(LinearLayout.VERTICAL);
         scroll.addView(choices,new ScrollView.LayoutParams(-1,-2));
@@ -1262,12 +1328,16 @@ public class MainActivity extends Activity {
             String prefix=replaceMode
                     ? (profile.equals(selectedSingle[0])?"●  ":"○  ")
                     : (already?"✓  ":"○  ");
-            TextView row=text(prefix+profile,responsive(12,13,14),already&&!replaceMode?MUTED:TEXT,false);
+            TextView row=text(prefix+profile,dense?11:responsive(12,13,14),
+                    already&&!replaceMode?MUTED:TEXT,false);
             row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setPadding(dp(12),dp(10),dp(10),dp(10));
+            row.setMaxLines(dense?1:2);
+            row.setEllipsize(TextUtils.TruncateAt.END);
+            row.setPadding(dp(dense?8:12),dp(dense?6:10),dp(dense?8:10),dp(dense?6:10));
+            row.setMinHeight(dp(dense?36:44));
             row.setBackground(rounded(already?BLUE_SOFT:CARD,LINE,12));
             LinearLayout.LayoutParams rowLp=new LinearLayout.LayoutParams(-1,-2);
-            rowLp.setMargins(0,dp(3),0,dp(3));
+            rowLp.setMargins(0,dp(dense?1:3),0,dp(dense?1:3));
             choices.addView(row,rowLp);
             rows.add(row);
 
@@ -1292,27 +1362,34 @@ public class MainActivity extends Activity {
             }
         }
 
-        LinearLayout.LayoutParams scrollLp=new LinearLayout.LayoutParams(-1,0,1);
-        card.addView(scroll,scrollLp);
+        card.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
 
         LinearLayout buttons=new LinearLayout(this);
-        buttons.setOrientation(LinearLayout.HORIZONTAL);
+        boolean stackButtons=screenWidthDp()<340 || systemFontScale()>1.30f;
+        buttons.setOrientation(stackButtons?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);
         buttons.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout.LayoutParams buttonsLp=new LinearLayout.LayoutParams(-1,-2);
-        buttonsLp.setMargins(0,dp(10),0,0);
+        buttonsLp.setMargins(0,dp(dense?5:10),0,0);
         card.addView(buttons,buttonsLp);
 
         TextView cancel=dialogAction("Отмена",false);
         cancel.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams cancelLp=new LinearLayout.LayoutParams(0,dp(46),1);
-        cancelLp.setMargins(0,0,dp(5),0);
-        buttons.addView(cancel,cancelLp);
-
         TextView save=dialogAction(replaceMode?"Переместить":"Добавить",true);
         save.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams saveLp=new LinearLayout.LayoutParams(0,dp(46),1);
-        saveLp.setMargins(dp(5),0,0,0);
-        buttons.addView(save,saveLp);
+
+        if(stackButtons) {
+            LinearLayout.LayoutParams cancelLp=new LinearLayout.LayoutParams(-1,-2);
+            cancelLp.setMargins(0,0,0,dp(5));
+            buttons.addView(cancel,cancelLp);
+            buttons.addView(save,new LinearLayout.LayoutParams(-1,-2));
+        } else {
+            LinearLayout.LayoutParams cancelLp=new LinearLayout.LayoutParams(0,-2,1);
+            cancelLp.setMargins(0,0,dp(5),0);
+            buttons.addView(cancel,cancelLp);
+            LinearLayout.LayoutParams saveLp=new LinearLayout.LayoutParams(0,-2,1);
+            saveLp.setMargins(dp(5),0,0,0);
+            buttons.addView(save,saveLp);
+        }
 
         cancel.setOnClickListener(v -> dialog.dismiss());
         save.setOnClickListener(v -> {
@@ -1344,18 +1421,8 @@ public class MainActivity extends Activity {
         });
 
         dialog.setContentView(card);
-        Window w=dialog.getWindow();
         dialog.show();
-        if(w!=null) {
-            w.setBackgroundDrawableResource(android.R.color.transparent);
-            w.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-            WindowManager.LayoutParams lp=w.getAttributes();
-            lp.width=dialogWidthPx();
-            lp.height=Math.min(getResources().getDisplayMetrics().heightPixels-dp(48),dp(680));
-            lp.dimAmount=0.38f;
-            w.setAttributes(lp);
-            w.setGravity(Gravity.CENTER);
-        }
+        applyAdaptiveDialogWindow(dialog,true);
     }
 
     private TextView pageTitle(String value) {
@@ -1380,13 +1447,16 @@ public class MainActivity extends Activity {
         return (s==null?"":s).toLowerCase(Locale.ROOT).replace('ё','е').trim();
     }
 
+    private String syncIdleLabel(){ return compactChromeUi()&&lowHeightUi()?"↻":"↻  Проверить"; }
+    private String syncBusyLabel(){ return compactChromeUi()&&lowHeightUi()?"…":"↻  Проверяю…"; }
+
     private void runSync(TextView b) {
         b.setEnabled(false);
-        b.setText("↻  Проверяю…");
+        b.setText(syncBusyLabel());
         status.setText("Проверяю обновления…");
         final ProgressDialog progress=new ProgressDialog(this);
-        progress.setTitle("Проверка клинических рекомендаций");
-        progress.setMessage("Получаю актуальный каталог и проверяю новые и обновлённые КР…");
+        progress.setTitle(lowHeightUi()?"Проверка КР":"Проверка клинических рекомендаций");
+        progress.setMessage(lowHeightUi()?"Получаю актуальный каталог…":"Получаю актуальный каталог и проверяю новые и обновлённые КР…");
         progress.setIndeterminate(true);
         progress.setCancelable(false);
         progress.show();
@@ -1403,7 +1473,7 @@ public class MainActivity extends Activity {
             runOnUiThread(() -> {
                 try { if(progress.isShowing()) progress.dismiss(); } catch(Exception ignored) {}
                 b.setEnabled(true);
-                b.setText("↻  Проверить");
+                b.setText(syncIdleLabel());
                 try { reload(); } catch(Exception ignored) {}
                 showSyncResult(r);
             });
@@ -1417,7 +1487,7 @@ public class MainActivity extends Activity {
             text.append("За 48 часов до момента этой проверки новых или обновлённых КР не обнаружено.");
         } else {
             text.append("Новые и обновлённые КР за 48 часов до момента проверки:");
-            int max=Math.min(12,recent.size());
+            int max=Math.min(lowHeightUi()?8:12,recent.size());
             for(int i=0;i<max;i++) {
                 DbHelper.ChangeEvent e=recent.get(i);
                 text.append("\n\n• ");
@@ -1433,11 +1503,14 @@ public class MainActivity extends Activity {
         }
         if(r.downloaded>0) text.append("\n\nPDF скачано: ").append(r.downloaded).append(".");
         if(r.downloadFailed>0) text.append("\nНе удалось скачать PDF: ").append(r.downloadFailed).append(".");
-        new AlertDialog.Builder(this)
+
+        AlertDialog dialog=new AlertDialog.Builder(this)
                 .setTitle("Результат проверки")
                 .setMessage(text.toString())
                 .setPositiveButton("ОК",null)
-                .show();
+                .create();
+        dialog.setOnShowListener(d -> applyAdaptiveAlertWindow(dialog));
+        dialog.show();
     }
 
     private void downloadOrOpen(Recommendation r) {
@@ -1459,7 +1532,15 @@ public class MainActivity extends Activity {
                     db.markViewed(r.baseId);
                     reload();
                     PdfManager.open(this,r);
-                } else new AlertDialog.Builder(this).setTitle("PDF не скачан").setMessage("Не удалось получить PDF для КР «"+r.title+"» (ID: "+r.id+"). Попробуйте повторить позже.").setPositiveButton("ОК",null).show();
+                } else {
+                    AlertDialog errorDialog=new AlertDialog.Builder(this)
+                            .setTitle("PDF не скачан")
+                            .setMessage("Не удалось получить PDF для КР «"+r.title+"» (ID: "+r.id+"). Попробуйте повторить позже.")
+                            .setPositiveButton("ОК",null)
+                            .create();
+                    errorDialog.setOnShowListener(d -> applyAdaptiveAlertWindow(errorDialog));
+                    errorDialog.show();
+                }
             });
         });
     }
@@ -1473,49 +1554,59 @@ public class MainActivity extends Activity {
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
         dialog.setCancelable(true);
 
+        final boolean dense=lowHeightUi();
+        final boolean stackButtons=screenWidthDp()<340 || systemFontScale()>1.30f;
+
         LinearLayout card=new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(20),dp(18),dp(20),dp(16));
+        card.setPadding(dp(dense?12:20),dp(dense?10:18),dp(dense?12:20),dp(dense?10:16));
         card.setBackground(rounded(CARD,LINE,20));
 
-        TextView badge=text("КР",12,BLUE,true);
+        LinearLayout titleRow=new LinearLayout(this);
+        titleRow.setOrientation(LinearLayout.HORIZONTAL);
+        titleRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView badge=text("КР",dense?10:12,BLUE,true);
         badge.setGravity(Gravity.CENTER);
-        badge.setPadding(dp(10),dp(6),dp(10),dp(6));
+        badge.setPadding(dp(dense?7:10),dp(dense?4:6),dp(dense?7:10),dp(dense?4:6));
         badge.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,12));
-        LinearLayout.LayoutParams badgeLp=new LinearLayout.LayoutParams(dp(48),dp(34));
-        badgeLp.bottomMargin=dp(12);
-        card.addView(badge,badgeLp);
+        titleRow.addView(badge,new LinearLayout.LayoutParams(-2,-2));
 
-        TextView title=text("Закрыть КР Навигатор?",responsive(18,20,21),TEXT,true);
-        title.setPadding(0,0,0,dp(6));
-        card.addView(title,new LinearLayout.LayoutParams(-1,-2));
+        TextView title=text("Закрыть КР Навигатор?",dense?16:responsive(18,20,21),TEXT,true);
+        title.setPadding(dp(dense?8:12),0,0,0);
+        titleRow.addView(title,new LinearLayout.LayoutParams(0,-2,1));
+        card.addView(titleRow,new LinearLayout.LayoutParams(-1,-2));
 
-        TextView message=text("Вы хотите выйти из приложения?",responsive(13,14,15),MUTED,false);
-        message.setLineSpacing(dp(2),1f);
+        TextView message=text("Вы хотите выйти из приложения?",dense?11:responsive(13,14,15),MUTED,false);
+        message.setLineSpacing(dp(1),1f);
+        message.setPadding(0,dp(dense?5:8),0,0);
         card.addView(message,new LinearLayout.LayoutParams(-1,-2));
 
         LinearLayout buttons=new LinearLayout(this);
-        buttons.setOrientation(LinearLayout.HORIZONTAL);
+        buttons.setOrientation(stackButtons?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);
         buttons.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout.LayoutParams buttonsLp=new LinearLayout.LayoutParams(-1,-2);
-        buttonsLp.setMargins(0,dp(18),0,0);
+        buttonsLp.setMargins(0,dp(dense?8:16),0,0);
         card.addView(buttons,buttonsLp);
 
-        TextView stay=text("Вернуться",14,BLUE,true);
+        TextView stay=dialogAction("Вернуться",false);
         stay.setGravity(Gravity.CENTER);
-        stay.setPadding(dp(12),dp(11),dp(12),dp(11));
-        stay.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,14));
-        LinearLayout.LayoutParams stayLp=new LinearLayout.LayoutParams(0,dp(46),1);
-        stayLp.setMargins(0,0,dp(6),0);
-        buttons.addView(stay,stayLp);
-
-        TextView exit=text("Выйти",14,Color.WHITE,true);
+        TextView exit=dialogAction("Выйти",true);
         exit.setGravity(Gravity.CENTER);
-        exit.setPadding(dp(12),dp(11),dp(12),dp(11));
-        exit.setBackground(rounded(BLUE,Color.TRANSPARENT,14));
-        LinearLayout.LayoutParams exitLp=new LinearLayout.LayoutParams(0,dp(46),1);
-        exitLp.setMargins(dp(6),0,0,0);
-        buttons.addView(exit,exitLp);
+
+        if(stackButtons) {
+            LinearLayout.LayoutParams stayLp=new LinearLayout.LayoutParams(-1,-2);
+            stayLp.setMargins(0,0,0,dp(5));
+            buttons.addView(stay,stayLp);
+            buttons.addView(exit,new LinearLayout.LayoutParams(-1,-2));
+        } else {
+            LinearLayout.LayoutParams stayLp=new LinearLayout.LayoutParams(0,-2,1);
+            stayLp.setMargins(0,0,dp(6),0);
+            buttons.addView(stay,stayLp);
+            LinearLayout.LayoutParams exitLp=new LinearLayout.LayoutParams(0,-2,1);
+            exitLp.setMargins(dp(6),0,0,0);
+            buttons.addView(exit,exitLp);
+        }
 
         stay.setOnClickListener(v -> dialog.dismiss());
         exit.setOnClickListener(v -> {
@@ -1524,25 +1615,8 @@ public class MainActivity extends Activity {
         });
 
         dialog.setContentView(card);
-        Window w=dialog.getWindow();
-        if(w!=null) {
-            w.setBackgroundDrawableResource(android.R.color.transparent);
-            w.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-            WindowManager.LayoutParams lp=new WindowManager.LayoutParams();
-            lp.copyFrom(w.getAttributes());
-            lp.width=dialogWidthPx();
-            lp.height=WindowManager.LayoutParams.WRAP_CONTENT;
-            lp.dimAmount=0.38f;
-            w.setAttributes(lp);
-            w.setGravity(Gravity.CENTER);
-        }
         dialog.show();
-        if(w!=null) {
-            WindowManager.LayoutParams lp=w.getAttributes();
-            lp.width=dialogWidthPx();
-            lp.height=WindowManager.LayoutParams.WRAP_CONTENT;
-            w.setAttributes(lp);
-        }
+        applyAdaptiveDialogWindow(dialog,false);
     }
 
     private boolean notificationsEnabled() {
