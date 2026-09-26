@@ -30,6 +30,7 @@ public class MainActivity extends Activity {
     private TextView recentList;
     private EditText search;
     private FrameLayout contentHost;
+    private LinearLayout landscapeSidebar;
     private List<Recommendation> all=new ArrayList<>();
 
     private static final int PAGE_ALL=0;
@@ -78,6 +79,7 @@ public class MainActivity extends Activity {
 
     private boolean compactUi(){ return screenWidthDp()<360; }
     private boolean tabletUi(){ return screenWidthDp()>=600; }
+    private boolean isLandscapeUi(){ return screenWidthDp()>screenHeightDp(); }
 
     private int responsive(int compact,int phone,int tablet) {
         return compactUi()?compact:(tabletUi()?tablet:phone);
@@ -114,6 +116,10 @@ public class MainActivity extends Activity {
     }
 
     private void buildUi() {
+        if(isLandscapeUi()) {
+            buildLandscapeUi();
+            return;
+        }
         final boolean compact=compactUi();
         final boolean tablet=tabletUi();
 
@@ -225,7 +231,236 @@ public class MainActivity extends Activity {
         });
     }
 
+
+    private void buildLandscapeUi() {
+        FrameLayout shell=new FrameLayout(this);
+        shell.setBackgroundColor(BG);
+        if(Build.VERSION.SDK_INT>=30) {
+            shell.setOnApplyWindowInsetsListener((v,insets) -> {
+                android.graphics.Insets bars=insets.getInsets(
+                        WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout()
+                );
+                v.setPadding(bars.left,bars.top,bars.right,bars.bottom);
+                return insets;
+            });
+        }
+
+        LinearLayout root=new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(12),dp(7),dp(12),dp(7));
+        root.setBackgroundColor(BG);
+        shell.addView(root,new FrameLayout.LayoutParams(-1,-1));
+
+        LinearLayout header=new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+
+        LinearLayout heading=new LinearLayout(this);
+        heading.setOrientation(LinearLayout.VERTICAL);
+        TextView title=text("КР Навигатор",22,TEXT,true);
+        title.setIncludeFontPadding(false);
+        heading.addView(title);
+
+        status=text("",10,MUTED,false);
+        status.setSingleLine(true);
+        status.setEllipsize(TextUtils.TruncateAt.END);
+        status.setPadding(0,dp(2),0,0);
+        heading.addView(status,new LinearLayout.LayoutParams(-1,-2));
+
+        LinearLayout.LayoutParams headingLp=new LinearLayout.LayoutParams(0,-2,0.34f);
+        headingLp.setMargins(0,0,dp(10),0);
+        header.addView(heading,headingLp);
+
+        recentList=text("",11,TEXT,false);
+        recentList.setMaxLines(2);
+        recentList.setEllipsize(TextUtils.TruncateAt.END);
+        recentList.setGravity(Gravity.CENTER_VERTICAL);
+        recentList.setPadding(dp(10),dp(5),dp(10),dp(5));
+        recentList.setBackground(rounded(CARD,LINE,12));
+        recentList.setClickable(true);
+        recentList.setOnClickListener(v -> showRecentDialog());
+        LinearLayout.LayoutParams recentLp=new LinearLayout.LayoutParams(0,dp(46),0.66f);
+        recentLp.setMargins(0,0,dp(10),0);
+        header.addView(recentList,recentLp);
+
+        TextView sync=text("↻  Проверить",12,BLUE,true);
+        sync.setGravity(Gravity.CENTER);
+        sync.setPadding(dp(12),0,dp(12),0);
+        sync.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,13));
+        sync.setClickable(true);
+        sync.setFocusable(true);
+        header.addView(sync,new LinearLayout.LayoutParams(-2,dp(42)));
+        root.addView(header,new LinearLayout.LayoutParams(-1,dp(50)));
+
+        LinearLayout body=new LinearLayout(this);
+        body.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams bodyLp=new LinearLayout.LayoutParams(-1,0,1);
+        bodyLp.setMargins(0,dp(6),0,0);
+        root.addView(body,bodyLp);
+
+        LinearLayout leftCard=new LinearLayout(this);
+        leftCard.setOrientation(LinearLayout.VERTICAL);
+        leftCard.setPadding(dp(8),dp(6),dp(8),dp(6));
+        leftCard.setBackground(rounded(CARD,LINE,15));
+        LinearLayout.LayoutParams leftLp=new LinearLayout.LayoutParams(0,-1,0.31f);
+        leftLp.setMargins(0,0,dp(8),0);
+        body.addView(leftCard,leftLp);
+
+        TextView profilesTitle=text("Профили",15,TEXT,true);
+        profilesTitle.setPadding(dp(4),0,dp(4),dp(4));
+        leftCard.addView(profilesTitle,new LinearLayout.LayoutParams(-1,-2));
+
+        ScrollView profileScroll=new ScrollView(this);
+        profileScroll.setFillViewport(false);
+        profileScroll.setVerticalScrollBarEnabled(false);
+        landscapeSidebar=new LinearLayout(this);
+        landscapeSidebar.setOrientation(LinearLayout.VERTICAL);
+        profileScroll.addView(landscapeSidebar,new ScrollView.LayoutParams(-1,-2));
+        leftCard.addView(profileScroll,new LinearLayout.LayoutParams(-1,0,1));
+
+        LinearLayout right=new LinearLayout(this);
+        right.setOrientation(LinearLayout.VERTICAL);
+        body.addView(right,new LinearLayout.LayoutParams(0,-1,0.69f));
+
+        search=new EditText(this);
+        search.setHint("Название, номер КР или код МКБ-10");
+        search.setHintTextColor(Color.rgb(145,153,165));
+        search.setTextColor(TEXT);
+        search.setTextSize(13);
+        search.setSingleLine(true);
+        search.setPadding(dp(12),0,dp(12),0);
+        search.setBackground(rounded(CARD,LINE,13));
+        right.addView(search,new LinearLayout.LayoutParams(-1,dp(42)));
+
+        contentHost=new FrameLayout(this);
+        LinearLayout.LayoutParams contentLp=new LinearLayout.LayoutParams(-1,0,1);
+        contentLp.setMargins(0,dp(5),0,0);
+        right.addView(contentHost,contentLp);
+
+        setContentView(shell);
+        if(Build.VERSION.SDK_INT>=30) shell.requestApplyInsets();
+
+        sync.setOnClickListener(v -> runSync(sync));
+        search.addTextChangedListener(new TextWatcher(){
+            public void beforeTextChanged(CharSequence s,int st,int count,int after){}
+            public void onTextChanged(CharSequence s,int st,int before,int count){
+                String q=s.toString().trim();
+                if(q.isEmpty()) renderCurrentPage(0); else renderSearch(q);
+            }
+            public void afterTextChanged(Editable e){}
+        });
+    }
+
+    private void refreshLandscapeSidebar() {
+        if(landscapeSidebar==null) return;
+        landscapeSidebar.removeAllViews();
+
+        LinkedHashMap<String,List<Recommendation>> groups=groupWithUserProfiles(all);
+        if(currentPage==PAGE_PROFILES && selectedProfile==null) {
+            for(String p:ProfileClassifier.PROFILES) {
+                List<Recommendation> items=groups.get(p);
+                if(items!=null && !items.isEmpty()) {
+                    selectedProfile=p;
+                    break;
+                }
+            }
+        }
+
+        landscapeSidebar.addView(landscapeNavRow(
+                "Все КР",all.size(),currentPage==PAGE_ALL,
+                v -> {
+                    currentPage=PAGE_ALL;
+                    selectedProfile=null;
+                    search.setText("");
+                    renderCurrentPage(0);
+                }
+        ));
+
+        landscapeSidebar.addView(landscapeNavRow(
+                "История",db==null?0:db.history(200).size(),currentPage==PAGE_HISTORY,
+                v -> {
+                    currentPage=PAGE_HISTORY;
+                    selectedProfile=null;
+                    search.setText("");
+                    renderCurrentPage(0);
+                }
+        ));
+
+        View divider=new View(this);
+        divider.setBackgroundColor(LINE);
+        LinearLayout.LayoutParams dividerLp=new LinearLayout.LayoutParams(-1,dp(1));
+        dividerLp.setMargins(dp(4),dp(4),dp(4),dp(5));
+        landscapeSidebar.addView(divider,dividerLp);
+
+        for(String p:ProfileClassifier.PROFILES) {
+            List<Recommendation> items=groups.get(p);
+            if(items==null || items.isEmpty()) continue;
+            boolean selected=currentPage==PAGE_PROFILES && p.equals(selectedProfile);
+            landscapeSidebar.addView(landscapeNavRow(
+                    p,items.size(),selected,
+                    v -> {
+                        currentPage=PAGE_PROFILES;
+                        selectedProfile=p;
+                        search.setText("");
+                        renderCurrentPage(0);
+                    }
+            ));
+        }
+    }
+
+    private TextView landscapeNavRow(String label,int count,boolean selected,View.OnClickListener click) {
+        TextView row=text(label+"   "+count,12,selected?BLUE_DARK:TEXT,selected);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setMaxLines(2);
+        row.setEllipsize(TextUtils.TruncateAt.END);
+        row.setPadding(dp(10),dp(7),dp(9),dp(7));
+        row.setBackground(rounded(selected?BLUE_SOFT:Color.TRANSPARENT,Color.TRANSPARENT,11));
+        row.setClickable(true);
+        row.setOnClickListener(click);
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
+        lp.setMargins(0,dp(1),0,dp(1));
+        row.setLayoutParams(lp);
+        return row;
+    }
+
+    private View makeLandscapeProfilePage(String profile) {
+        List<Recommendation> recs=groupWithUserProfiles(all).get(profile);
+        if(recs==null) recs=Collections.emptyList();
+        return makeListPage(profile,recs);
+    }
+
+    private View makeLandscapeHistoryPage() {
+        List<Recommendation> history=db.history(200);
+        return makeListPage("История",history);
+    }
+
+    private void showRecentDialog() {
+        List<DbHelper.ChangeEvent> recent=changesForLastScan(30);
+        StringBuilder sb=new StringBuilder();
+        if(recent.isEmpty()) {
+            sb.append("За 48 часов до последней проверки новых или обновлённых КР не обнаружено.");
+        } else {
+            for(int i=0;i<recent.size();i++) {
+                DbHelper.ChangeEvent e=recent.get(i);
+                if(i>0) sb.append("\n\n");
+                if("NEW".equals(e.type)) {
+                    sb.append("НОВАЯ — ").append(e.title).append(" (").append(e.newId).append(")");
+                } else {
+                    sb.append("ОБНОВЛЕНА — ").append(e.title).append(" (");
+                    if(e.oldId!=null && !e.oldId.isEmpty()) sb.append(e.oldId).append(" → ");
+                    sb.append(e.newId).append(")");
+                }
+            }
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Изменения за 48 часов")
+                .setMessage(sb.toString())
+                .setPositiveButton("ОК",null)
+                .show();
+    }
+
     @Override public boolean dispatchTouchEvent(android.view.MotionEvent e) {
+        if(isLandscapeUi()) return super.dispatchTouchEvent(e);
         if(contentHost!=null) {
             int action=e.getActionMasked();
             if(action==android.view.MotionEvent.ACTION_DOWN) {
@@ -264,7 +499,11 @@ public class MainActivity extends Activity {
         String last=getSharedPreferences("prefs",MODE_PRIVATE).getString("last_sync","ещё не выполнялась");
         long next=getSharedPreferences("prefs",MODE_PRIVATE).getLong("next_alarm",AlarmScheduler.nextWeekday7());
         String notifyNote=notificationsEnabled()?"":"\n⚠ Уведомления Android отключены";
-        status.setText(all.size()+" КР  •  Последняя проверка: "+last+"\nСледующая: "+DateFormat.getDateTimeInstance(DateFormat.MEDIUM,DateFormat.SHORT).format(new Date(next))+notifyNote);
+        if(isLandscapeUi()) {
+            status.setText(all.size()+" КР  •  проверено: "+last+(notificationsEnabled()?"":"  •  уведомления выкл."));
+        } else {
+            status.setText(all.size()+" КР  •  Последняя проверка: "+last+"\nСледующая: "+DateFormat.getDateTimeInstance(DateFormat.MEDIUM,DateFormat.SHORT).format(new Date(next))+notifyNote);
+        }
         renderRecent();
         String q=search==null?"":search.getText().toString().trim();
         if(q.isEmpty()) renderCurrentPage(0); else renderSearch(q);
@@ -277,13 +516,25 @@ public class MainActivity extends Activity {
     }
 
     private void renderRecent() {
-        List<DbHelper.ChangeEvent> recent=changesForLastScan(5);
+        List<DbHelper.ChangeEvent> recent=changesForLastScan(isLandscapeUi()?30:5);
         if(recent.isEmpty()) {
-            recentList.setText("За 48 часов до последней проверки новых или обновлённых КР не обнаружено.");
+            recentList.setText(isLandscapeUi()?"Изменения за 48 ч: нет":"За 48 часов до последней проверки новых или обновлённых КР не обнаружено.");
             recentList.setTextColor(MUTED);
             return;
         }
         recentList.setTextColor(TEXT);
+
+        if(isLandscapeUi()) {
+            DbHelper.ChangeEvent e=recent.get(0);
+            StringBuilder compact=new StringBuilder("Изменения 48 ч: ");
+            if("NEW".equals(e.type)) compact.append("НОВАЯ — ");
+            else compact.append("ОБНОВЛЕНА — ");
+            compact.append(e.title).append(" · ").append(e.newId);
+            if(recent.size()>1) compact.append("   +").append(recent.size()-1);
+            recentList.setText(compact.toString());
+            return;
+        }
+
         StringBuilder sb=new StringBuilder();
         int max=Math.min(3,recent.size());
         for(int i=0;i<max;i++) {
@@ -304,6 +555,16 @@ public class MainActivity extends Activity {
     private void renderCurrentPage(int direction) {
         if(contentHost==null) return;
         searchShowsMkb=false;
+
+        if(isLandscapeUi()) {
+            refreshLandscapeSidebar();
+            if(currentPage==PAGE_ALL) showContent(makeListPage("Все КР",all),0);
+            else if(currentPage==PAGE_HISTORY) showContent(makeLandscapeHistoryPage(),0);
+            else if(selectedProfile!=null) showContent(makeLandscapeProfilePage(selectedProfile),0);
+            else showContent(makeListPage("Все КР",all),0);
+            return;
+        }
+
         if(currentPage==PAGE_ALL) showContent(makeListPage("Все КР",all),direction);
         else if(currentPage==PAGE_HISTORY) showContent(makeHistoryPage(),direction);
         else if(selectedProfile!=null) showContent(makeProfileListPage(selectedProfile),direction);
