@@ -67,6 +67,48 @@ public class DbHelper extends SQLiteOpenHelper {
         getWritableDatabase().delete("recs",null,null);
         try { getWritableDatabase().delete("changes",null,null); } catch(Exception ignored) {}
     }
+    public boolean remapBase(String oldBase,Recommendation replacement,String lastSeen) {
+        if(oldBase==null || replacement==null || replacement.baseId==null) return false;
+        if(oldBase.equals(replacement.baseId)) {
+            upsert(replacement,lastSeen);
+            return true;
+        }
+
+        SQLiteDatabase db=getWritableDatabase();
+        db.beginTransaction();
+        try {
+            // The new base must not already exist; otherwise this is not a
+            // technical renumbering and should be handled as a normal record.
+            try(Cursor existing=db.query("recs",new String[]{"base_id"},"base_id=?",
+                    new String[]{replacement.baseId},null,null,null)) {
+                if(existing.moveToFirst()) return false;
+            }
+
+            ContentValues rec=new ContentValues();
+            rec.put("base_id",replacement.baseId);
+            rec.put("current_id",replacement.id);
+            rec.put("title",replacement.title);
+            rec.put("filename",replacement.filename);
+            rec.put("mkb_codes",replacement.mkbCodes);
+            rec.put("last_seen",lastSeen);
+            int changed=db.update("recs",rec,"base_id=?",new String[]{oldBase});
+            if(changed!=1) return false;
+
+            ContentValues history=new ContentValues();
+            history.put("base_id",replacement.baseId);
+            db.update("history",history,"base_id=?",new String[]{oldBase});
+
+            ContentValues profile=new ContentValues();
+            profile.put("base_id",replacement.baseId);
+            db.update("profile_custom",profile,"base_id=?",new String[]{oldBase});
+
+            db.setTransactionSuccessful();
+            return true;
+        } finally {
+            db.endTransaction();
+        }
+    }
+
     public Recommendation getByBase(String base) {
         try(Cursor c=getReadableDatabase().query("recs",null,"base_id=?",new String[]{base},null,null,null)) {
             if(c.moveToFirst()) return fromCursor(c); return null;
