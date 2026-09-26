@@ -171,6 +171,27 @@ public class MainActivity extends Activity {
         return t;
     }
 
+    private TextView aboutHeaderButton(float size) {
+        TextView info=text("ⓘ",size,BLUE,true);
+        info.setContentDescription("О приложении");
+        info.setGravity(Gravity.CENTER);
+        info.setMinWidth(dp(36));
+        info.setMinHeight(dp(36));
+        info.setPadding(dp(6),0,dp(6),0);
+        info.setClickable(true);
+        info.setFocusable(true);
+        info.setOnClickListener(v -> {
+            currentPage=PAGE_ABOUT;
+            selectedProfile=null;
+            if(search!=null && search.getText()!=null && search.getText().length()>0) {
+                search.setText("");
+            } else {
+                renderCurrentPage(0);
+            }
+        });
+        return info;
+    }
+
     private void buildUi() {
         if(useTwoPaneUi()) {
             buildAdaptiveTwoPaneUi();
@@ -212,11 +233,21 @@ public class MainActivity extends Activity {
 
         LinearLayout heading=new LinearLayout(this);
         heading.setOrientation(LinearLayout.VERTICAL);
+
+        LinearLayout titleRow=new LinearLayout(this);
+        titleRow.setOrientation(LinearLayout.HORIZONTAL);
+        titleRow.setGravity(Gravity.CENTER_VERTICAL);
         TextView title=text("КР Навигатор",responsive(21,23,26),TEXT,true);
+        titleRow.addView(title,new LinearLayout.LayoutParams(-2,-2));
+        TextView info=aboutHeaderButton(responsive(17,18,20));
+        LinearLayout.LayoutParams infoLp=new LinearLayout.LayoutParams(dp(36),dp(36));
+        infoLp.setMargins(dp(5),0,0,0);
+        titleRow.addView(info,infoLp);
+
         TextView subtitle=text("Клинические рекомендации",responsive(11,12,13),MUTED,false);
         subtitle.setPadding(0,dp(2),0,0);
         subtitle.setMaxLines(2);
-        heading.addView(title);
+        heading.addView(titleRow,new LinearLayout.LayoutParams(-1,-2));
         heading.addView(subtitle);
 
         if(compact) {
@@ -322,11 +353,20 @@ public class MainActivity extends Activity {
 
         LinearLayout heading=new LinearLayout(this);
         heading.setOrientation(LinearLayout.VERTICAL);
+
+        LinearLayout titleRow=new LinearLayout(this);
+        titleRow.setOrientation(LinearLayout.HORIZONTAL);
+        titleRow.setGravity(Gravity.CENTER_VERTICAL);
         TextView title=text("КР Навигатор",low?18:(expanded?23:21),TEXT,true);
         title.setIncludeFontPadding(false);
         title.setSingleLine(true);
         title.setEllipsize(TextUtils.TruncateAt.END);
-        heading.addView(title);
+        titleRow.addView(title,new LinearLayout.LayoutParams(0,-2,1));
+        TextView info=aboutHeaderButton(low?16:(expanded?19:18));
+        LinearLayout.LayoutParams infoLp=new LinearLayout.LayoutParams(dp(low?32:36),dp(low?32:36));
+        infoLp.setMargins(dp(3),0,0,0);
+        titleRow.addView(info,infoLp);
+        heading.addView(titleRow,new LinearLayout.LayoutParams(-1,-2));
 
         status=text("",low?9:10,MUTED,false);
         status.setSingleLine(true);
@@ -455,10 +495,19 @@ public class MainActivity extends Activity {
 
         LinearLayout heading=new LinearLayout(this);
         heading.setOrientation(LinearLayout.VERTICAL);
+
+        LinearLayout titleRow=new LinearLayout(this);
+        titleRow.setOrientation(LinearLayout.HORIZONTAL);
+        titleRow.setGravity(Gravity.CENTER_VERTICAL);
         TextView title=text("КР Навигатор",19,TEXT,true);
         title.setSingleLine(true);
         title.setIncludeFontPadding(false);
-        heading.addView(title);
+        titleRow.addView(title,new LinearLayout.LayoutParams(-2,-2));
+        TextView info=aboutHeaderButton(16);
+        LinearLayout.LayoutParams infoLp=new LinearLayout.LayoutParams(dp(32),dp(32));
+        infoLp.setMargins(dp(3),0,0,0);
+        titleRow.addView(info,infoLp);
+        heading.addView(titleRow,new LinearLayout.LayoutParams(-1,-2));
 
         status=text("",9,MUTED,false);
         status.setSingleLine(true);
@@ -548,16 +597,6 @@ public class MainActivity extends Activity {
                 "История",db==null?0:db.history(200).size(),currentPage==PAGE_HISTORY,
                 v -> {
                     currentPage=PAGE_HISTORY;
-                    selectedProfile=null;
-                    search.setText("");
-                    renderCurrentPage(0);
-                }
-        ));
-
-        landscapeSidebar.addView(landscapeNavRow(
-                "О приложении",-1,currentPage==PAGE_ABOUT,
-                v -> {
-                    currentPage=PAGE_ABOUT;
                     selectedProfile=null;
                     search.setText("");
                     renderCurrentPage(0);
@@ -852,16 +891,6 @@ public class MainActivity extends Activity {
         });
         pageHead.addView(historyNav);
 
-        TextView aboutNav=text("ⓘ",responsive(15,16,17),BLUE,true);
-        aboutNav.setContentDescription("О приложении");
-        aboutNav.setPadding(dp(7),dp(5),0,dp(5));
-        aboutNav.setClickable(true);
-        aboutNav.setOnClickListener(v -> {
-            currentPage=PAGE_ABOUT;
-            selectedProfile=null;
-            renderCurrentPage(0);
-        });
-        pageHead.addView(aboutNav);
         outer.addView(pageHead);
 
         LinkedHashMap<String,List<Recommendation>> groups=groupWithUserProfiles(all);
@@ -927,16 +956,6 @@ public class MainActivity extends Activity {
         });
         head.addView(historyLink);
 
-        TextView aboutLink=text("ⓘ",16,BLUE,true);
-        aboutLink.setContentDescription("О приложении");
-        aboutLink.setPadding(dp(8),dp(5),0,dp(5));
-        aboutLink.setClickable(true);
-        aboutLink.setOnClickListener(v -> {
-            currentPage=PAGE_ABOUT;
-            selectedProfile=null;
-            renderCurrentPage(0);
-        });
-        head.addView(aboutLink);
         outer.addView(head,new LinearLayout.LayoutParams(-1,-2));
 
         LinkedHashMap<String,List<Recommendation>> groups=groupWithUserProfiles(all);
