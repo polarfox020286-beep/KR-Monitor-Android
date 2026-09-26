@@ -8,10 +8,10 @@ import java.util.*;
 public final class AlarmScheduler {
     private AlarmScheduler() {}
 
-    public static long nextWeekday7() {
+    public static long nextWeekday12() {
         Calendar now=Calendar.getInstance();
         Calendar next=(Calendar)now.clone();
-        next.set(Calendar.HOUR_OF_DAY,7);
+        next.set(Calendar.HOUR_OF_DAY,12);
         next.set(Calendar.MINUTE,0);
         next.set(Calendar.SECOND,0);
         next.set(Calendar.MILLISECOND,0);
@@ -22,7 +22,7 @@ public final class AlarmScheduler {
         while(next.get(Calendar.DAY_OF_WEEK)==Calendar.SATURDAY || next.get(Calendar.DAY_OF_WEEK)==Calendar.SUNDAY) {
             next.add(Calendar.DAY_OF_MONTH,1);
         }
-        next.set(Calendar.HOUR_OF_DAY,7);
+        next.set(Calendar.HOUR_OF_DAY,12);
         next.set(Calendar.MINUTE,0);
         next.set(Calendar.SECOND,0);
         next.set(Calendar.MILLISECOND,0);
@@ -31,15 +31,18 @@ public final class AlarmScheduler {
 
     public static void scheduleNext(Context c) {
         AlarmManager am=(AlarmManager)c.getSystemService(Context.ALARM_SERVICE);
+        if(am==null) return;
 
-        // Cancel alarm used by older versions (Monday 19:00).
-        Intent legacyIntent=new Intent(c,AlarmReceiver.class);
-        PendingIntent legacy=PendingIntent.getBroadcast(c,1900,legacyIntent,PendingIntent.FLAG_NO_CREATE|PendingIntent.FLAG_IMMUTABLE);
-        if(legacy!=null) { am.cancel(legacy); legacy.cancel(); }
+        // Cancel alarms used by older versions so an upgrade does not leave
+        // the old 07:00 or historical 19:00 schedule active.
+        cancelIfExists(c,am,1900);
+        cancelIfExists(c,am,700);
 
         Intent i=new Intent(c,AlarmReceiver.class);
-        PendingIntent pi=PendingIntent.getBroadcast(c,700,i,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
-        long when=nextWeekday7();
+        PendingIntent pi=PendingIntent.getBroadcast(
+                c,1200,i,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE
+        );
+        long when=nextWeekday12();
         if(Build.VERSION.SDK_INT>=31 && !am.canScheduleExactAlarms()) {
             am.setWindow(AlarmManager.RTC_WAKEUP,when,15*60*1000L,pi);
         } else if(Build.VERSION.SDK_INT>=23) {
@@ -47,6 +50,20 @@ public final class AlarmScheduler {
         } else {
             am.setExact(AlarmManager.RTC_WAKEUP,when,pi);
         }
-        c.getSharedPreferences("prefs",Context.MODE_PRIVATE).edit().putLong("next_alarm",when).apply();
+        c.getSharedPreferences("prefs",Context.MODE_PRIVATE)
+                .edit()
+                .putLong("next_alarm",when)
+                .apply();
+    }
+
+    private static void cancelIfExists(Context c,AlarmManager am,int requestCode) {
+        Intent intent=new Intent(c,AlarmReceiver.class);
+        PendingIntent old=PendingIntent.getBroadcast(
+                c,requestCode,intent,PendingIntent.FLAG_NO_CREATE|PendingIntent.FLAG_IMMUTABLE
+        );
+        if(old!=null) {
+            am.cancel(old);
+            old.cancel();
+        }
     }
 }
