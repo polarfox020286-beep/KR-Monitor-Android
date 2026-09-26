@@ -8,18 +8,20 @@ import java.util.*;
 
 public class DbHelper extends SQLiteOpenHelper {
     private static final String DB = "kr.db";
-    private static final int VER = 6;
+    private static final int VER = 7;
     public DbHelper(Context c) { super(c, DB, null, VER); }
     @Override public void onCreate(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE recs(base_id TEXT PRIMARY KEY,current_id TEXT NOT NULL,title TEXT NOT NULL,filename TEXT NOT NULL,mkb_codes TEXT NOT NULL DEFAULT '',last_seen TEXT,added_at TEXT)");
         db.execSQL("CREATE TABLE history(base_id TEXT PRIMARY KEY,viewed_at INTEGER NOT NULL)");
         db.execSQL("CREATE TABLE changes(id INTEGER PRIMARY KEY AUTOINCREMENT,base_id TEXT NOT NULL,event_type TEXT NOT NULL,old_id TEXT,new_id TEXT NOT NULL,title TEXT NOT NULL,changed_at TEXT NOT NULL,UNIQUE(base_id,event_type,new_id))");
+        db.execSQL("CREATE TABLE profile_custom(base_id TEXT PRIMARY KEY,mode TEXT NOT NULL,profiles TEXT NOT NULL)");
     }
     @Override public void onUpgrade(SQLiteDatabase db,int oldV,int newV) {
         if(oldV<2) db.execSQL("ALTER TABLE recs ADD COLUMN added_at TEXT");
         if(oldV<3) db.execSQL("CREATE TABLE IF NOT EXISTS history(base_id TEXT PRIMARY KEY,viewed_at INTEGER NOT NULL)");
         if(oldV<4) db.execSQL("ALTER TABLE recs ADD COLUMN mkb_codes TEXT NOT NULL DEFAULT ''");
         if(oldV<6) ensureChangesTable(db);
+        if(oldV<7) ensureProfileCustomTable(db);
     }
 
     @Override public void onOpen(SQLiteDatabase db) {
@@ -27,6 +29,11 @@ public class DbHelper extends SQLiteOpenHelper {
         // Defensive repair for 1.1.9: that build could mark the DB as v5
         // without creating the changes table.
         ensureChangesTable(db);
+        ensureProfileCustomTable(db);
+    }
+
+    private void ensureProfileCustomTable(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS profile_custom(base_id TEXT PRIMARY KEY,mode TEXT NOT NULL,profiles TEXT NOT NULL)");
     }
 
     private void ensureChangesTable(SQLiteDatabase db) {
@@ -138,6 +145,86 @@ public class DbHelper extends SQLiteOpenHelper {
                     c.getString(c.getColumnIndexOrThrow("new_id")),
                     c.getString(c.getColumnIndexOrThrow("title")),
                     c.getString(c.getColumnIndexOrThrow("changed_at"))));
+        }
+        return out;
+    }
+
+    public static final class ProfileRule {
+        public final String mode;
+        public final LinkedHashSet<String> profiles;
+        ProfileRule(String mode,Collection<String> profiles) {
+            this.mode=mode==null?"":mode;
+            this.profiles=new LinkedHashSet<>();
+            if(profiles!=null) this.profiles.addAll(profiles);
+        }
+    }
+
+    private String encodeProfiles(Collection<String> profiles) {
+        StringBuilder out=new StringBuilder();
+        if(profiles!=null) {
+            for(String p:profiles) {
+                if(p==null) continue;
+                String value=p.trim().replace("\n"," ").replace("\r"," ");
+                if(value.isEmpty()) continue;
+                if(out.length()>0) out.append("\n");
+                out.append(value);
+            }
+        }
+        return out.toString();
+    }
+
+    private LinkedHashSet<String> decodeProfiles(String raw) {
+        LinkedHashSet<String> out=new LinkedHashSet<>();
+        if(raw==null || raw.trim().isEmpty()) return out;
+        for(String p:raw.split("\\n")) {
+            String value=p.trim();
+            if(!value.isEmpty()) out.add(value);
+        }
+        return out;
+    }
+
+    public void saveProfileRule(String baseId,String mode,Collection<String> profiles) {
+        if(baseId==null || baseId.trim().isEmpty()) return;
+        LinkedHashSet<String> clean=new LinkedHashSet<>();
+        if(profiles!=null) {
+            for(String p:profiles) if(ProfileClassifier.PROFILES.contains(p)) clean.add(p);
+        }
+        if(clean.isEmpty()) {
+            clearProfileRule(baseId);
+            return;
+        }
+        String safeMode="REPLACE".equals(mode)?"REPLACE":"ADD";
+        ContentValues v=new ContentValues();
+        v.put("base_id",baseId);
+        v.put("mode",safeMode);
+        v.put("profiles",encodeProfiles(clean));
+        getWritableDatabase().insertWithOnConflict("profile_custom",null,v,SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    public void clearProfileRule(String baseId) {
+        if(baseId==null) return;
+        getWritableDatabase().delete("profile_custom","base_id=?",new String[]{baseId});
+    }
+
+    public ProfileRule getProfileRule(String baseId) {
+        if(baseId==null) return null;
+        try(Cursor c=getReadableDatabase().query("profile_custom",null,"base_id=?",new String[]{baseId},null,null,null)) {
+            if(c.moveToFirst()) return new ProfileRule(
+                    c.getString(c.getColumnIndexOrThrow("mode")),
+                    decodeProfiles(c.getString(c.getColumnIndexOrThrow("profiles"))));
+        }
+        return null;
+    }
+
+    public Map<String,ProfileRule> allProfileRules() {
+        LinkedHashMap<String,ProfileRule> out=new LinkedHashMap<>();
+        try(Cursor c=getReadableDatabase().query("profile_custom",null,null,null,null,null,"base_id")) {
+            while(c.moveToNext()) {
+                String base=c.getString(c.getColumnIndexOrThrow("base_id"));
+                out.put(base,new ProfileRule(
+                        c.getString(c.getColumnIndexOrThrow("mode")),
+                        decodeProfiles(c.getString(c.getColumnIndexOrThrow("profiles")))));
+            }
         }
         return out;
     }
