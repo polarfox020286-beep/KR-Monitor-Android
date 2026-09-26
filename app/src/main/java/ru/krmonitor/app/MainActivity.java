@@ -249,7 +249,7 @@ public class MainActivity extends Activity {
         recentHeader.addView(recentTitle,compact
                 ? new LinearLayout.LayoutParams(-1,-2)
                 : new LinearLayout.LayoutParams(0,-2,1));
-        TextView recentCaption=text("48 ч до последней проверки",responsive(10,11,12),MUTED,false);
+        TextView recentCaption=text("За последние 48 часов",responsive(10,11,12),MUTED,false);
         if(compact) recentCaption.setPadding(0,dp(2),0,0);
         recentHeader.addView(recentCaption);
         root.addView(recentHeader);
