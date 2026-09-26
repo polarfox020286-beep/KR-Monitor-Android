@@ -615,6 +615,87 @@ public class MainActivity extends Activity {
         });
     }
 
+    @Override public void onBackPressed() {
+        showExitDialog();
+    }
+
+    private void showExitDialog() {
+        final Dialog dialog=new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setCancelable(true);
+
+        LinearLayout card=new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(20),dp(18),dp(20),dp(16));
+        card.setBackground(rounded(CARD,LINE,20));
+
+        TextView badge=text("КР",12,BLUE,true);
+        badge.setGravity(Gravity.CENTER);
+        badge.setPadding(dp(10),dp(6),dp(10),dp(6));
+        badge.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,12));
+        LinearLayout.LayoutParams badgeLp=new LinearLayout.LayoutParams(dp(48),dp(34));
+        badgeLp.bottomMargin=dp(12);
+        card.addView(badge,badgeLp);
+
+        TextView title=text("Закрыть КР Навигатор?",20,TEXT,true);
+        title.setPadding(0,0,0,dp(6));
+        card.addView(title,new LinearLayout.LayoutParams(-1,-2));
+
+        TextView message=text("Вы хотите выйти из приложения?",14,MUTED,false);
+        message.setLineSpacing(dp(2),1f);
+        card.addView(message,new LinearLayout.LayoutParams(-1,-2));
+
+        LinearLayout buttons=new LinearLayout(this);
+        buttons.setOrientation(LinearLayout.HORIZONTAL);
+        buttons.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams buttonsLp=new LinearLayout.LayoutParams(-1,-2);
+        buttonsLp.setMargins(0,dp(18),0,0);
+        card.addView(buttons,buttonsLp);
+
+        TextView stay=text("Вернуться",14,BLUE,true);
+        stay.setGravity(Gravity.CENTER);
+        stay.setPadding(dp(12),dp(11),dp(12),dp(11));
+        stay.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,14));
+        LinearLayout.LayoutParams stayLp=new LinearLayout.LayoutParams(0,dp(46),1);
+        stayLp.setMargins(0,0,dp(6),0);
+        buttons.addView(stay,stayLp);
+
+        TextView exit=text("Выйти",14,Color.WHITE,true);
+        exit.setGravity(Gravity.CENTER);
+        exit.setPadding(dp(12),dp(11),dp(12),dp(11));
+        exit.setBackground(rounded(BLUE,Color.TRANSPARENT,14));
+        LinearLayout.LayoutParams exitLp=new LinearLayout.LayoutParams(0,dp(46),1);
+        exitLp.setMargins(dp(6),0,0,0);
+        buttons.addView(exit,exitLp);
+
+        stay.setOnClickListener(v -> dialog.dismiss());
+        exit.setOnClickListener(v -> {
+            dialog.dismiss();
+            finishAndRemoveTask();
+        });
+
+        dialog.setContentView(card);
+        Window w=dialog.getWindow();
+        if(w!=null) {
+            w.setBackgroundDrawableResource(android.R.color.transparent);
+            w.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            WindowManager.LayoutParams lp=new WindowManager.LayoutParams();
+            lp.copyFrom(w.getAttributes());
+            lp.width=(int)(getResources().getDisplayMetrics().widthPixels*0.88f);
+            lp.height=WindowManager.LayoutParams.WRAP_CONTENT;
+            lp.dimAmount=0.38f;
+            w.setAttributes(lp);
+            w.setGravity(Gravity.CENTER);
+        }
+        dialog.show();
+        if(w!=null) {
+            WindowManager.LayoutParams lp=w.getAttributes();
+            lp.width=(int)(getResources().getDisplayMetrics().widthPixels*0.88f);
+            lp.height=WindowManager.LayoutParams.WRAP_CONTENT;
+            w.setAttributes(lp);
+        }
+    }
+
     private boolean notificationsEnabled() {
         if(Build.VERSION.SDK_INT>=33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED) return false;
         if(Build.VERSION.SDK_INT>=24) {
