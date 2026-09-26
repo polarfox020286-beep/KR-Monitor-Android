@@ -49,13 +49,21 @@ public class SplashActivity extends Activity {
                 FrameLayout.LayoutParams.MATCH_PARENT
         ));
 
+        final int widthDp = screenWidthDp();
+        final int heightDp = screenHeightDp();
+        final boolean compact = widthDp < 360 || heightDp < 600;
+        final boolean tablet = widthDp >= 600;
+        final float heightScale = heightDp < 520 ? 0.78f : (heightDp < 650 ? 0.9f : 1f);
+
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setGravity(Gravity.CENTER_HORIZONTAL);
-        content.setPadding(dp(24), dp(12), dp(24), dp(12));
+        content.setPadding(dp(compact?16:24), dp(compact?8:12), dp(compact?16:24), dp(compact?8:12));
 
+        int maxContentDp = tablet ? 560 : Math.max(280, widthDp - (compact?20:32));
+        int contentWidth = Math.min(getResources().getDisplayMetrics().widthPixels-dp(16), dp(maxContentDp));
         FrameLayout.LayoutParams contentLp = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
+                contentWidth,
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 Gravity.CENTER
         );
@@ -64,14 +72,22 @@ public class SplashActivity extends Activity {
         ImageView mark = new ImageView(this);
         mark.setImageResource(R.drawable.hospital_e);
         mark.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        LinearLayout.LayoutParams markLp = new LinearLayout.LayoutParams(dp(154), dp(224));
-        markLp.bottomMargin = dp(12);
+        int markWidth = Math.round((compact?124:(tablet?190:154))*heightScale);
+        int markHeight = Math.round(markWidth*224f/154f);
+        LinearLayout.LayoutParams markLp = new LinearLayout.LayoutParams(dp(markWidth), dp(markHeight));
+        markLp.bottomMargin = dp(compact?8:12);
         content.addView(mark, markLp);
 
         TextView hospitalName = new TextView(this);
         hospitalName.setText("Елизаветинская\nбольница");
         hospitalName.setTextColor(NAME_GRAY);
-        hospitalName.setTextSize(34);
+        hospitalName.setTextSize(compact?28:(tablet?40:34));
+        hospitalName.setAutoSizeTextTypeUniformWithConfiguration(
+                compact?22:26,
+                tablet?42:34,
+                1,
+                android.util.TypedValue.COMPLEX_UNIT_SP
+        );
         hospitalName.setGravity(Gravity.CENTER);
         hospitalName.setIncludeFontPadding(false);
         hospitalName.setLineSpacing(dp(2), 1.0f);
@@ -86,13 +102,19 @@ public class SplashActivity extends Activity {
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 dp(58)
         );
-        sloganLp.topMargin = dp(12);
+        sloganLp.topMargin = dp(compact?8:12);
         content.addView(sloganHost, sloganLp);
 
         TextView slogan = new TextView(this);
         slogan.setText("Эксперты здоровья");
         slogan.setTextColor(BRAND_BLUE);
-        slogan.setTextSize(24);
+        slogan.setTextSize(compact?20:(tablet?28:24));
+        slogan.setAutoSizeTextTypeUniformWithConfiguration(
+                compact?17:20,
+                tablet?30:26,
+                1,
+                android.util.TypedValue.COMPLEX_UNIT_SP
+        );
         slogan.setGravity(Gravity.CENTER);
         slogan.setIncludeFontPadding(false);
         slogan.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
@@ -110,7 +132,8 @@ public class SplashActivity extends Activity {
                 new int[]{0x00FFFFFF, 0xD9FFFFFF, 0x00FFFFFF}
         );
         shimmer.setBackground(shimmerBg);
-        FrameLayout.LayoutParams shimmerLp = new FrameLayout.LayoutParams(dp(46), dp(46));
+        int shimmerSize=compact?38:(tablet?52:46);
+        FrameLayout.LayoutParams shimmerLp = new FrameLayout.LayoutParams(dp(shimmerSize), dp(shimmerSize));
         shimmerLp.gravity = Gravity.CENTER_VERTICAL | Gravity.LEFT;
         sloganHost.addView(shimmer, shimmerLp);
 
@@ -178,6 +201,18 @@ public class SplashActivity extends Activity {
 
     private int dp(int value) {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    private int screenWidthDp() {
+        int value=getResources().getConfiguration().screenWidthDp;
+        if(value>0) return value;
+        return Math.round(getResources().getDisplayMetrics().widthPixels/getResources().getDisplayMetrics().density);
+    }
+
+    private int screenHeightDp() {
+        int value=getResources().getConfiguration().screenHeightDp;
+        if(value>0) return value;
+        return Math.round(getResources().getDisplayMetrics().heightPixels/getResources().getDisplayMetrics().density);
     }
 
     @Override
