@@ -1090,6 +1090,7 @@ public class MainActivity extends Activity {
         boolean idQuery=raw.matches("\\d+(?:_\\d+)?");
         boolean mkbQuery=!idQuery && MkbUtils.looksLikeCode(raw);
         boolean aliasQuery=!idQuery && !mkbQuery && SearchAliases.hasAlias(raw);
+        boolean acronymQuery=!idQuery && !mkbQuery && raw.trim().matches("(?iu)[а-яa-z0-9]{2,5}");
         searchShowsMkb=mkbQuery;
 
         ArrayList<Recommendation> results=new ArrayList<>();
@@ -1120,10 +1121,14 @@ public class MainActivity extends Activity {
                         String v=norm(variant);
                         if(v.equals(direct)) continue;
                         if(titleContainsVariant(title,v)) {
-                            score=Math.max(score,70);
+                            score=Math.max(score,80);
                             break;
                         }
                     }
+                }
+
+                if(acronymQuery && SearchAliases.titleAcronymMatches(r.title,raw)) {
+                    score=Math.max(score,65);
                 }
 
                 if(score>0) scored.put(r,score);
@@ -1140,7 +1145,7 @@ public class MainActivity extends Activity {
         String heading;
         if(idQuery) heading="КР "+raw;
         else if(mkbQuery) heading="МКБ-10: "+raw.toUpperCase(Locale.ROOT);
-        else if(aliasQuery) heading="Результаты: "+raw.toUpperCase(Locale.ROOT);
+        else if(aliasQuery || acronymQuery) heading="Результаты: "+raw.toUpperCase(Locale.ROOT);
         else heading="Результаты поиска";
 
         showContent(makeListPage(heading,results),0);
