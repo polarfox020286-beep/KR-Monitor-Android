@@ -36,6 +36,7 @@ public class MainActivity extends Activity {
     private static final int PAGE_ALL=0;
     private static final int PAGE_PROFILES=1;
     private static final int PAGE_HISTORY=2;
+    private static final int PAGE_ABOUT=3;
     private int currentPage=PAGE_PROFILES;
     private String selectedProfile=null;
     private float swipeX,swipeY;
@@ -553,6 +554,16 @@ public class MainActivity extends Activity {
                 }
         ));
 
+        landscapeSidebar.addView(landscapeNavRow(
+                "О приложении",-1,currentPage==PAGE_ABOUT,
+                v -> {
+                    currentPage=PAGE_ABOUT;
+                    selectedProfile=null;
+                    search.setText("");
+                    renderCurrentPage(0);
+                }
+        ));
+
         View divider=new View(this);
         divider.setBackgroundColor(LINE);
         LinearLayout.LayoutParams dividerLp=new LinearLayout.LayoutParams(-1,dp(1));
@@ -593,10 +604,12 @@ public class MainActivity extends Activity {
         name.setLineSpacing(0,1.0f);
         row.addView(name,new LinearLayout.LayoutParams(0,-2,1));
 
-        TextView number=text(String.valueOf(count),low?10:11,selected?BLUE:MUTED,selected);
-        number.setGravity(Gravity.CENTER);
-        number.setPadding(dp(5),0,0,0);
-        row.addView(number,new LinearLayout.LayoutParams(-2,-2));
+        if(count>=0) {
+            TextView number=text(String.valueOf(count),low?10:11,selected?BLUE:MUTED,selected);
+            number.setGravity(Gravity.CENTER);
+            number.setPadding(dp(5),0,0,0);
+            row.addView(number,new LinearLayout.LayoutParams(-2,-2));
+        }
 
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
         lp.setMargins(0,dp(1),0,dp(1));
@@ -742,6 +755,7 @@ public class MainActivity extends Activity {
             refreshLandscapeSidebar();
             if(currentPage==PAGE_ALL) showContent(makeListPage("Все КР",all),0);
             else if(currentPage==PAGE_HISTORY) showContent(makeLandscapeHistoryPage(),0);
+            else if(currentPage==PAGE_ABOUT) showContent(makeAboutPage(),0);
             else if(selectedProfile!=null) showContent(makeLandscapeProfilePage(selectedProfile),0);
             else showContent(makeListPage("Все КР",all),0);
             return;
@@ -749,6 +763,7 @@ public class MainActivity extends Activity {
 
         if(currentPage==PAGE_ALL) showContent(makeListPage("Все КР",all),direction);
         else if(currentPage==PAGE_HISTORY) showContent(makeHistoryPage(),direction);
+        else if(currentPage==PAGE_ABOUT) showContent(makeAboutPage(),direction);
         else if(selectedProfile!=null) showContent(makeProfileListPage(selectedProfile),direction);
         else showContent(makeProfilesPage(),direction);
     }
@@ -816,8 +831,36 @@ public class MainActivity extends Activity {
         pageHead.setOrientation(LinearLayout.HORIZONTAL);
         pageHead.setGravity(Gravity.CENTER_VERTICAL);
         pageHead.addView(pageTitle("Профили"),new LinearLayout.LayoutParams(0,-2,1));
-        TextView hint=text(compactUi()?"← Все   История →":"← Все КР     История →",responsive(10,11,12),MUTED,false);
-        pageHead.addView(hint);
+
+        TextView allNav=text("Все КР",responsive(10,11,12),BLUE,true);
+        allNav.setPadding(dp(6),dp(5),dp(6),dp(5));
+        allNav.setClickable(true);
+        allNav.setOnClickListener(v -> {
+            currentPage=PAGE_ALL;
+            selectedProfile=null;
+            renderCurrentPage(0);
+        });
+        pageHead.addView(allNav);
+
+        TextView historyNav=text("История",responsive(10,11,12),BLUE,true);
+        historyNav.setPadding(dp(6),dp(5),dp(6),dp(5));
+        historyNav.setClickable(true);
+        historyNav.setOnClickListener(v -> {
+            currentPage=PAGE_HISTORY;
+            selectedProfile=null;
+            renderCurrentPage(0);
+        });
+        pageHead.addView(historyNav);
+
+        TextView aboutNav=text("О приложении",responsive(10,11,12),BLUE,true);
+        aboutNav.setPadding(dp(6),dp(5),0,dp(5));
+        aboutNav.setClickable(true);
+        aboutNav.setOnClickListener(v -> {
+            currentPage=PAGE_ABOUT;
+            selectedProfile=null;
+            renderCurrentPage(0);
+        });
+        pageHead.addView(aboutNav);
         outer.addView(pageHead);
 
         LinkedHashMap<String,List<Recommendation>> groups=groupWithUserProfiles(all);
@@ -882,6 +925,16 @@ public class MainActivity extends Activity {
             renderCurrentPage(0);
         });
         head.addView(historyLink);
+
+        TextView aboutLink=text("О приложении",11,BLUE,true);
+        aboutLink.setPadding(dp(8),dp(5),0,dp(5));
+        aboutLink.setClickable(true);
+        aboutLink.setOnClickListener(v -> {
+            currentPage=PAGE_ABOUT;
+            selectedProfile=null;
+            renderCurrentPage(0);
+        });
+        head.addView(aboutLink);
         outer.addView(head,new LinearLayout.LayoutParams(-1,-2));
 
         LinkedHashMap<String,List<Recommendation>> groups=groupWithUserProfiles(all);
@@ -901,6 +954,130 @@ public class MainActivity extends Activity {
             });
             rows.addView(row);
         }
+
+        outer.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+        return outer;
+    }
+
+    private String appVersionName() {
+        try {
+            return getPackageManager().getPackageInfo(getPackageName(),0).versionName;
+        } catch(Exception e) {
+            return "";
+        }
+    }
+
+    private View aboutSection(String title,String body) {
+        LinearLayout card=new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        int pad=lowHeightUi()?9:13;
+        card.setPadding(dp(pad),dp(lowHeightUi()?7:11),dp(pad),dp(lowHeightUi()?7:11));
+        card.setBackground(rounded(CARD,LINE,14));
+
+        TextView heading=text(title,lowHeightUi()?12:14,TEXT,true);
+        card.addView(heading);
+
+        TextView textView=text(body,lowHeightUi()?10:12,MUTED,false);
+        textView.setPadding(0,dp(4),0,0);
+        textView.setLineSpacing(dp(2),1.05f);
+        textView.setTextIsSelectable(true);
+        card.addView(textView);
+
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
+        lp.setMargins(0,0,0,dp(lowHeightUi()?5:8));
+        card.setLayoutParams(lp);
+        return card;
+    }
+
+    private View makeAboutPage() {
+        LinearLayout outer=new LinearLayout(this);
+        outer.setOrientation(LinearLayout.VERTICAL);
+
+        LinearLayout head=new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.addView(pageTitle("О приложении"),new LinearLayout.LayoutParams(0,-2,1));
+
+        if(!useTwoPaneUi()) {
+            TextView back=text("‹ Профили",11,BLUE,true);
+            back.setPadding(dp(8),dp(5),dp(8),dp(5));
+            back.setClickable(true);
+            back.setOnClickListener(v -> {
+                currentPage=PAGE_PROFILES;
+                selectedProfile=null;
+                renderCurrentPage(0);
+            });
+            head.addView(back);
+        }
+        outer.addView(head);
+
+        ScrollView scroll=new ScrollView(this);
+        scroll.setVerticalScrollBarEnabled(false);
+        LinearLayout body=new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(0,dp(2),0,dp(10));
+        scroll.addView(body,new ScrollView.LayoutParams(-1,-2));
+
+        SharedPreferences prefs=getSharedPreferences("prefs",MODE_PRIVATE);
+        String version=appVersionName();
+        String lastSuccess=prefs.getString("last_sync","ещё не выполнялась");
+        String lastAttempt=prefs.getString("last_sync_attempt","");
+        String syncStatus=prefs.getString("last_sync_status","");
+        int checkedCount=prefs.getInt("last_sync_count",0);
+
+        String state;
+        if("ERROR".equals(syncStatus)) {
+            state="Последняя попытка обновления не удалась. Используется сохранённый локальный каталог.";
+            if(lastAttempt!=null && !lastAttempt.isEmpty()) state+="\nПоследняя попытка: "+lastAttempt;
+        } else if("OK".equals(syncStatus)) {
+            state="Каталог прошёл проверку целостности.";
+            if(checkedCount>0) state+=" Проверено записей: "+checkedCount+".";
+        } else {
+            state="Используется локальный каталог. Проверка состояния ещё не зарегистрирована.";
+        }
+
+        body.addView(aboutSection(
+                "КР Навигатор",
+                "Версия: "+(version==null||version.isEmpty()?"—":version)+
+                "\nКР в локальном каталоге: "+all.size()+
+                "\nПоследняя успешная синхронизация: "+lastSuccess
+        ));
+
+        body.addView(aboutSection("Состояние каталога",state));
+
+        body.addView(aboutSection(
+                "Источник данных",
+                "Основной источник — официальный Рубрикатор клинических рекомендаций Минздрава России. "+
+                "При временной недоступности официального API приложение может использовать резервную копию каталога. "+
+                "Перед применением обновления каталог проходит автоматическую проверку целостности."
+        ));
+
+        TextView official=dialogAction("Открыть официальный рубрикатор",true);
+        official.setGravity(Gravity.CENTER);
+        official.setOnClickListener(v -> {
+            try {
+                startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://cr.minzdrav.gov.ru/clin-rec")));
+            } catch(Exception e) {
+                Toast.makeText(this,"Не удалось открыть браузер",Toast.LENGTH_SHORT).show();
+            }
+        });
+        LinearLayout.LayoutParams officialLp=new LinearLayout.LayoutParams(-1,-2);
+        officialLp.setMargins(0,0,0,dp(8));
+        body.addView(official,officialLp);
+
+        body.addView(aboutSection(
+                "Конфиденциальность",
+                "Приложение не требует учётной записи и не запрашивает ФИО, телефон или e-mail. "+
+                "История открытых КР, пользовательское распределение по профилям и другие настройки хранятся локально на устройстве. "+
+                "Сетевое соединение используется для получения каталога КР и загрузки документов."
+        ));
+
+        body.addView(aboutSection(
+                "Важно",
+                "КР Навигатор — вспомогательный инструмент для поиска и контроля обновлений. "+
+                "Он не является официальным рубрикатором и не заменяет официальный источник. "+
+                "При расхождении данных следует руководствоваться актуальной информацией официального Рубрикатора клинических рекомендаций Минздрава России."
+        ));
 
         outer.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         return outer;
@@ -1675,6 +1852,12 @@ public class MainActivity extends Activity {
     @Override public void onBackPressed() {
         if(search!=null && search.getText()!=null && search.getText().toString().trim().length()>0) {
             closeSearchToProfiles();
+            return;
+        }
+        if(currentPage==PAGE_ABOUT) {
+            currentPage=PAGE_PROFILES;
+            selectedProfile=null;
+            renderCurrentPage(0);
             return;
         }
         showExitDialog();
