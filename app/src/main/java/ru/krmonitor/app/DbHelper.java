@@ -8,13 +8,14 @@ import java.util.*;
 
 public class DbHelper extends SQLiteOpenHelper {
     private static final String DB = "kr.db";
-    private static final int VER = 7;
+    private static final int VER = 8;
     public DbHelper(Context c) { super(c, DB, null, VER); }
     @Override public void onCreate(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE recs(base_id TEXT PRIMARY KEY,current_id TEXT NOT NULL,title TEXT NOT NULL,filename TEXT NOT NULL,mkb_codes TEXT NOT NULL DEFAULT '',last_seen TEXT,added_at TEXT)");
         db.execSQL("CREATE TABLE history(base_id TEXT PRIMARY KEY,viewed_at INTEGER NOT NULL)");
         db.execSQL("CREATE TABLE changes(id INTEGER PRIMARY KEY AUTOINCREMENT,base_id TEXT NOT NULL,event_type TEXT NOT NULL,old_id TEXT,new_id TEXT NOT NULL,title TEXT NOT NULL,changed_at TEXT NOT NULL,UNIQUE(base_id,event_type,new_id))");
         db.execSQL("CREATE TABLE profile_custom(base_id TEXT PRIMARY KEY,mode TEXT NOT NULL,profiles TEXT NOT NULL)");
+        db.execSQL("CREATE TABLE favorites(base_id TEXT PRIMARY KEY,added_at INTEGER NOT NULL)");
     }
     @Override public void onUpgrade(SQLiteDatabase db,int oldV,int newV) {
         if(oldV<2) db.execSQL("ALTER TABLE recs ADD COLUMN added_at TEXT");
@@ -22,6 +23,7 @@ public class DbHelper extends SQLiteOpenHelper {
         if(oldV<4) db.execSQL("ALTER TABLE recs ADD COLUMN mkb_codes TEXT NOT NULL DEFAULT ''");
         if(oldV<6) ensureChangesTable(db);
         if(oldV<7) ensureProfileCustomTable(db);
+        if(oldV<8) ensureFavoritesTable(db);
     }
 
     @Override public void onOpen(SQLiteDatabase db) {
@@ -30,6 +32,11 @@ public class DbHelper extends SQLiteOpenHelper {
         // without creating the changes table.
         ensureChangesTable(db);
         ensureProfileCustomTable(db);
+        ensureFavoritesTable(db);
+    }
+
+    private void ensureFavoritesTable(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS favorites(base_id TEXT PRIMARY KEY,added_at INTEGER NOT NULL)");
     }
 
     private void ensureProfileCustomTable(SQLiteDatabase db) {
@@ -101,6 +108,10 @@ public class DbHelper extends SQLiteOpenHelper {
             ContentValues profile=new ContentValues();
             profile.put("base_id",replacement.baseId);
             db.update("profile_custom",profile,"base_id=?",new String[]{oldBase});
+
+            ContentValues favorite=new ContentValues();
+            favorite.put("base_id",replacement.baseId);
+            db.update("favorites",favorite,"base_id=?",new String[]{oldBase});
 
             db.setTransactionSuccessful();
             return true;
@@ -267,6 +278,37 @@ public class DbHelper extends SQLiteOpenHelper {
                         c.getString(c.getColumnIndexOrThrow("mode")),
                         decodeProfiles(c.getString(c.getColumnIndexOrThrow("profiles")))));
             }
+        }
+        return out;
+    }
+
+    public boolean isFavorite(String baseId) {
+        if(baseId==null) return false;
+        try(Cursor c=getReadableDatabase().query("favorites",new String[]{"base_id"},
+                "base_id=?",new String[]{baseId},null,null,null)) {
+            return c.moveToFirst();
+        }
+    }
+
+    public boolean toggleFavorite(String baseId) {
+        if(baseId==null || baseId.trim().isEmpty()) return false;
+        SQLiteDatabase db=getWritableDatabase();
+        if(isFavorite(baseId)) {
+            db.delete("favorites","base_id=?",new String[]{baseId});
+            return false;
+        }
+        ContentValues v=new ContentValues();
+        v.put("base_id",baseId);
+        v.put("added_at",System.currentTimeMillis());
+        db.insertWithOnConflict("favorites",null,v,SQLiteDatabase.CONFLICT_REPLACE);
+        return true;
+    }
+
+    public List<Recommendation> favorites() {
+        ArrayList<Recommendation> out=new ArrayList<>();
+        String sql="SELECT r.* FROM favorites f JOIN recs r ON r.base_id=f.base_id ORDER BY f.added_at DESC";
+        try(Cursor c=getReadableDatabase().rawQuery(sql,null)) {
+            while(c.moveToNext()) out.add(fromCursor(c));
         }
         return out;
     }
