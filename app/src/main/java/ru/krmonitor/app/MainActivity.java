@@ -79,7 +79,17 @@ public class MainActivity extends Activity {
 
     private boolean compactUi(){ return screenWidthDp()<360; }
     private boolean tabletUi(){ return screenWidthDp()>=600; }
-    private boolean isLandscapeUi(){ return screenWidthDp()>screenHeightDp(); }
+
+    // Adaptive window size classes. The layout is chosen from available dp,
+    // so it also works in split-screen, on tablets and on foldables.
+    private boolean useTwoPaneUi(){ return screenWidthDp()>=600; }
+    private boolean expandedTwoPaneUi(){ return screenWidthDp()>=840; }
+    private boolean lowHeightUi(){ return screenHeightDp()<480; }
+    private boolean compactSinglePaneUi(){
+        return !useTwoPaneUi() && screenWidthDp()>screenHeightDp() && lowHeightUi();
+    }
+    private boolean compactChromeUi(){ return useTwoPaneUi() || compactSinglePaneUi(); }
+    private int clampInt(int value,int min,int max){ return Math.max(min,Math.min(max,value)); }
 
     private int responsive(int compact,int phone,int tablet) {
         return compactUi()?compact:(tabletUi()?tablet:phone);
@@ -116,8 +126,12 @@ public class MainActivity extends Activity {
     }
 
     private void buildUi() {
-        if(isLandscapeUi()) {
-            buildLandscapeUi();
+        if(useTwoPaneUi()) {
+            buildAdaptiveTwoPaneUi();
+            return;
+        }
+        if(compactSinglePaneUi()) {
+            buildCompactSinglePaneUi();
             return;
         }
         final boolean compact=compactUi();
@@ -232,7 +246,11 @@ public class MainActivity extends Activity {
     }
 
 
-    private void buildLandscapeUi() {
+    private void buildAdaptiveTwoPaneUi() {
+        final boolean expanded=expandedTwoPaneUi();
+        final boolean low=lowHeightUi();
+        final int widthDp=screenWidthDp();
+
         FrameLayout shell=new FrameLayout(this);
         shell.setBackgroundColor(BG);
         if(Build.VERSION.SDK_INT>=30) {
@@ -247,7 +265,8 @@ public class MainActivity extends Activity {
 
         LinearLayout root=new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(12),dp(7),dp(12),dp(7));
+        int outerPad=low?6:(expanded?14:10);
+        root.setPadding(dp(outerPad),dp(low?4:7),dp(outerPad),dp(low?4:7));
         root.setBackgroundColor(BG);
         shell.addView(root,new FrameLayout.LayoutParams(-1,-1));
 
@@ -257,57 +276,70 @@ public class MainActivity extends Activity {
 
         LinearLayout heading=new LinearLayout(this);
         heading.setOrientation(LinearLayout.VERTICAL);
-        TextView title=text("КР Навигатор",22,TEXT,true);
+        TextView title=text("КР Навигатор",low?18:(expanded?23:21),TEXT,true);
         title.setIncludeFontPadding(false);
+        title.setSingleLine(true);
+        title.setEllipsize(TextUtils.TruncateAt.END);
         heading.addView(title);
 
-        status=text("",10,MUTED,false);
+        status=text("",low?9:10,MUTED,false);
         status.setSingleLine(true);
         status.setEllipsize(TextUtils.TruncateAt.END);
-        status.setPadding(0,dp(2),0,0);
-        heading.addView(status,new LinearLayout.LayoutParams(-1,-2));
+        if(!low) {
+            status.setPadding(0,dp(2),0,0);
+            heading.addView(status,new LinearLayout.LayoutParams(-1,-2));
+        }
 
-        LinearLayout.LayoutParams headingLp=new LinearLayout.LayoutParams(0,-2,0.34f);
-        headingLp.setMargins(0,0,dp(10),0);
+        LinearLayout.LayoutParams headingLp=new LinearLayout.LayoutParams(0,-2,expanded?0.30f:0.34f);
+        headingLp.setMargins(0,0,dp(low?5:9),0);
         header.addView(heading,headingLp);
 
-        recentList=text("",11,TEXT,false);
-        recentList.setMaxLines(2);
+        recentList=text("",low?10:11,TEXT,false);
+        recentList.setMaxLines(low?1:2);
         recentList.setEllipsize(TextUtils.TruncateAt.END);
         recentList.setGravity(Gravity.CENTER_VERTICAL);
-        recentList.setPadding(dp(10),dp(5),dp(10),dp(5));
+        recentList.setPadding(dp(low?7:10),dp(low?4:5),dp(low?7:10),dp(low?4:5));
         recentList.setBackground(rounded(CARD,LINE,12));
         recentList.setClickable(true);
+        recentList.setFocusable(true);
         recentList.setOnClickListener(v -> showRecentDialog());
-        LinearLayout.LayoutParams recentLp=new LinearLayout.LayoutParams(0,dp(46),0.66f);
-        recentLp.setMargins(0,0,dp(10),0);
+        recentList.setMinHeight(dp(low?34:42));
+        LinearLayout.LayoutParams recentLp=new LinearLayout.LayoutParams(0,-2,expanded?0.70f:0.66f);
+        recentLp.setMargins(0,0,dp(low?5:9),0);
         header.addView(recentList,recentLp);
 
-        TextView sync=text("↻  Проверить",12,BLUE,true);
+        TextView sync=text(low?"↻":"↻  Проверить",low?18:12,BLUE,true);
         sync.setGravity(Gravity.CENTER);
-        sync.setPadding(dp(12),0,dp(12),0);
+        sync.setPadding(dp(low?10:12),dp(7),dp(low?10:12),dp(7));
         sync.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,13));
         sync.setClickable(true);
         sync.setFocusable(true);
-        header.addView(sync,new LinearLayout.LayoutParams(-2,dp(42)));
-        root.addView(header,new LinearLayout.LayoutParams(-1,dp(50)));
+        sync.setMinHeight(dp(low?34:40));
+        header.addView(sync,new LinearLayout.LayoutParams(-2,-2));
+        root.addView(header,new LinearLayout.LayoutParams(-1,-2));
 
         LinearLayout body=new LinearLayout(this);
         body.setOrientation(LinearLayout.HORIZONTAL);
         LinearLayout.LayoutParams bodyLp=new LinearLayout.LayoutParams(-1,0,1);
-        bodyLp.setMargins(0,dp(6),0,0);
+        bodyLp.setMargins(0,dp(low?4:6),0,0);
         root.addView(body,bodyLp);
+
+        int sidebarDp=Math.round(widthDp*(expanded?0.27f:0.32f));
+        sidebarDp=clampInt(sidebarDp,expanded?220:190,expanded?320:270);
+        // Keep enough room for the recommendation pane even when system bars
+        // or split-screen reduce the real pixel width.
+        sidebarDp=Math.min(sidebarDp,Math.max(170,widthDp-350));
 
         LinearLayout leftCard=new LinearLayout(this);
         leftCard.setOrientation(LinearLayout.VERTICAL);
-        leftCard.setPadding(dp(8),dp(6),dp(8),dp(6));
+        leftCard.setPadding(dp(low?5:8),dp(low?4:6),dp(low?5:8),dp(low?4:6));
         leftCard.setBackground(rounded(CARD,LINE,15));
-        LinearLayout.LayoutParams leftLp=new LinearLayout.LayoutParams(0,-1,0.31f);
-        leftLp.setMargins(0,0,dp(8),0);
+        LinearLayout.LayoutParams leftLp=new LinearLayout.LayoutParams(dp(sidebarDp),-1);
+        leftLp.setMargins(0,0,dp(low?5:8),0);
         body.addView(leftCard,leftLp);
 
-        TextView profilesTitle=text("Профили",15,TEXT,true);
-        profilesTitle.setPadding(dp(4),0,dp(4),dp(4));
+        TextView profilesTitle=text("Профили",low?13:(expanded?16:15),TEXT,true);
+        profilesTitle.setPadding(dp(4),0,dp(4),dp(low?2:4));
         leftCard.addView(profilesTitle,new LinearLayout.LayoutParams(-1,-2));
 
         ScrollView profileScroll=new ScrollView(this);
@@ -320,22 +352,112 @@ public class MainActivity extends Activity {
 
         LinearLayout right=new LinearLayout(this);
         right.setOrientation(LinearLayout.VERTICAL);
-        body.addView(right,new LinearLayout.LayoutParams(0,-1,0.69f));
+        body.addView(right,new LinearLayout.LayoutParams(0,-1,1));
 
         search=new EditText(this);
-        search.setHint("Название, номер КР или код МКБ-10");
+        search.setHint(widthDp<720?"Название, № КР или МКБ-10":"Название, номер КР или код МКБ-10");
         search.setHintTextColor(Color.rgb(145,153,165));
         search.setTextColor(TEXT);
-        search.setTextSize(13);
+        search.setTextSize(low?12:(expanded?14:13));
         search.setSingleLine(true);
-        search.setPadding(dp(12),0,dp(12),0);
+        search.setPadding(dp(low?9:12),0,dp(low?9:12),0);
         search.setBackground(rounded(CARD,LINE,13));
-        right.addView(search,new LinearLayout.LayoutParams(-1,dp(42)));
+        search.setMinHeight(dp(low?36:42));
+        right.addView(search,new LinearLayout.LayoutParams(-1,-2));
 
         contentHost=new FrameLayout(this);
         LinearLayout.LayoutParams contentLp=new LinearLayout.LayoutParams(-1,0,1);
-        contentLp.setMargins(0,dp(5),0,0);
+        contentLp.setMargins(0,dp(low?3:5),0,0);
         right.addView(contentHost,contentLp);
+
+        setContentView(shell);
+        if(Build.VERSION.SDK_INT>=30) shell.requestApplyInsets();
+
+        sync.setOnClickListener(v -> runSync(sync));
+        search.addTextChangedListener(new TextWatcher(){
+            public void beforeTextChanged(CharSequence s,int st,int count,int after){}
+            public void onTextChanged(CharSequence s,int st,int before,int count){
+                String q=s.toString().trim();
+                if(q.isEmpty()) renderCurrentPage(0); else renderSearch(q);
+            }
+            public void afterTextChanged(Editable e){}
+        });
+    }
+
+    private void buildCompactSinglePaneUi() {
+        FrameLayout shell=new FrameLayout(this);
+        shell.setBackgroundColor(BG);
+        if(Build.VERSION.SDK_INT>=30) {
+            shell.setOnApplyWindowInsetsListener((v,insets) -> {
+                android.graphics.Insets bars=insets.getInsets(
+                        WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout()
+                );
+                v.setPadding(bars.left,bars.top,bars.right,bars.bottom);
+                return insets;
+            });
+        }
+
+        LinearLayout root=new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(8),dp(4),dp(8),dp(4));
+        root.setBackgroundColor(BG);
+        shell.addView(root,new FrameLayout.LayoutParams(-1,-1));
+
+        LinearLayout header=new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+
+        LinearLayout heading=new LinearLayout(this);
+        heading.setOrientation(LinearLayout.VERTICAL);
+        TextView title=text("КР Навигатор",19,TEXT,true);
+        title.setSingleLine(true);
+        title.setIncludeFontPadding(false);
+        heading.addView(title);
+
+        status=text("",9,MUTED,false);
+        status.setSingleLine(true);
+        status.setEllipsize(TextUtils.TruncateAt.END);
+        heading.addView(status,new LinearLayout.LayoutParams(-1,-2));
+        header.addView(heading,new LinearLayout.LayoutParams(0,-2,1));
+
+        TextView sync=text("↻",19,BLUE,true);
+        sync.setGravity(Gravity.CENTER);
+        sync.setPadding(dp(10),dp(6),dp(10),dp(6));
+        sync.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,12));
+        sync.setClickable(true);
+        sync.setFocusable(true);
+        LinearLayout.LayoutParams syncLp=new LinearLayout.LayoutParams(-2,-2);
+        syncLp.setMargins(dp(6),0,0,0);
+        header.addView(sync,syncLp);
+        root.addView(header,new LinearLayout.LayoutParams(-1,-2));
+
+        recentList=text("",10,TEXT,false);
+        recentList.setSingleLine(true);
+        recentList.setEllipsize(TextUtils.TruncateAt.END);
+        recentList.setGravity(Gravity.CENTER_VERTICAL);
+        recentList.setPadding(dp(8),dp(4),dp(8),dp(4));
+        recentList.setBackground(rounded(CARD,LINE,11));
+        recentList.setClickable(true);
+        recentList.setOnClickListener(v -> showRecentDialog());
+        LinearLayout.LayoutParams recentLp=new LinearLayout.LayoutParams(-1,-2);
+        recentLp.setMargins(0,dp(3),0,dp(3));
+        root.addView(recentList,recentLp);
+
+        search=new EditText(this);
+        search.setHint("Название, № КР или МКБ-10");
+        search.setHintTextColor(Color.rgb(145,153,165));
+        search.setTextColor(TEXT);
+        search.setTextSize(12);
+        search.setSingleLine(true);
+        search.setPadding(dp(9),0,dp(9),0);
+        search.setBackground(rounded(CARD,LINE,12));
+        search.setMinHeight(dp(36));
+        root.addView(search,new LinearLayout.LayoutParams(-1,-2));
+
+        contentHost=new FrameLayout(this);
+        LinearLayout.LayoutParams contentLp=new LinearLayout.LayoutParams(-1,0,1);
+        contentLp.setMargins(0,dp(3),0,0);
+        root.addView(contentHost,contentLp);
 
         setContentView(shell);
         if(Build.VERSION.SDK_INT>=30) shell.requestApplyInsets();
@@ -408,15 +530,29 @@ public class MainActivity extends Activity {
         }
     }
 
-    private TextView landscapeNavRow(String label,int count,boolean selected,View.OnClickListener click) {
-        TextView row=text(label+"   "+count,12,selected?BLUE_DARK:TEXT,selected);
+    private View landscapeNavRow(String label,int count,boolean selected,View.OnClickListener click) {
+        final boolean low=lowHeightUi();
+
+        LinearLayout row=new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setMaxLines(2);
-        row.setEllipsize(TextUtils.TruncateAt.END);
-        row.setPadding(dp(10),dp(7),dp(9),dp(7));
+        row.setPadding(dp(low?7:9),dp(low?5:7),dp(low?6:8),dp(low?5:7));
         row.setBackground(rounded(selected?BLUE_SOFT:Color.TRANSPARENT,Color.TRANSPARENT,11));
         row.setClickable(true);
+        row.setFocusable(true);
         row.setOnClickListener(click);
+
+        TextView name=text(label,low?11:(expandedTwoPaneUi()?13:12),selected?BLUE_DARK:TEXT,selected);
+        name.setMaxLines(2);
+        name.setEllipsize(TextUtils.TruncateAt.END);
+        name.setLineSpacing(0,1.0f);
+        row.addView(name,new LinearLayout.LayoutParams(0,-2,1));
+
+        TextView number=text(String.valueOf(count),low?10:11,selected?BLUE:MUTED,selected);
+        number.setGravity(Gravity.CENTER);
+        number.setPadding(dp(5),0,0,0);
+        row.addView(number,new LinearLayout.LayoutParams(-2,-2));
+
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
         lp.setMargins(0,dp(1),0,dp(1));
         row.setLayoutParams(lp);
@@ -460,7 +596,7 @@ public class MainActivity extends Activity {
     }
 
     @Override public boolean dispatchTouchEvent(android.view.MotionEvent e) {
-        if(isLandscapeUi()) return super.dispatchTouchEvent(e);
+        if(useTwoPaneUi()) return super.dispatchTouchEvent(e);
         if(contentHost!=null) {
             int action=e.getActionMasked();
             if(action==android.view.MotionEvent.ACTION_DOWN) {
@@ -499,7 +635,7 @@ public class MainActivity extends Activity {
         String last=getSharedPreferences("prefs",MODE_PRIVATE).getString("last_sync","ещё не выполнялась");
         long next=getSharedPreferences("prefs",MODE_PRIVATE).getLong("next_alarm",AlarmScheduler.nextWeekday7());
         String notifyNote=notificationsEnabled()?"":"\n⚠ Уведомления Android отключены";
-        if(isLandscapeUi()) {
+        if(compactChromeUi()) {
             status.setText(all.size()+" КР  •  проверено: "+last+(notificationsEnabled()?"":"  •  уведомления выкл."));
         } else {
             status.setText(all.size()+" КР  •  Последняя проверка: "+last+"\nСледующая: "+DateFormat.getDateTimeInstance(DateFormat.MEDIUM,DateFormat.SHORT).format(new Date(next))+notifyNote);
@@ -516,15 +652,15 @@ public class MainActivity extends Activity {
     }
 
     private void renderRecent() {
-        List<DbHelper.ChangeEvent> recent=changesForLastScan(isLandscapeUi()?30:5);
+        List<DbHelper.ChangeEvent> recent=changesForLastScan(compactChromeUi()?30:5);
         if(recent.isEmpty()) {
-            recentList.setText(isLandscapeUi()?"Изменения за 48 ч: нет":"За 48 часов до последней проверки новых или обновлённых КР не обнаружено.");
+            recentList.setText(compactChromeUi()?"Изменения за 48 ч: нет":"За 48 часов до последней проверки новых или обновлённых КР не обнаружено.");
             recentList.setTextColor(MUTED);
             return;
         }
         recentList.setTextColor(TEXT);
 
-        if(isLandscapeUi()) {
+        if(compactChromeUi()) {
             DbHelper.ChangeEvent e=recent.get(0);
             StringBuilder compact=new StringBuilder("Изменения 48 ч: ");
             if("NEW".equals(e.type)) compact.append("НОВАЯ — ");
@@ -556,7 +692,7 @@ public class MainActivity extends Activity {
         if(contentHost==null) return;
         searchShowsMkb=false;
 
-        if(isLandscapeUi()) {
+        if(useTwoPaneUi()) {
             refreshLandscapeSidebar();
             if(currentPage==PAGE_ALL) showContent(makeListPage("Все КР",all),0);
             else if(currentPage==PAGE_HISTORY) showContent(makeLandscapeHistoryPage(),0);
@@ -625,6 +761,8 @@ public class MainActivity extends Activity {
     }
 
     private View makeProfilesPage() {
+        if(compactSinglePaneUi()) return makeCompactProfilesPage();
+
         LinearLayout outer=new LinearLayout(this);
         outer.setOrientation(LinearLayout.VERTICAL);
 
@@ -666,6 +804,58 @@ public class MainActivity extends Activity {
             }
             rows.addView(row,new LinearLayout.LayoutParams(-1,-2));
         }
+        outer.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+        return outer;
+    }
+
+    private View makeCompactProfilesPage() {
+        LinearLayout outer=new LinearLayout(this);
+        outer.setOrientation(LinearLayout.VERTICAL);
+
+        LinearLayout head=new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.addView(pageTitle("Профили"),new LinearLayout.LayoutParams(0,-2,1));
+
+        TextView allLink=text("Все КР",11,BLUE,true);
+        allLink.setPadding(dp(8),dp(5),dp(8),dp(5));
+        allLink.setClickable(true);
+        allLink.setOnClickListener(v -> {
+            currentPage=PAGE_ALL;
+            selectedProfile=null;
+            renderCurrentPage(0);
+        });
+        head.addView(allLink);
+
+        TextView historyLink=text("История",11,BLUE,true);
+        historyLink.setPadding(dp(8),dp(5),dp(8),dp(5));
+        historyLink.setClickable(true);
+        historyLink.setOnClickListener(v -> {
+            currentPage=PAGE_HISTORY;
+            selectedProfile=null;
+            renderCurrentPage(0);
+        });
+        head.addView(historyLink);
+        outer.addView(head,new LinearLayout.LayoutParams(-1,-2));
+
+        LinkedHashMap<String,List<Recommendation>> groups=groupWithUserProfiles(all);
+        ScrollView scroll=new ScrollView(this);
+        scroll.setVerticalScrollBarEnabled(false);
+        LinearLayout rows=new LinearLayout(this);
+        rows.setOrientation(LinearLayout.VERTICAL);
+        scroll.addView(rows,new ScrollView.LayoutParams(-1,-2));
+
+        for(String p:ProfileClassifier.PROFILES) {
+            List<Recommendation> items=groups.get(p);
+            if(items==null || items.isEmpty()) continue;
+            View row=landscapeNavRow(p,items.size(),false,v -> {
+                selectedProfile=p;
+                currentPage=PAGE_PROFILES;
+                renderCurrentPage(0);
+            });
+            rows.addView(row);
+        }
+
         outer.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         return outer;
     }
@@ -760,27 +950,43 @@ public class MainActivity extends Activity {
 
     private View makeProfileListPage(String profile) {
         List<Recommendation> recs=groupWithUserProfiles(all).get(profile);
+        if(recs==null) recs=Collections.emptyList();
         LinearLayout outer=new LinearLayout(this);
         outer.setOrientation(LinearLayout.VERTICAL);
 
         LinearLayout head=new LinearLayout(this);
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
-        TextView back=text("‹  Профили",13,BLUE,true);
-        back.setPadding(dp(9),dp(7),dp(9),dp(7));
+
+        TextView back=text("‹  Профили",compactSinglePaneUi()?11:13,BLUE,true);
+        back.setPadding(dp(compactSinglePaneUi()?7:9),dp(compactSinglePaneUi()?5:7),dp(compactSinglePaneUi()?7:9),dp(compactSinglePaneUi()?5:7));
         back.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,12));
         back.setClickable(true);
         back.setOnClickListener(v -> { selectedProfile=null; renderCurrentPage(0); });
         head.addView(back);
-        TextView count=text(recs.size()+" КР",12,MUTED,false);
-        LinearLayout.LayoutParams countLp=new LinearLayout.LayoutParams(-2,-2);
-        countLp.setMargins(dp(10),0,0,0);
-        head.addView(count,countLp);
-        outer.addView(head);
 
-        TextView name=pageTitle(profile);
-        name.setPadding(dp(2),dp(8),dp(2),dp(5));
-        outer.addView(name);
+        if(compactSinglePaneUi()) {
+            TextView name=text(profile,13,TEXT,true);
+            name.setSingleLine(true);
+            name.setEllipsize(TextUtils.TruncateAt.END);
+            name.setPadding(dp(8),0,dp(6),0);
+            head.addView(name,new LinearLayout.LayoutParams(0,-2,1));
+
+            TextView count=text(recs.size()+" КР",10,MUTED,false);
+            head.addView(count);
+            outer.addView(head,new LinearLayout.LayoutParams(-1,-2));
+        } else {
+            TextView count=text(recs.size()+" КР",12,MUTED,false);
+            LinearLayout.LayoutParams countLp=new LinearLayout.LayoutParams(-2,-2);
+            countLp.setMargins(dp(10),0,0,0);
+            head.addView(count,countLp);
+            outer.addView(head);
+
+            TextView name=pageTitle(profile);
+            name.setPadding(dp(2),dp(8),dp(2),dp(5));
+            outer.addView(name);
+        }
+
         addRecommendationList(outer,recs);
         return outer;
     }
@@ -794,17 +1000,26 @@ public class MainActivity extends Activity {
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.addView(pageTitle("История"),new LinearLayout.LayoutParams(0,-2,1));
-        TextView hint=text("← Профили",responsive(10,11,12),MUTED,false);
+        TextView hint=text("← Профили",compactSinglePaneUi()?10:responsive(10,11,12),MUTED,false);
+        hint.setClickable(true);
+        hint.setOnClickListener(v -> {
+            currentPage=PAGE_PROFILES;
+            selectedProfile=null;
+            renderCurrentPage(0);
+        });
         head.addView(hint);
         outer.addView(head);
 
-        TextView caption=text("Все клинические рекомендации, которые вы открывали",12,MUTED,false);
-        caption.setPadding(dp(2),0,dp(2),dp(6));
-        outer.addView(caption);
+        if(!compactSinglePaneUi()) {
+            TextView caption=text("Все клинические рекомендации, которые вы открывали",12,MUTED,false);
+            caption.setPadding(dp(2),0,dp(2),dp(6));
+            outer.addView(caption);
+        }
+
         if(history.isEmpty()) {
-            TextView empty=text("История пока пуста.",14,MUTED,false);
+            TextView empty=text("История пока пуста.",compactSinglePaneUi()?12:14,MUTED,false);
             empty.setGravity(Gravity.CENTER);
-            empty.setPadding(dp(8),dp(30),dp(8),dp(8));
+            empty.setPadding(dp(8),dp(compactSinglePaneUi()?12:30),dp(8),dp(8));
             outer.addView(empty);
         } else addRecommendationList(outer,history);
         return outer;
@@ -872,18 +1087,21 @@ public class MainActivity extends Activity {
                 LinearLayout row=new LinearLayout(MainActivity.this);
                 row.setOrientation(LinearLayout.HORIZONTAL);
                 row.setGravity(Gravity.CENTER_VERTICAL);
-                row.setPadding(dp(responsive(9,12,14)),dp(responsive(8,10,11)),dp(responsive(8,9,12)),dp(responsive(8,10,11)));
+                boolean dense=useTwoPaneUi() || compactSinglePaneUi();
+                int rowHPad=dense?(lowHeightUi()?7:9):responsive(9,12,14);
+                int rowVPad=dense?(lowHeightUi()?5:7):responsive(8,10,11);
+                row.setPadding(dp(rowHPad),dp(rowVPad),dp(rowHPad),dp(rowVPad));
                 row.setBackground(rounded(CARD,LINE,14));
 
                 LinearLayout labels=new LinearLayout(MainActivity.this);
                 labels.setOrientation(LinearLayout.VERTICAL);
-                TextView name=text(r.title,responsive(13,14,15),TEXT,false);
-                name.setMaxLines(3);
+                TextView name=text(r.title,dense?(lowHeightUi()?12:13):responsive(13,14,15),TEXT,false);
+                name.setMaxLines(dense?2:3);
                 String metaText="КР "+r.id+(PdfManager.isPdf(PdfManager.file(MainActivity.this,r))?"  •  PDF скачан":"");
                 if(profileRules.containsKey(r.baseId)) metaText += "  •  ✎ профиль настроен";
                 if(searchShowsMkb && r.mkbCodes!=null && !r.mkbCodes.isEmpty()) metaText += "  •  МКБ-10: "+r.mkbCodes;
-                TextView meta=text(metaText,responsive(10,11,12),MUTED,false);
-                meta.setPadding(0,dp(4),0,0);
+                TextView meta=text(metaText,(useTwoPaneUi()||compactSinglePaneUi())?10:responsive(10,11,12),MUTED,false);
+                meta.setPadding(0,dp((useTwoPaneUi()||compactSinglePaneUi())?2:4),0,0);
                 labels.addView(name);
                 labels.addView(meta);
                 row.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
