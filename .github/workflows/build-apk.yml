@@ -53,8 +53,8 @@ jobs:
 
       - name: Build signed release APK
         env:
-          KR_VERSION_CODE: '2034'
-          KR_VERSION_NAME: '1.1.28'
+          KR_VERSION_CODE: '2035'
+          KR_VERSION_NAME: '1.1.29'
           KR_KEYSTORE_FILE: ${{ runner.temp }}/kr-navigator-release.jks
           KR_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KR_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
