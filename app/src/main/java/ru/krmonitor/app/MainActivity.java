@@ -281,17 +281,35 @@ public class MainActivity extends Activity {
         labelView.setGravity(Gravity.CENTER);
         labelView.setSingleLine(true);
         labelView.setIncludeFontPadding(true);
-        if(Build.VERSION.SDK_INT>=26) {
-            int minSp=narrowPhoneUi()?6:7;
-            int maxSp=lowHeightUi()?9:10;
-            labelView.setAutoSizeTextTypeUniformWithConfiguration(
-                    minSp,maxSp,1,TypedValue.COMPLEX_UNIT_SP
-            );
-        }
         LinearLayout.LayoutParams labelLp=new LinearLayout.LayoutParams(-1,-2);
         labelLp.setMargins(0,dp(1),0,0);
         item.addView(labelView,labelLp);
+        fitBottomNavigationLabel(labelView);
         return item;
+    }
+
+    private void fitBottomNavigationLabel(TextView label) {
+        if(label==null) return;
+        label.post(() -> {
+            int inner=label.getWidth()-label.getPaddingLeft()-label.getPaddingRight();
+            if(inner<=0) return;
+
+            String value=label.getText()==null?"":label.getText().toString();
+            android.graphics.Paint paint=new android.graphics.Paint(label.getPaint());
+            float maxDp=lowHeightUi()?9f:10f;
+            float minDp=6.5f;
+            float chosen=maxDp;
+
+            for(float size=maxDp;size>=minDp;size-=0.5f) {
+                paint.setTextSize(dpFloat(size));
+                if(paint.measureText(value)<=inner) {
+                    chosen=size;
+                    break;
+                }
+                chosen=size;
+            }
+            label.setTextSize(TypedValue.COMPLEX_UNIT_DIP,chosen);
+        });
     }
 
     private void navigateBottom(int page) {
