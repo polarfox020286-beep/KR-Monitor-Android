@@ -46,6 +46,7 @@ public class PdfViewerActivity extends Activity {
     private ProgressBar progress;
     private TextView pageLabel;
     private TextView searchStatus;
+    private TextView favoriteButton;
     private LinearLayout searchPanel;
     private EditText searchInput;
     private TextView previousMatch;
@@ -164,6 +165,12 @@ public class PdfViewerActivity extends Activity {
         LinearLayout.LayoutParams titleLp=new LinearLayout.LayoutParams(0,-2,1);
         titleLp.setMargins(dp(3),0,dp(3),0);
         toolbar.addView(titles,titleLp);
+
+        favoriteButton=action("☆",24,false);
+        favoriteButton.setContentDescription("Добавить в избранное");
+        favoriteButton.setOnClickListener(v -> toggleFavorite());
+        toolbar.addView(favoriteButton,new LinearLayout.LayoutParams(dp(44),dp(44)));
+        refreshFavoriteButton();
 
         TextView find=action("⌕",23,false);
         find.setContentDescription("Поиск по тексту");
@@ -780,6 +787,31 @@ public class PdfViewerActivity extends Activity {
         menu.show();
     }
 
+    private void refreshFavoriteButton() {
+        if(favoriteButton==null || baseId==null || baseId.isEmpty()) return;
+        DbHelper db=new DbHelper(getApplicationContext());
+        boolean favorite=db.isFavorite(baseId);
+        db.close();
+
+        favoriteButton.setText(favorite?"★":"☆");
+        favoriteButton.setTextColor(favorite?Color.rgb(206,145,0):BLUE);
+        favoriteButton.setContentDescription(favorite?"Убрать из избранного":"Добавить в избранное");
+    }
+
+    private void toggleFavorite() {
+        if(baseId==null || baseId.isEmpty()) return;
+        DbHelper db=new DbHelper(getApplicationContext());
+        boolean favorite=db.toggleFavorite(baseId);
+        db.close();
+
+        favoriteButton.setText(favorite?"★":"☆");
+        favoriteButton.setTextColor(favorite?Color.rgb(206,145,0):BLUE);
+        favoriteButton.setContentDescription(favorite?"Убрать из избранного":"Добавить в избранное");
+        Toast.makeText(this,
+                favorite?"Добавлено в избранное":"Удалено из избранного",
+                Toast.LENGTH_SHORT).show();
+    }
+
     private void hideKeyboard() {
         InputMethodManager imm=(InputMethodManager)getSystemService(INPUT_METHOD_SERVICE);
         if(imm!=null) imm.hideSoftInputFromWindow(searchInput.getWindowToken(),0);
@@ -824,6 +856,11 @@ public class PdfViewerActivity extends Activity {
             return;
         }
         super.onBackPressed();
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        if(favoriteButton!=null) refreshFavoriteButton();
     }
 
     @Override protected void onPause() {
