@@ -108,16 +108,26 @@ public class MainActivity extends Activity {
 
     private int profileColumns() {
         int w=screenWidthDp();
-        if(w<340 || (largeFontUi() && w<420) || (veryLargeFontUi() && w<600)) return 1;
+
+        // Keep the familiar two-column phone layout whenever the real
+        // available window is wide enough. Font scale changes card height
+        // and text fitting, not the number of columns by itself.
+        if(w<300) return 1;
         if(w<600) return 2;
         if(w<900) return 3;
         return 4;
     }
 
+    private float cappedChromeSp(float baseSp) {
+        float scale=Math.max(0.85f,systemFontScale());
+        float effective=Math.min(scale,1.25f);
+        return baseSp*effective/scale;
+    }
+
     private int profileCardHeightDp() {
         int base=responsive(142,150,156);
-        float extra=Math.max(0f,Math.min(0.65f,systemFontScale()-1f));
-        return base+Math.round(extra*44f);
+        float extra=Math.max(0f,Math.min(0.70f,systemFontScale()-1f));
+        return base+Math.round(extra*34f);
     }
 
     private boolean dialogNeedsBoundedHeight(){
@@ -306,7 +316,8 @@ public class MainActivity extends Activity {
         }
         final boolean compact=compactUi();
         final boolean tablet=tabletUi();
-        final boolean stackedHeader=compact || (largeFontUi() && screenWidthDp()<500);
+        final boolean stackedHeader=screenWidthDp()<300 ||
+                (veryLargeFontUi() && screenWidthDp()<320);
 
         FrameLayout shell=new FrameLayout(this);
         shell.setBackgroundColor(BG);
@@ -342,6 +353,16 @@ public class MainActivity extends Activity {
         titleRow.setOrientation(LinearLayout.HORIZONTAL);
         titleRow.setGravity(Gravity.CENTER_VERTICAL);
         TextView title=text("КР Навигатор",responsive(21,23,26),TEXT,true);
+        title.setSingleLine(true);
+        title.setEllipsize(TextUtils.TruncateAt.END);
+        title.setTextSize(cappedChromeSp(responsive(21,23,26)));
+        int titleMaxDp=Math.max(118,screenWidthDp()-(compact?170:190));
+        title.setMaxWidth(dp(titleMaxDp));
+        if(Build.VERSION.SDK_INT>=26) {
+            title.setAutoSizeTextTypeUniformWithConfiguration(
+                    15,responsive(21,23,26),1,TypedValue.COMPLEX_UNIT_SP
+            );
+        }
         titleRow.addView(title,new LinearLayout.LayoutParams(-2,-2));
         TextView info=aboutHeaderButton(responsive(17,18,20));
         LinearLayout.LayoutParams infoLp=new LinearLayout.LayoutParams(dp(36),dp(36));
@@ -349,6 +370,7 @@ public class MainActivity extends Activity {
         titleRow.addView(info,infoLp);
 
         TextView subtitle=text("Клинические рекомендации",responsive(11,12,13),MUTED,false);
+        subtitle.setTextSize(cappedChromeSp(responsive(11,12,13)));
         subtitle.setPadding(0,dp(2),0,0);
         subtitle.setMaxLines(2);
         heading.addView(titleRow,new LinearLayout.LayoutParams(-1,-2));
@@ -361,12 +383,20 @@ public class MainActivity extends Activity {
         }
 
         TextView sync=text("↻  Проверить",responsive(12,13,14),BLUE,true);
+        sync.setSingleLine(true);
+        sync.setTextSize(cappedChromeSp(responsive(12,13,14)));
         sync.setGravity(Gravity.CENTER);
-        sync.setPadding(dp(12),dp(9),dp(12),dp(9));
+        sync.setPadding(dp(compact?8:12),dp(9),dp(compact?8:12),dp(9));
         sync.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,14));
         sync.setClickable(true);
         sync.setFocusable(true);
         sync.setMinHeight(dp(44));
+        sync.setMaxWidth(dp(compact?112:132));
+        if(Build.VERSION.SDK_INT>=26) {
+            sync.setAutoSizeTextTypeUniformWithConfiguration(
+                    10,responsive(12,13,14),1,TypedValue.COMPLEX_UNIT_SP
+            );
+        }
         LinearLayout.LayoutParams syncLp=stackedHeader
                 ? new LinearLayout.LayoutParams(-1,-2)
                 : new LinearLayout.LayoutParams(-2,-2);
@@ -1258,7 +1288,7 @@ public class MainActivity extends Activity {
         if(available<=0) return;
         float size=responsive(12,13,14);
         String[] words=value.split("\\s+");
-        float minimum=screenWidthDp()<380?9.5f:10.5f;
+        float minimum=screenWidthDp()<380?8.8f:10.0f;
         while(size>minimum) {
             view.setTextSize(size);
             float widest=0f;
