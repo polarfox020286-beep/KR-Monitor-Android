@@ -63,4 +63,4 @@ jobs:
           name: android-signing-tools
           path: exported-tools
 
-# build-trigger: 1.1.39 inexact background sync for RuStore
+# build-trigger: 1.1.39 rebuild after Uri import fix
