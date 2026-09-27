@@ -460,6 +460,7 @@ public class MainActivity extends Activity {
         sync.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,14));
         sync.setClickable(true);
         sync.setFocusable(true);
+        sync.setContentDescription("Проверить обновления");
         sync.setMinHeight(dp(44));
 
         int syncWidthDp=clampInt(Math.round(screenWidthDp()*0.33f),116,148);
@@ -616,6 +617,7 @@ public class MainActivity extends Activity {
         sync.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,13));
         sync.setClickable(true);
         sync.setFocusable(true);
+        sync.setContentDescription("Проверить обновления");
         sync.setMinHeight(dp(low?34:40));
         header.addView(sync,new LinearLayout.LayoutParams(-2,-2));
         fitSyncButton(sync,low?"↻":"↻  Проверить");
@@ -744,6 +746,7 @@ public class MainActivity extends Activity {
         sync.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,12));
         sync.setClickable(true);
         sync.setFocusable(true);
+        sync.setContentDescription("Проверить обновления");
         LinearLayout.LayoutParams syncLp=new LinearLayout.LayoutParams(-2,-2);
         syncLp.setMargins(dp(6),0,0,0);
         header.addView(sync,syncLp);
