@@ -114,6 +114,26 @@ public class NavigationSmokeTest {
         waitForText("О приложении");
         screenshot("05_about");
 
+        UiObject2 downloads=device.findObject(By.desc("Скачанные КР"));
+        if(downloads==null) {
+            device.swipe(
+                    device.getDisplayWidth()/2,
+                    (int)(device.getDisplayHeight()*0.78f),
+                    device.getDisplayWidth()/2,
+                    (int)(device.getDisplayHeight()*0.28f),
+                    18
+            );
+            device.waitForIdle();
+            downloads=device.wait(Until.findObject(By.desc("Скачанные КР")),TIMEOUT);
+        }
+        assertNotNull("Downloaded KR manager entry is missing",downloads);
+        downloads.click();
+        assertNotNull(
+                "Downloaded KR manager did not open",
+                device.wait(Until.findObject(By.desc("Назад к информации о приложении")),TIMEOUT)
+        );
+        screenshot("06_downloads");
+
         scenario.onActivity(activity -> assertAllVisibleTextViewsStayInsideWindow(activity));
     }
 
