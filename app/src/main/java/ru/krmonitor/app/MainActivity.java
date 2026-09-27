@@ -14,6 +14,7 @@ import android.text.*;
 import android.view.*;
 import android.view.animation.TranslateAnimation;
 import android.widget.*;
+import android.util.TypedValue;
 import java.text.DateFormat;
 import java.util.*;
 import java.util.concurrent.*;
@@ -100,32 +101,43 @@ public class MainActivity extends Activity {
         return compactUi()?compact:(tabletUi()?tablet:phone);
     }
 
+    private float systemFontScale(){ return getResources().getConfiguration().fontScale; }
+    private boolean largeFontUi(){ return systemFontScale()>1.20f; }
+    private boolean veryLargeFontUi(){ return systemFontScale()>1.45f; }
+    private boolean narrowPhoneUi(){ return !useTwoPaneUi() && screenWidthDp()<360; }
+
     private int profileColumns() {
         int w=screenWidthDp();
-        if(w<300) return 1;
+        if(w<340 || (largeFontUi() && w<420) || (veryLargeFontUi() && w<600)) return 1;
         if(w<600) return 2;
         if(w<900) return 3;
         return 4;
     }
 
-    private float systemFontScale(){ return getResources().getConfiguration().fontScale; }
+    private int profileCardHeightDp() {
+        int base=responsive(142,150,156);
+        float extra=Math.max(0f,Math.min(0.65f,systemFontScale()-1f));
+        return base+Math.round(extra*44f);
+    }
 
     private boolean dialogNeedsBoundedHeight(){
-        return lowHeightUi() || screenHeightDp()<650 || systemFontScale()>1.15f;
+        return lowHeightUi() || screenHeightDp()<650 || systemFontScale()>1.20f;
     }
 
     private int dialogWidthPx() {
-        int marginDp=lowHeightUi()?12:24;
-        int availableDp=Math.max(260,screenWidthDp()-marginDp);
-        int maxDp=expandedTwoPaneUi()?560:(useTwoPaneUi()?500:420);
+        int w=screenWidthDp();
+        int marginDp=w<360?24:40;
+        int availableDp=Math.max(260,w-marginDp);
+        int maxDp=expandedTwoPaneUi()?520:(useTwoPaneUi()?460:380);
         return dp(Math.min(availableDp,maxDp));
     }
 
     private int dialogMaxHeightPx() {
-        int marginDp=lowHeightUi()?10:32;
-        int availableDp=Math.max(220,screenHeightDp()-marginDp);
-        int maxDp=expandedTwoPaneUi()?720:680;
-        return dp(Math.min(availableDp,maxDp));
+        int h=screenHeightDp();
+        float share=lowHeightUi()?0.88f:0.78f;
+        int byScreen=Math.max(220,Math.round(h*share));
+        int maxDp=expandedTwoPaneUi()?640:(useTwoPaneUi()?600:560);
+        return dp(Math.min(byScreen,maxDp));
     }
 
     private void applyAdaptiveDialogWindow(Dialog dialog,boolean boundedHeight) {
@@ -144,16 +156,30 @@ public class MainActivity extends Activity {
     private void applyAdaptiveAlertWindow(AlertDialog dialog) {
         Window w=dialog.getWindow();
         if(w==null) return;
-        WindowManager.LayoutParams lp=w.getAttributes();
-        lp.width=dialogWidthPx();
-        lp.height=dialogNeedsBoundedHeight()?dialogMaxHeightPx():WindowManager.LayoutParams.WRAP_CONTENT;
-        w.setAttributes(lp);
+
+        final int width=dialogWidthPx();
+        w.setLayout(width,WindowManager.LayoutParams.WRAP_CONTENT);
         w.setGravity(Gravity.CENTER);
+
         TextView message=dialog.findViewById(android.R.id.message);
         if(message!=null) {
             message.setTextSize(lowHeightUi()?12:14);
             message.setLineSpacing(dp(2),1f);
         }
+
+        // A short informational message must stay compact. Only dialogs whose
+        // measured content is genuinely too tall are capped and become scrollable.
+        View decor=w.getDecorView();
+        decor.post(() -> {
+            if(dialog.getWindow()==null) return;
+            int maxHeight=dialogMaxHeightPx();
+            int measured=decor.getHeight();
+            dialog.getWindow().setLayout(
+                    width,
+                    measured>maxHeight?maxHeight:WindowManager.LayoutParams.WRAP_CONTENT
+            );
+            dialog.getWindow().setGravity(Gravity.CENTER);
+        });
     }
 
     private GradientDrawable rounded(int fill,int stroke,int radius) {
@@ -198,12 +224,15 @@ public class MainActivity extends Activity {
         LinearLayout bar=new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER);
-        int height=lowHeightUi()?48:58;
         bar.setPadding(dp(3),dp(3),dp(3),dp(3));
         bar.setBackground(rounded(CARD,LINE,16));
         bottomNav=bar;
         refreshBottomNavigation();
-        bar.setMinimumHeight(dp(height));
+
+        // The bar may grow when a device uses a taller system font. Never clip
+        // labels into a hard-coded 48/58 dp box.
+        int minHeight=lowHeightUi()?48:(largeFontUi()?62:58);
+        bar.setMinimumHeight(dp(minHeight));
         return bar;
     }
 
@@ -212,13 +241,13 @@ public class MainActivity extends Activity {
         bottomNav.removeAllViews();
 
         bottomNav.addView(bottomNavItem("▤","Все КР",PAGE_ALL,currentPage==PAGE_ALL),
-                new LinearLayout.LayoutParams(0,-1,1));
+                new LinearLayout.LayoutParams(0,-2,1));
         bottomNav.addView(bottomNavItem("▦","Профили",PAGE_PROFILES,currentPage==PAGE_PROFILES),
-                new LinearLayout.LayoutParams(0,-1,1));
+                new LinearLayout.LayoutParams(0,-2,1));
         bottomNav.addView(bottomNavItem("★","Избранное",PAGE_FAVORITES,currentPage==PAGE_FAVORITES),
-                new LinearLayout.LayoutParams(0,-1,1));
+                new LinearLayout.LayoutParams(0,-2,1));
         bottomNav.addView(bottomNavItem("◷","История",PAGE_HISTORY,currentPage==PAGE_HISTORY),
-                new LinearLayout.LayoutParams(0,-1,1));
+                new LinearLayout.LayoutParams(0,-2,1));
     }
 
     private View bottomNavItem(String icon,String label,int page,boolean selected) {
@@ -233,16 +262,24 @@ public class MainActivity extends Activity {
         item.setOnClickListener(v -> navigateBottom(page));
 
         TextView iconView=text(icon,lowHeightUi()?15:18,selected?BLUE:MUTED,selected);
+        iconView.setTextSize(TypedValue.COMPLEX_UNIT_DIP,lowHeightUi()?15:18);
         iconView.setGravity(Gravity.CENTER);
-        iconView.setIncludeFontPadding(false);
+        iconView.setIncludeFontPadding(true);
         item.addView(iconView,new LinearLayout.LayoutParams(-1,-2));
 
         TextView labelView=text(label,lowHeightUi()?8:10,selected?BLUE:MUTED,selected);
         labelView.setGravity(Gravity.CENTER);
         labelView.setSingleLine(true);
-        labelView.setIncludeFontPadding(false);
+        labelView.setIncludeFontPadding(true);
+        if(Build.VERSION.SDK_INT>=26) {
+            int minSp=narrowPhoneUi()?6:7;
+            int maxSp=lowHeightUi()?9:10;
+            labelView.setAutoSizeTextTypeUniformWithConfiguration(
+                    minSp,maxSp,1,TypedValue.COMPLEX_UNIT_SP
+            );
+        }
         LinearLayout.LayoutParams labelLp=new LinearLayout.LayoutParams(-1,-2);
-        labelLp.setMargins(0,dp(2),0,0);
+        labelLp.setMargins(0,dp(1),0,0);
         item.addView(labelView,labelLp);
         return item;
     }
@@ -269,6 +306,7 @@ public class MainActivity extends Activity {
         }
         final boolean compact=compactUi();
         final boolean tablet=tabletUi();
+        final boolean stackedHeader=compact || (largeFontUi() && screenWidthDp()<500);
 
         FrameLayout shell=new FrameLayout(this);
         shell.setBackgroundColor(BG);
@@ -294,8 +332,8 @@ public class MainActivity extends Activity {
         shell.addView(root,rootLp);
 
         LinearLayout header=new LinearLayout(this);
-        header.setOrientation(compact?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);
-        header.setGravity(compact?Gravity.LEFT:Gravity.CENTER_VERTICAL);
+        header.setOrientation(stackedHeader?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);
+        header.setGravity(stackedHeader?Gravity.LEFT:Gravity.CENTER_VERTICAL);
 
         LinearLayout heading=new LinearLayout(this);
         heading.setOrientation(LinearLayout.VERTICAL);
@@ -316,7 +354,7 @@ public class MainActivity extends Activity {
         heading.addView(titleRow,new LinearLayout.LayoutParams(-1,-2));
         heading.addView(subtitle);
 
-        if(compact) {
+        if(stackedHeader) {
             header.addView(heading,new LinearLayout.LayoutParams(-1,-2));
         } else {
             header.addView(heading,new LinearLayout.LayoutParams(0,-2,1));
@@ -328,10 +366,11 @@ public class MainActivity extends Activity {
         sync.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,14));
         sync.setClickable(true);
         sync.setFocusable(true);
-        LinearLayout.LayoutParams syncLp=compact
-                ? new LinearLayout.LayoutParams(-1,dp(44))
+        sync.setMinHeight(dp(44));
+        LinearLayout.LayoutParams syncLp=stackedHeader
+                ? new LinearLayout.LayoutParams(-1,-2)
                 : new LinearLayout.LayoutParams(-2,-2);
-        if(compact) syncLp.setMargins(0,dp(8),0,0);
+        if(stackedHeader) syncLp.setMargins(0,dp(8),0,0);
         header.addView(sync,syncLp);
         root.addView(header);
 
@@ -368,7 +407,8 @@ public class MainActivity extends Activity {
         search.setSingleLine(true);
         search.setPadding(dp(responsive(11,14,16)),0,dp(responsive(11,14,16)),0);
         search.setBackground(rounded(CARD,LINE,15));
-        root.addView(search,new LinearLayout.LayoutParams(-1,dp(responsive(46,48,52))));
+        search.setMinHeight(dp(responsive(46,48,52)));
+        root.addView(search,new LinearLayout.LayoutParams(-1,-2));
 
         contentHost=new FrameLayout(this);
         LinearLayout.LayoutParams contentLp=new LinearLayout.LayoutParams(-1,0,1);
@@ -376,7 +416,7 @@ public class MainActivity extends Activity {
         root.addView(contentHost,contentLp);
 
         LinearLayout nav=buildBottomNavigation();
-        LinearLayout.LayoutParams navLp=new LinearLayout.LayoutParams(-1,dp(58));
+        LinearLayout.LayoutParams navLp=new LinearLayout.LayoutParams(-1,-2);
         navLp.setMargins(0,dp(5),0,0);
         root.addView(nav,navLp);
 
@@ -433,7 +473,14 @@ public class MainActivity extends Activity {
         title.setIncludeFontPadding(false);
         title.setSingleLine(true);
         title.setEllipsize(TextUtils.TruncateAt.END);
-        titleRow.addView(title,new LinearLayout.LayoutParams(0,-2,1));
+        int headingApprox=Math.round(widthDp*(expanded?0.30f:0.34f));
+        title.setMaxWidth(dp(Math.max(110,headingApprox-(low?40:46))));
+        if(Build.VERSION.SDK_INT>=26) {
+            title.setAutoSizeTextTypeUniformWithConfiguration(
+                    low?13:15,low?18:(expanded?23:21),1,TypedValue.COMPLEX_UNIT_SP
+            );
+        }
+        titleRow.addView(title,new LinearLayout.LayoutParams(-2,-2));
         TextView info=aboutHeaderButton(low?16:(expanded?19:18));
         LinearLayout.LayoutParams infoLp=new LinearLayout.LayoutParams(dp(low?32:36),dp(low?32:36));
         infoLp.setMargins(dp(3),0,0,0);
@@ -574,6 +621,12 @@ public class MainActivity extends Activity {
         TextView title=text("КР Навигатор",19,TEXT,true);
         title.setSingleLine(true);
         title.setIncludeFontPadding(false);
+        title.setMaxWidth(dp(Math.max(120,screenWidthDp()-105)));
+        if(Build.VERSION.SDK_INT>=26) {
+            title.setAutoSizeTextTypeUniformWithConfiguration(
+                    13,19,1,TypedValue.COMPLEX_UNIT_SP
+            );
+        }
         titleRow.addView(title,new LinearLayout.LayoutParams(-2,-2));
         TextView info=aboutHeaderButton(16);
         LinearLayout.LayoutParams infoLp=new LinearLayout.LayoutParams(dp(32),dp(32));
@@ -627,7 +680,7 @@ public class MainActivity extends Activity {
         root.addView(contentHost,contentLp);
 
         LinearLayout nav=buildBottomNavigation();
-        LinearLayout.LayoutParams navLp=new LinearLayout.LayoutParams(-1,dp(48));
+        LinearLayout.LayoutParams navLp=new LinearLayout.LayoutParams(-1,-2);
         navLp.setMargins(0,dp(3),0,0);
         root.addView(nav,navLp);
 
@@ -980,7 +1033,7 @@ public class MainActivity extends Activity {
         for(String p:ProfileClassifier.PROFILES) if(!groups.get(p).isEmpty()) visible.add(p);
         int columns=profileColumns();
         int gap=responsive(3,4,6);
-        int cardHeight=responsive(142,150,156);
+        int cardHeight=profileCardHeightDp();
         for(int i=0;i<visible.size();i+=columns) {
             LinearLayout row=new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
@@ -1179,7 +1232,7 @@ public class MainActivity extends Activity {
         name.setGravity(Gravity.CENTER);
         name.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
         name.setIncludeFontPadding(false);
-        name.setMaxLines(5);
+        name.setMaxLines(largeFontUi()?7:5);
         name.setEllipsize(null);
         name.setHorizontallyScrolling(false);
         name.setLineSpacing(dp(1),1.0f);
@@ -1503,7 +1556,7 @@ public class MainActivity extends Activity {
                 LinearLayout labels=new LinearLayout(MainActivity.this);
                 labels.setOrientation(LinearLayout.VERTICAL);
                 TextView name=text(r.title,dense?(lowHeightUi()?12:13):responsive(13,14,15),TEXT,false);
-                name.setMaxLines(dense?2:3);
+                name.setMaxLines(largeFontUi()?(dense?3:5):(dense?2:3));
                 String metaText="КР "+r.id+(PdfManager.isPdf(PdfManager.file(MainActivity.this,r))?"  •  PDF скачан":"");
                 if(profileRules.containsKey(r.baseId)) metaText += "  •  ✎ профиль настроен";
                 if(searchShowsMkb && r.mkbCodes!=null && !r.mkbCodes.isEmpty()) metaText += "  •  МКБ-10: "+r.mkbCodes;
