@@ -212,7 +212,14 @@ public class PdfViewerActivity extends Activity {
 
         pageLabel=text("— / —",13,TEXT,true);
         pageLabel.setGravity(Gravity.CENTER);
-        bottom.addView(pageLabel,new LinearLayout.LayoutParams(0,dp(46),1));
+        pageLabel.setClickable(true);
+        pageLabel.setFocusable(true);
+        pageLabel.setContentDescription("Выбрать страницу");
+        pageLabel.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,12));
+        pageLabel.setOnClickListener(v -> showPagePicker());
+        LinearLayout.LayoutParams pageLp=new LinearLayout.LayoutParams(0,dp(40),1);
+        pageLp.setMargins(dp(8),dp(3),dp(8),dp(3));
+        bottom.addView(pageLabel,pageLp);
 
         TextView next=action("›",28,false);
         next.setContentDescription("Следующая страница");
@@ -495,12 +502,82 @@ public class PdfViewerActivity extends Activity {
         return "page_"+baseId;
     }
 
+    private void showPagePicker() {
+        if(pageCount<=0) return;
+
+        final EditText input=new EditText(this);
+        input.setSingleLine(true);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        input.setImeOptions(EditorInfo.IME_ACTION_GO);
+        input.setText(String.valueOf(currentPage+1));
+        input.setSelectAllOnFocus(true);
+        input.setHint("1–"+pageCount);
+        input.setTextSize(18);
+        int pad=dp(16);
+        input.setPadding(pad,dp(10),pad,dp(10));
+
+        LinearLayout wrap=new LinearLayout(this);
+        wrap.setOrientation(LinearLayout.VERTICAL);
+        wrap.setPadding(dp(20),dp(2),dp(20),0);
+
+        TextView hint=text("Введите номер страницы от 1 до "+pageCount,12,MUTED,false);
+        hint.setPadding(0,0,0,dp(6));
+        wrap.addView(hint,new LinearLayout.LayoutParams(-1,-2));
+        wrap.addView(input,new LinearLayout.LayoutParams(-1,-2));
+
+        AlertDialog dialog=new AlertDialog.Builder(this)
+                .setTitle("Перейти к странице")
+                .setView(wrap)
+                .setNegativeButton("Отмена",null)
+                .setPositiveButton("Перейти",null)
+                .create();
+
+        dialog.setOnShowListener(d -> {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                String raw=input.getText().toString().trim();
+                int page;
+                try {
+                    page=Integer.parseInt(raw);
+                } catch(Exception e) {
+                    input.setError("Введите номер страницы");
+                    return;
+                }
+                if(page<1 || page>pageCount) {
+                    input.setError("Доступны страницы 1–"+pageCount);
+                    return;
+                }
+                dialog.dismiss();
+                goToPage(page-1);
+            });
+            input.requestFocus();
+            input.postDelayed(() -> {
+                InputMethodManager imm=(InputMethodManager)getSystemService(INPUT_METHOD_SERVICE);
+                if(imm!=null) imm.showSoftInput(input,InputMethodManager.SHOW_IMPLICIT);
+            },120);
+        });
+
+        input.setOnEditorActionListener((v,action,event) -> {
+            if(action==EditorInfo.IME_ACTION_GO && dialog.isShowing()) {
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick();
+                return true;
+            }
+            return false;
+        });
+
+        dialog.show();
+    }
+
     private void showMenu(View anchor) {
         PopupMenu menu=new PopupMenu(this,anchor);
+        menu.getMenu().add("Перейти к странице");
         menu.getMenu().add("На первую страницу");
         menu.getMenu().add("Открыть другим приложением");
         menu.setOnMenuItemClickListener(item -> {
             String label=item.getTitle().toString();
+            if(label.startsWith("Перейти к")) {
+                showPagePicker();
+                return true;
+            }
             if(label.startsWith("На первую")) {
                 goToPage(0);
                 return true;
@@ -628,8 +705,16 @@ public class PdfViewerActivity extends Activity {
                     if(relativeScale>1.08f || swipeListener==null || e1==null || e2==null) return false;
                     float dx=e2.getX()-e1.getX();
                     float dy=e2.getY()-e1.getY();
-                    if(Math.abs(dx)>120 && Math.abs(dx)>Math.abs(dy)*1.5f && Math.abs(velocityX)>500) {
+
+                    // Horizontal page turn: left = next, right = previous.
+                    if(Math.abs(dx)>120 && Math.abs(dx)>Math.abs(dy)*1.25f && Math.abs(velocityX)>500) {
                         swipeListener.onSwipe(dx<0?-1:1);
+                        return true;
+                    }
+
+                    // Vertical page turn: up = next, down = previous.
+                    if(Math.abs(dy)>120 && Math.abs(dy)>Math.abs(dx)*1.25f && Math.abs(velocityY)>500) {
+                        swipeListener.onSwipe(dy<0?-1:1);
                         return true;
                     }
                     return false;
