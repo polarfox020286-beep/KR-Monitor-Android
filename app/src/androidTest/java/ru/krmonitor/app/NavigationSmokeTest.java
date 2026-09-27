@@ -179,10 +179,16 @@ public class NavigationSmokeTest {
         View root=activity.getWindow().getDecorView();
         List<TextView> texts=new ArrayList<>();
         collectTextViews(root,texts);
+        Rect visible=new Rect();
         for(TextView tv:texts) {
             if(tv.getVisibility()!=View.VISIBLE || tv.getWidth()<=0 || tv.getHeight()<=0) continue;
             CharSequence value=tv.getText();
             if(value==null || value.length()==0) continue;
+
+            // A child inside a ScrollView may have VISIBLE state while being
+            // legitimately below the viewport. Only inspect text that is
+            // actually visible on screen right now.
+            if(!tv.getGlobalVisibleRect(visible) || visible.isEmpty()) continue;
             assertFullyInsideRoot(root,tv,"Visible text outside window: "+value);
         }
     }
