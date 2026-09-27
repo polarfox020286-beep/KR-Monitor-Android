@@ -965,38 +965,6 @@ public class MainActivity extends Activity {
         pageHead.setOrientation(LinearLayout.HORIZONTAL);
         pageHead.setGravity(Gravity.CENTER_VERTICAL);
         pageHead.addView(pageTitle("Профили"),new LinearLayout.LayoutParams(0,-2,1));
-
-        TextView allNav=text("Все КР",responsive(10,11,12),BLUE,true);
-        allNav.setPadding(dp(6),dp(5),dp(6),dp(5));
-        allNav.setClickable(true);
-        allNav.setOnClickListener(v -> {
-            currentPage=PAGE_ALL;
-            selectedProfile=null;
-            renderCurrentPage(0);
-        });
-        pageHead.addView(allNav);
-
-        TextView favoritesNav=text(compactUi()?"★":"★ Избранное",responsive(10,11,12),BLUE,true);
-        favoritesNav.setContentDescription("Избранное");
-        favoritesNav.setPadding(dp(6),dp(5),dp(6),dp(5));
-        favoritesNav.setClickable(true);
-        favoritesNav.setOnClickListener(v -> {
-            currentPage=PAGE_FAVORITES;
-            selectedProfile=null;
-            renderCurrentPage(0);
-        });
-        pageHead.addView(favoritesNav);
-
-        TextView historyNav=text("История",responsive(10,11,12),BLUE,true);
-        historyNav.setPadding(dp(6),dp(5),dp(6),dp(5));
-        historyNav.setClickable(true);
-        historyNav.setOnClickListener(v -> {
-            currentPage=PAGE_HISTORY;
-            selectedProfile=null;
-            renderCurrentPage(0);
-        });
-        pageHead.addView(historyNav);
-
         outer.addView(pageHead);
 
         LinkedHashMap<String,List<Recommendation>> groups=groupWithUserProfiles(all);
@@ -1041,38 +1009,6 @@ public class MainActivity extends Activity {
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.addView(pageTitle("Профили"),new LinearLayout.LayoutParams(0,-2,1));
-
-        TextView allLink=text("Все КР",11,BLUE,true);
-        allLink.setPadding(dp(8),dp(5),dp(8),dp(5));
-        allLink.setClickable(true);
-        allLink.setOnClickListener(v -> {
-            currentPage=PAGE_ALL;
-            selectedProfile=null;
-            renderCurrentPage(0);
-        });
-        head.addView(allLink);
-
-        TextView favoritesLink=text("★",16,BLUE,true);
-        favoritesLink.setContentDescription("Избранное");
-        favoritesLink.setPadding(dp(8),dp(5),dp(8),dp(5));
-        favoritesLink.setClickable(true);
-        favoritesLink.setOnClickListener(v -> {
-            currentPage=PAGE_FAVORITES;
-            selectedProfile=null;
-            renderCurrentPage(0);
-        });
-        head.addView(favoritesLink);
-
-        TextView historyLink=text("История",11,BLUE,true);
-        historyLink.setPadding(dp(8),dp(5),dp(8),dp(5));
-        historyLink.setClickable(true);
-        historyLink.setOnClickListener(v -> {
-            currentPage=PAGE_HISTORY;
-            selectedProfile=null;
-            renderCurrentPage(0);
-        });
-        head.addView(historyLink);
-
         outer.addView(head,new LinearLayout.LayoutParams(-1,-2));
 
         LinkedHashMap<String,List<Recommendation>> groups=groupWithUserProfiles(all);
@@ -1361,14 +1297,8 @@ public class MainActivity extends Activity {
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.addView(pageTitle("История"),new LinearLayout.LayoutParams(0,-2,1));
-        TextView hint=text("← Профили",compactSinglePaneUi()?10:responsive(10,11,12),MUTED,false);
-        hint.setClickable(true);
-        hint.setOnClickListener(v -> {
-            currentPage=PAGE_PROFILES;
-            selectedProfile=null;
-            renderCurrentPage(0);
-        });
-        head.addView(hint);
+        TextView count=text(history.size()+" КР",compactSinglePaneUi()?10:responsive(10,11,12),MUTED,false);
+        head.addView(count);
         outer.addView(head);
 
         if(!compactSinglePaneUi()) {
@@ -1395,18 +1325,6 @@ public class MainActivity extends Activity {
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.addView(pageTitle("Избранное"),new LinearLayout.LayoutParams(0,-2,1));
-
-        if(!useTwoPaneUi()) {
-            TextView back=text("‹ Профили",compactSinglePaneUi()?10:responsive(10,11,12),BLUE,true);
-            back.setPadding(dp(8),dp(5),dp(8),dp(5));
-            back.setClickable(true);
-            back.setOnClickListener(v -> {
-                currentPage=PAGE_PROFILES;
-                selectedProfile=null;
-                renderCurrentPage(0);
-            });
-            head.addView(back);
-        }
 
         TextView count=text(favorites.size()+" КР",compactSinglePaneUi()?10:12,MUTED,false);
         count.setPadding(dp(6),0,0,0);
