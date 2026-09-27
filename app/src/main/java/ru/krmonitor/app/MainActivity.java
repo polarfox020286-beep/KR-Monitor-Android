@@ -39,6 +39,7 @@ public class MainActivity extends Activity {
     private static final int PAGE_HISTORY=2;
     private static final int PAGE_ABOUT=3;
     private static final int PAGE_FAVORITES=4;
+    private static final int PAGE_DOWNLOADS=5;
     private int currentPage=PAGE_PROFILES;
     private String selectedProfile=null;
     private float swipeX,swipeY;
@@ -1053,6 +1054,7 @@ public class MainActivity extends Activity {
             if(currentPage==PAGE_ALL) showContent(makeListPage("Все КР",all),0);
             else if(currentPage==PAGE_HISTORY) showContent(makeLandscapeHistoryPage(),0);
             else if(currentPage==PAGE_FAVORITES) showContent(makeFavoritesPage(),0);
+            else if(currentPage==PAGE_DOWNLOADS) showContent(makeDownloadsPage(),0);
             else if(currentPage==PAGE_ABOUT) showContent(makeAboutPage(),0);
             else if(selectedProfile!=null) showContent(makeLandscapeProfilePage(selectedProfile),0);
             else showContent(makeListPage("Все КР",all),0);
@@ -1062,6 +1064,7 @@ public class MainActivity extends Activity {
         if(currentPage==PAGE_ALL) showContent(makeListPage("Все КР",all),direction);
         else if(currentPage==PAGE_HISTORY) showContent(makeHistoryPage(),direction);
         else if(currentPage==PAGE_FAVORITES) showContent(makeFavoritesPage(),direction);
+        else if(currentPage==PAGE_DOWNLOADS) showContent(makeDownloadsPage(),direction);
         else if(currentPage==PAGE_ABOUT) showContent(makeAboutPage(),direction);
         else if(selectedProfile!=null) showContent(makeProfileListPage(selectedProfile),direction);
         else showContent(makeProfilesPage(),direction);
@@ -1293,6 +1296,8 @@ public class MainActivity extends Activity {
                 "\nПоследняя успешная синхронизация: "+lastSuccess
         ));
 
+        body.addView(downloadsEntryCard());
+
         body.addView(aboutSection("Состояние каталога",state));
 
         body.addView(aboutSection(
@@ -1331,6 +1336,289 @@ public class MainActivity extends Activity {
 
         outer.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         return outer;
+    }
+
+    private List<Recommendation> downloadedRecommendations() {
+        ArrayList<Recommendation> out=new ArrayList<>();
+        for(Recommendation r:all) {
+            if(PdfManager.isPdf(PdfManager.file(this,r))) out.add(r);
+        }
+        out.sort((a,b) -> a.title.compareToIgnoreCase(b.title));
+        return out;
+    }
+
+    private long downloadedBytes(Collection<Recommendation> recs) {
+        long total=0L;
+        if(recs!=null) {
+            for(Recommendation r:recs) total+=PdfManager.sizeBytes(this,r);
+        }
+        return total;
+    }
+
+    private String readableBytes(long bytes) {
+        if(bytes<1024L) return bytes+" Б";
+        double kb=bytes/1024.0;
+        if(kb<1024.0) return String.format(Locale.getDefault(),"%.1f КБ",kb);
+        double mb=kb/1024.0;
+        if(mb<1024.0) return String.format(Locale.getDefault(),"%.1f МБ",mb);
+        return String.format(Locale.getDefault(),"%.2f ГБ",mb/1024.0);
+    }
+
+    private View downloadsEntryCard() {
+        List<Recommendation> downloaded=downloadedRecommendations();
+        long bytes=downloadedBytes(downloaded);
+
+        LinearLayout card=new LinearLayout(this);
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        int pad=lowHeightUi()?9:13;
+        card.setPadding(dp(pad),dp(lowHeightUi()?8:11),dp(pad),dp(lowHeightUi()?8:11));
+        card.setBackground(rounded(CARD,LINE,14));
+        card.setClickable(true);
+        card.setFocusable(true);
+        card.setContentDescription("Скачанные КР");
+        card.setOnClickListener(v -> {
+            currentPage=PAGE_DOWNLOADS;
+            selectedProfile=null;
+            if(search!=null && search.getText()!=null && search.getText().length()>0) search.setText("");
+            else renderCurrentPage(0);
+        });
+
+        LinearLayout labels=new LinearLayout(this);
+        labels.setOrientation(LinearLayout.VERTICAL);
+        TextView title=text("Скачанные КР",lowHeightUi()?12:14,TEXT,true);
+        labels.addView(title);
+        TextView meta=text(
+                downloaded.size()+" документов • "+readableBytes(bytes),
+                lowHeightUi()?10:12,MUTED,false
+        );
+        meta.setPadding(0,dp(3),0,0);
+        labels.addView(meta);
+        card.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
+
+        TextView action=text("Управлять  ›",lowHeightUi()?10:12,BLUE,true);
+        action.setGravity(Gravity.CENTER_VERTICAL);
+        action.setPadding(dp(8),dp(5),0,dp(5));
+        card.addView(action,new LinearLayout.LayoutParams(-2,-2));
+
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
+        lp.setMargins(0,0,0,dp(lowHeightUi()?5:8));
+        card.setLayoutParams(lp);
+        return card;
+    }
+
+    private View makeDownloadsPage() {
+        final List<Recommendation> downloaded=downloadedRecommendations();
+        final long totalBytes=downloadedBytes(downloaded);
+
+        LinearLayout outer=new LinearLayout(this);
+        outer.setOrientation(LinearLayout.VERTICAL);
+
+        LinearLayout head=new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.addView(pageTitle("Скачанные КР"),new LinearLayout.LayoutParams(0,-2,1));
+
+        TextView back=text("‹ О приложении",compactChromeUi()?10:11,BLUE,true);
+        back.setPadding(dp(8),dp(5),dp(8),dp(5));
+        back.setClickable(true);
+        back.setContentDescription("Назад к информации о приложении");
+        back.setOnClickListener(v -> {
+            currentPage=PAGE_ABOUT;
+            selectedProfile=null;
+            renderCurrentPage(0);
+        });
+        head.addView(back);
+        outer.addView(head);
+
+        LinearLayout summary=new LinearLayout(this);
+        summary.setOrientation(LinearLayout.VERTICAL);
+        summary.setPadding(dp(12),dp(9),dp(12),dp(9));
+        summary.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,14));
+
+        TextView summaryTitle=text(
+                downloaded.size()+" скачанных КР",
+                compactChromeUi()?12:14,BLUE_DARK,true
+        );
+        summary.addView(summaryTitle);
+        TextView summaryMeta=text(
+                "Занято: "+readableBytes(totalBytes),
+                compactChromeUi()?10:12,MUTED,false
+        );
+        summaryMeta.setPadding(0,dp(3),0,0);
+        summary.addView(summaryMeta);
+
+        LinearLayout.LayoutParams summaryLp=new LinearLayout.LayoutParams(-1,-2);
+        summaryLp.setMargins(0,0,0,dp(7));
+        outer.addView(summary,summaryLp);
+
+        if(downloaded.isEmpty()) {
+            TextView empty=text(
+                    "Скачанных PDF пока нет. Откройте любую клиническую рекомендацию — документ будет сохранён на устройстве и появится здесь.",
+                    compactChromeUi()?12:14,MUTED,false
+            );
+            empty.setGravity(Gravity.CENTER);
+            empty.setLineSpacing(dp(2),1.05f);
+            empty.setPadding(dp(16),dp(compactChromeUi()?14:32),dp(16),dp(12));
+            outer.addView(empty,new LinearLayout.LayoutParams(-1,-2));
+            return outer;
+        }
+
+        LinearLayout actions=new LinearLayout(this);
+        boolean stackActions=screenWidthDp()<370 || systemFontScale()>1.25f;
+        actions.setOrientation(stackActions?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);
+
+        TextView keepFavorites=dialogAction("Оставить только избранные",false);
+        keepFavorites.setGravity(Gravity.CENTER);
+        keepFavorites.setOnClickListener(v -> confirmBulkPdfDelete(true));
+
+        TextView deleteAll=dialogAction("Удалить всё",false);
+        deleteAll.setGravity(Gravity.CENTER);
+        deleteAll.setTextColor(Color.rgb(178,52,52));
+        deleteAll.setOnClickListener(v -> confirmBulkPdfDelete(false));
+
+        if(stackActions) {
+            LinearLayout.LayoutParams firstLp=new LinearLayout.LayoutParams(-1,-2);
+            firstLp.setMargins(0,0,0,dp(5));
+            actions.addView(keepFavorites,firstLp);
+            actions.addView(deleteAll,new LinearLayout.LayoutParams(-1,-2));
+        } else {
+            LinearLayout.LayoutParams firstLp=new LinearLayout.LayoutParams(0,-2,1);
+            firstLp.setMargins(0,0,dp(4),0);
+            actions.addView(keepFavorites,firstLp);
+            LinearLayout.LayoutParams secondLp=new LinearLayout.LayoutParams(0,-2,1);
+            secondLp.setMargins(dp(4),0,0,0);
+            actions.addView(deleteAll,secondLp);
+        }
+        LinearLayout.LayoutParams actionsLp=new LinearLayout.LayoutParams(-1,-2);
+        actionsLp.setMargins(0,0,0,dp(5));
+        outer.addView(actions,actionsLp);
+
+        final Set<String> favoriteIds=new LinkedHashSet<>(db.favoriteBaseIds());
+        ListView list=new ListView(this);
+        list.setDivider(null);
+        list.setDividerHeight(0);
+        list.setBackgroundColor(Color.TRANSPARENT);
+        list.setClipToPadding(false);
+        list.setPadding(0,0,0,dp(8));
+        list.setAdapter(new BaseAdapter(){
+            @Override public int getCount(){ return downloaded.size(); }
+            @Override public Object getItem(int p){ return downloaded.get(p); }
+            @Override public long getItemId(int p){ return p; }
+
+            @Override public View getView(int p,View convert,ViewGroup parent){
+                Recommendation r=downloaded.get(p);
+                LinearLayout wrap=new LinearLayout(MainActivity.this);
+                wrap.setPadding(0,dp(3),0,dp(3));
+
+                LinearLayout row=new LinearLayout(MainActivity.this);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                row.setGravity(Gravity.CENTER_VERTICAL);
+                int hPad=compactChromeUi()?8:11;
+                int vPad=compactChromeUi()?6:9;
+                row.setPadding(dp(hPad),dp(vPad),dp(hPad),dp(vPad));
+                row.setBackground(rounded(CARD,LINE,14));
+
+                LinearLayout labels=new LinearLayout(MainActivity.this);
+                labels.setOrientation(LinearLayout.VERTICAL);
+                TextView title=text(
+                        (favoriteIds.contains(r.baseId)?"★  ":"")+r.title,
+                        compactChromeUi()?12:14,TEXT,false
+                );
+                title.setMaxLines(largeFontUi()?4:3);
+                title.setEllipsize(TextUtils.TruncateAt.END);
+                labels.addView(title);
+
+                TextView meta=text(
+                        "КР "+r.id+" • "+readableBytes(PdfManager.sizeBytes(MainActivity.this,r)),
+                        compactChromeUi()?9:11,MUTED,false
+                );
+                meta.setPadding(0,dp(3),0,0);
+                labels.addView(meta);
+                row.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
+
+                TextView remove=text("Удалить",compactChromeUi()?9:10,Color.rgb(178,52,52),true);
+                remove.setGravity(Gravity.CENTER);
+                remove.setPadding(dp(7),dp(7),dp(7),dp(7));
+                remove.setBackground(rounded(CARD,LINE,11));
+                remove.setClickable(true);
+                remove.setFocusable(false);
+                remove.setContentDescription("Удалить PDF "+r.title);
+                remove.setOnClickListener(v -> confirmSinglePdfDelete(r));
+                LinearLayout.LayoutParams removeLp=new LinearLayout.LayoutParams(-2,-2);
+                removeLp.setMargins(dp(8),0,0,0);
+                row.addView(remove,removeLp);
+
+                wrap.addView(row,new LinearLayout.LayoutParams(-1,-2));
+                return wrap;
+            }
+        });
+        list.setOnItemClickListener((p,v,pos,id) -> PdfManager.open(MainActivity.this,downloaded.get(pos)));
+        outer.addView(list,new LinearLayout.LayoutParams(-1,0,1));
+        return outer;
+    }
+
+    private void confirmSinglePdfDelete(Recommendation r) {
+        long bytes=PdfManager.sizeBytes(this,r);
+        AlertDialog dialog=new AlertDialog.Builder(this)
+                .setTitle("Удалить скачанный PDF?")
+                .setMessage("КР "+r.id+"\n"+r.title+"\n\nБудет освобождено "+readableBytes(bytes)+
+                        ". Сама рекомендация, избранное и история останутся в приложении.")
+                .setNegativeButton("Отмена",null)
+                .setPositiveButton("Удалить",(d,w) -> {
+                    boolean ok=PdfManager.delete(this,r);
+                    Toast.makeText(this,ok?"PDF удалён":"Не удалось удалить PDF",Toast.LENGTH_SHORT).show();
+                    renderCurrentPage(0);
+                })
+                .create();
+        dialog.setOnShowListener(d -> applyAdaptiveAlertWindow(dialog));
+        dialog.show();
+    }
+
+    private void confirmBulkPdfDelete(boolean keepFavorites) {
+        List<Recommendation> downloaded=downloadedRecommendations();
+        Set<String> favorites=keepFavorites?db.favoriteBaseIds():Collections.emptySet();
+        ArrayList<Recommendation> targets=new ArrayList<>();
+        for(Recommendation r:downloaded) {
+            if(!keepFavorites || !favorites.contains(r.baseId)) targets.add(r);
+        }
+
+        if(targets.isEmpty()) {
+            Toast.makeText(this,
+                    keepFavorites?"Все скачанные КР уже находятся в избранном":"Скачанных PDF нет",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        long bytes=downloadedBytes(targets);
+        String title=keepFavorites?"Удалить PDF не из избранного?":"Удалить все скачанные PDF?";
+        String message="Будет удалено документов: "+targets.size()+
+                "\nБудет освобождено: "+readableBytes(bytes)+
+                "\n\nИзбранное, история и каталог КР не удаляются.";
+        if(keepFavorites) message+=" PDF избранных КР останутся на устройстве.";
+
+        AlertDialog dialog=new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setMessage(message)
+                .setNegativeButton("Отмена",null)
+                .setPositiveButton("Удалить",(d,w) -> {
+                    int removed=0;
+                    long freed=0L;
+                    for(Recommendation r:targets) {
+                        long before=PdfManager.sizeBytes(this,r);
+                        if(PdfManager.delete(this,r)) {
+                            removed++;
+                            freed+=before;
+                        }
+                    }
+                    Toast.makeText(this,
+                            "Удалено: "+removed+" • освобождено "+readableBytes(freed),
+                            Toast.LENGTH_LONG).show();
+                    renderCurrentPage(0);
+                })
+                .create();
+        dialog.setOnShowListener(d -> applyAdaptiveAlertWindow(dialog));
+        dialog.show();
     }
 
     private View profileCard(String profile,int count) {
@@ -2161,6 +2449,12 @@ public class MainActivity extends Activity {
     @Override public void onBackPressed() {
         if(search!=null && search.getText()!=null && search.getText().toString().trim().length()>0) {
             closeSearchToProfiles();
+            return;
+        }
+        if(currentPage==PAGE_DOWNLOADS) {
+            currentPage=PAGE_ABOUT;
+            selectedProfile=null;
+            renderCurrentPage(0);
             return;
         }
         if(currentPage==PAGE_ABOUT || currentPage==PAGE_FAVORITES) {
