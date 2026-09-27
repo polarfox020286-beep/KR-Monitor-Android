@@ -101,13 +101,12 @@ jobs:
 
             gradle :app:connectedDebugAndroidTest --stacktrace
 
-            OUT="$GITHUB_WORKSPACE/ui-artifacts/${{ matrix.name }}"
-            mkdir -p "$OUT"
+            mkdir -p "$GITHUB_WORKSPACE/ui-artifacts/${{ matrix.name }}"
 
-            adb pull /sdcard/Android/data/ru.krmonitor.app/files/ui-screenshots "$OUT/screenshots" || true
-            adb exec-out screencap -p > "$OUT/final-screen.png" || true
+            adb pull /sdcard/Android/data/ru.krmonitor.app/files/ui-screenshots "$GITHUB_WORKSPACE/ui-artifacts/${{ matrix.name }}/screenshots" || true
+            adb exec-out screencap -p > "$GITHUB_WORKSPACE/ui-artifacts/${{ matrix.name }}/final-screen.png" || true
             adb shell uiautomator dump /sdcard/window.xml || true
-            adb pull /sdcard/window.xml "$OUT/window.xml" || true
+            adb pull /sdcard/window.xml "$GITHUB_WORKSPACE/ui-artifacts/${{ matrix.name }}/window.xml" || true
 
       - name: Collect Android test reports
         if: always()
