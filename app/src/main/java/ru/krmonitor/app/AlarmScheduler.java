@@ -43,12 +43,14 @@ public final class AlarmScheduler {
                 c,1200,i,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE
         );
         long when=nextWeekday12();
-        if(Build.VERSION.SDK_INT>=31 && !am.canScheduleExactAlarms()) {
-            am.setWindow(AlarmManager.RTC_WAKEUP,when,15*60*1000L,pi);
-        } else if(Build.VERSION.SDK_INT>=23) {
-            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,when,pi);
+
+        // Background catalog refresh does not need to fire at an exact minute.
+        // Use an inexact idle-capable alarm so Android can batch work for
+        // battery efficiency and the app does not need SCHEDULE_EXACT_ALARM.
+        if(Build.VERSION.SDK_INT>=23) {
+            am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,when,pi);
         } else {
-            am.setExact(AlarmManager.RTC_WAKEUP,when,pi);
+            am.set(AlarmManager.RTC_WAKEUP,when,pi);
         }
         c.getSharedPreferences("prefs",Context.MODE_PRIVATE)
                 .edit()
