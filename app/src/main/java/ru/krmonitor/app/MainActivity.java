@@ -288,6 +288,26 @@ public class MainActivity extends Activity {
         return item;
     }
 
+    private void fitSearchField(EditText field,float maxDp,float minDp) {
+        if(field==null) return;
+        field.post(() -> {
+            int inner=field.getWidth()-field.getPaddingLeft()-field.getPaddingRight();
+            if(inner<=0) return;
+
+            CharSequence hintValue=field.getHint();
+            String hint=hintValue==null?"":hintValue.toString();
+            android.graphics.Paint paint=new android.graphics.Paint(field.getPaint());
+            float chosen=maxDp;
+
+            for(float size=maxDp;size>=minDp;size-=0.5f) {
+                paint.setTextSize(dpFloat(size));
+                chosen=size;
+                if(paint.measureText(hint)<=inner) break;
+            }
+            field.setTextSize(TypedValue.COMPLEX_UNIT_DIP,chosen);
+        });
+    }
+
     private void fitBottomNavigationLabel(TextView label) {
         if(label==null) return;
         label.post(() -> {
@@ -501,12 +521,13 @@ public class MainActivity extends Activity {
         search.setHint(compact?"Название, № КР или МКБ-10":"Название, номер КР или код МКБ-10");
         search.setHintTextColor(Color.rgb(145,153,165));
         search.setTextColor(TEXT);
-        search.setTextSize(responsive(14,15,16));
+        search.setTextSize(TypedValue.COMPLEX_UNIT_DIP,responsive(14,15,16));
         search.setSingleLine(true);
         search.setPadding(dp(responsive(11,14,16)),0,dp(responsive(11,14,16)),0);
         search.setBackground(rounded(CARD,LINE,15));
         search.setMinHeight(dp(responsive(46,48,52)));
         root.addView(search,new LinearLayout.LayoutParams(-1,-2));
+        fitSearchField(search,responsive(14,15,16),10f);
 
         contentHost=new FrameLayout(this);
         LinearLayout.LayoutParams contentLp=new LinearLayout.LayoutParams(-1,0,1);
@@ -663,12 +684,13 @@ public class MainActivity extends Activity {
         search.setHint(widthDp<720?"Название, № КР или МКБ-10":"Название, номер КР или код МКБ-10");
         search.setHintTextColor(Color.rgb(145,153,165));
         search.setTextColor(TEXT);
-        search.setTextSize(low?12:(expanded?14:13));
+        search.setTextSize(TypedValue.COMPLEX_UNIT_DIP,low?12:(expanded?14:13));
         search.setSingleLine(true);
         search.setPadding(dp(low?9:12),0,dp(low?9:12),0);
         search.setBackground(rounded(CARD,LINE,13));
         search.setMinHeight(dp(low?36:42));
         right.addView(search,new LinearLayout.LayoutParams(-1,-2));
+        fitSearchField(search,low?12f:(expanded?14f:13f),9.5f);
 
         contentHost=new FrameLayout(this);
         LinearLayout.LayoutParams contentLp=new LinearLayout.LayoutParams(-1,0,1);
@@ -769,12 +791,13 @@ public class MainActivity extends Activity {
         search.setHint("Название, № КР или МКБ-10");
         search.setHintTextColor(Color.rgb(145,153,165));
         search.setTextColor(TEXT);
-        search.setTextSize(12);
+        search.setTextSize(TypedValue.COMPLEX_UNIT_DIP,12);
         search.setSingleLine(true);
         search.setPadding(dp(9),0,dp(9),0);
         search.setBackground(rounded(CARD,LINE,12));
         search.setMinHeight(dp(36));
         root.addView(search,new LinearLayout.LayoutParams(-1,-2));
+        fitSearchField(search,12f,9f);
 
         contentHost=new FrameLayout(this);
         LinearLayout.LayoutParams contentLp=new LinearLayout.LayoutParams(-1,0,1);
