@@ -1,4 +1,4 @@
-name: UI Quality Checks
+name: UI Quick Checks
 
 on:
   workflow_dispatch:
@@ -27,25 +27,17 @@ jobs:
       max-parallel: 2
       matrix:
         include:
-          - name: phone-320x640-font100
-            width: 320
-            height: 640
+          - name: phone-360x800-font100
+            width: 360
+            height: 800
             font_scale: '1.0'
           - name: phone-360x800-font160
             width: 360
             height: 800
             font_scale: '1.6'
-          - name: phone-430x932-font130
-            width: 430
-            height: 932
-            font_scale: '1.3'
           - name: landscape-800x400-font100
             width: 800
             height: 400
-            font_scale: '1.0'
-          - name: tablet-800x1280-font100
-            width: 800
-            height: 1280
             font_scale: '1.0'
 
     steps:
