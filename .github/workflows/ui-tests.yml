@@ -26,6 +26,7 @@ concurrency:
   group: ui-quality-${{ github.ref }}
   cancel-in-progress: true
 
+# Fast gate: standard phone, large-font phone, and landscape.
 jobs:
   plan:
     name: Select UI test matrix
