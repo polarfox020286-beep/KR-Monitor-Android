@@ -10,6 +10,7 @@ import android.os.Build;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+import android.widget.EditText;
 
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -78,6 +79,7 @@ public class NavigationSmokeTest {
 
         scenario.onActivity(activity -> {
             assertSyncButtonFits(activity);
+            assertSearchHintFits(activity);
             assertPhoneBottomNavigationFitsWhenPresent(activity);
         });
 
@@ -136,6 +138,28 @@ public class NavigationSmokeTest {
     private void screenshot(String name) {
         File file=new File(screenshotDir,name+".png");
         assertTrue("Could not save screenshot "+name,device.takeScreenshot(file));
+    }
+
+    private static void assertSearchHintFits(Activity activity) {
+        List<TextView> texts=new ArrayList<>();
+        collectTextViews(activity.getWindow().getDecorView(),texts);
+        EditText search=null;
+        for(TextView tv:texts) {
+            if(!(tv instanceof EditText)) continue;
+            CharSequence hint=tv.getHint();
+            if(hint!=null && hint.toString().contains("Название")) {
+                search=(EditText)tv;
+                break;
+            }
+        }
+        assertNotNull("Search field is missing",search);
+
+        int available=search.getWidth()-search.getPaddingLeft()-search.getPaddingRight();
+        assertTrue("Search field has no content width",available>0);
+        String hint=search.getHint()==null?"":search.getHint().toString();
+        float measured=search.getPaint().measureText(hint);
+        assertTrue("Search hint is clipped: "+hint+" measured="+measured+" available="+available,
+                measured<=available+2.5f);
     }
 
     private static void assertPhoneBottomNavigationFitsWhenPresent(Activity activity) {
