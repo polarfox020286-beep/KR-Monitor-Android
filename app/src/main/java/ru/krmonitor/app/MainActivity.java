@@ -8,6 +8,7 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.*;
+import android.net.Uri;
 import android.text.*;
 import android.view.*;
 import android.view.animation.TranslateAnimation;
