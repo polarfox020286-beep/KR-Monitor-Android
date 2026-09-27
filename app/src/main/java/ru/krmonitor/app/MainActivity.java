@@ -37,6 +37,7 @@ public class MainActivity extends Activity {
     private static final int PAGE_PROFILES=1;
     private static final int PAGE_HISTORY=2;
     private static final int PAGE_ABOUT=3;
+    private static final int PAGE_FAVORITES=4;
     private int currentPage=PAGE_PROFILES;
     private String selectedProfile=null;
     private float swipeX,swipeY;
@@ -594,6 +595,16 @@ public class MainActivity extends Activity {
         ));
 
         landscapeSidebar.addView(landscapeNavRow(
+                "★ Избранное",db==null?0:db.favoriteCount(),currentPage==PAGE_FAVORITES,
+                v -> {
+                    currentPage=PAGE_FAVORITES;
+                    selectedProfile=null;
+                    search.setText("");
+                    renderCurrentPage(0);
+                }
+        ));
+
+        landscapeSidebar.addView(landscapeNavRow(
                 "История",db==null?0:db.history(200).size(),currentPage==PAGE_HISTORY,
                 v -> {
                     currentPage=PAGE_HISTORY;
@@ -715,16 +726,22 @@ public class MainActivity extends Activity {
 
     private void swipeRight() {
         selectedProfile=null;
-        if(currentPage>PAGE_ALL) {
-            currentPage--;
+        if(currentPage==PAGE_HISTORY) {
+            currentPage=PAGE_PROFILES;
+            renderCurrentPage(-1);
+        } else if(currentPage==PAGE_PROFILES) {
+            currentPage=PAGE_ALL;
             renderCurrentPage(-1);
         }
     }
 
     private void swipeLeft() {
         selectedProfile=null;
-        if(currentPage<PAGE_HISTORY) {
-            currentPage++;
+        if(currentPage==PAGE_ALL) {
+            currentPage=PAGE_PROFILES;
+            renderCurrentPage(1);
+        } else if(currentPage==PAGE_PROFILES) {
+            currentPage=PAGE_HISTORY;
             renderCurrentPage(1);
         }
     }
@@ -794,6 +811,7 @@ public class MainActivity extends Activity {
             refreshLandscapeSidebar();
             if(currentPage==PAGE_ALL) showContent(makeListPage("Все КР",all),0);
             else if(currentPage==PAGE_HISTORY) showContent(makeLandscapeHistoryPage(),0);
+            else if(currentPage==PAGE_FAVORITES) showContent(makeFavoritesPage(),0);
             else if(currentPage==PAGE_ABOUT) showContent(makeAboutPage(),0);
             else if(selectedProfile!=null) showContent(makeLandscapeProfilePage(selectedProfile),0);
             else showContent(makeListPage("Все КР",all),0);
@@ -802,6 +820,7 @@ public class MainActivity extends Activity {
 
         if(currentPage==PAGE_ALL) showContent(makeListPage("Все КР",all),direction);
         else if(currentPage==PAGE_HISTORY) showContent(makeHistoryPage(),direction);
+        else if(currentPage==PAGE_FAVORITES) showContent(makeFavoritesPage(),direction);
         else if(currentPage==PAGE_ABOUT) showContent(makeAboutPage(),direction);
         else if(selectedProfile!=null) showContent(makeProfileListPage(selectedProfile),direction);
         else showContent(makeProfilesPage(),direction);
@@ -839,6 +858,17 @@ public class MainActivity extends Activity {
             for(String p:groups) {
                 List<Recommendation> bucket=out.get(p);
                 if(bucket!=null) bucket.add(r);
+            }
+        }
+        Set<String> favorites=db==null?Collections.emptySet():db.favoriteBaseIds();
+        if(!favorites.isEmpty()) {
+            for(List<Recommendation> bucket:out.values()) {
+                bucket.sort((a,b) -> {
+                    boolean af=favorites.contains(a.baseId);
+                    boolean bf=favorites.contains(b.baseId);
+                    if(af!=bf) return af?-1:1;
+                    return 0;
+                });
             }
         }
         return out;
@@ -880,6 +910,17 @@ public class MainActivity extends Activity {
             renderCurrentPage(0);
         });
         pageHead.addView(allNav);
+
+        TextView favoritesNav=text(compactUi()?"★":"★ Избранное",responsive(10,11,12),BLUE,true);
+        favoritesNav.setContentDescription("Избранное");
+        favoritesNav.setPadding(dp(6),dp(5),dp(6),dp(5));
+        favoritesNav.setClickable(true);
+        favoritesNav.setOnClickListener(v -> {
+            currentPage=PAGE_FAVORITES;
+            selectedProfile=null;
+            renderCurrentPage(0);
+        });
+        pageHead.addView(favoritesNav);
 
         TextView historyNav=text("История",responsive(10,11,12),BLUE,true);
         historyNav.setPadding(dp(6),dp(5),dp(6),dp(5));
@@ -945,6 +986,17 @@ public class MainActivity extends Activity {
             renderCurrentPage(0);
         });
         head.addView(allLink);
+
+        TextView favoritesLink=text("★",16,BLUE,true);
+        favoritesLink.setContentDescription("Избранное");
+        favoritesLink.setPadding(dp(8),dp(5),dp(8),dp(5));
+        favoritesLink.setClickable(true);
+        favoritesLink.setOnClickListener(v -> {
+            currentPage=PAGE_FAVORITES;
+            selectedProfile=null;
+            renderCurrentPage(0);
+        });
+        head.addView(favoritesLink);
 
         TextView historyLink=text("История",11,BLUE,true);
         historyLink.setPadding(dp(8),dp(5),dp(8),dp(5));
@@ -1269,6 +1321,51 @@ public class MainActivity extends Activity {
         return outer;
     }
 
+    private View makeFavoritesPage() {
+        List<Recommendation> favorites=db.favorites();
+        LinearLayout outer=new LinearLayout(this);
+        outer.setOrientation(LinearLayout.VERTICAL);
+
+        LinearLayout head=new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.addView(pageTitle("Избранное"),new LinearLayout.LayoutParams(0,-2,1));
+
+        if(!useTwoPaneUi()) {
+            TextView back=text("‹ Профили",compactSinglePaneUi()?10:responsive(10,11,12),BLUE,true);
+            back.setPadding(dp(8),dp(5),dp(8),dp(5));
+            back.setClickable(true);
+            back.setOnClickListener(v -> {
+                currentPage=PAGE_PROFILES;
+                selectedProfile=null;
+                renderCurrentPage(0);
+            });
+            head.addView(back);
+        }
+
+        TextView count=text(favorites.size()+" КР",compactSinglePaneUi()?10:12,MUTED,false);
+        count.setPadding(dp(6),0,0,0);
+        head.addView(count);
+        outer.addView(head);
+
+        if(favorites.isEmpty()) {
+            TextView empty=text(
+                    "Избранных КР пока нет. Нажмите ☆ рядом с нужной рекомендацией, чтобы добавить её сюда.",
+                    compactSinglePaneUi()?12:14,MUTED,false
+            );
+            empty.setGravity(Gravity.CENTER);
+            empty.setPadding(dp(16),dp(compactSinglePaneUi()?18:36),dp(16),dp(12));
+            empty.setLineSpacing(dp(2),1.05f);
+            outer.addView(empty,new LinearLayout.LayoutParams(-1,-2));
+        } else {
+            TextView caption=text("Сохранённые клинические рекомендации",compactSinglePaneUi()?10:12,MUTED,false);
+            caption.setPadding(dp(2),0,dp(2),dp(6));
+            outer.addView(caption);
+            addRecommendationList(outer,favorites);
+        }
+        return outer;
+    }
+
     private View makeListPage(String heading,List<Recommendation> recs) {
         LinearLayout outer=new LinearLayout(this);
         outer.setOrientation(LinearLayout.VERTICAL);
@@ -1395,6 +1492,7 @@ public class MainActivity extends Activity {
 
     private void addRecommendationList(LinearLayout outer,List<Recommendation> recs) {
         final Map<String,DbHelper.ProfileRule> profileRules=db.allProfileRules();
+        final Set<String> favoriteIds=new LinkedHashSet<>(db.favoriteBaseIds());
         ListView list=new ListView(this);
         list.setDivider(null);
         list.setDividerHeight(0);
@@ -1431,6 +1529,26 @@ public class MainActivity extends Activity {
                 labels.addView(name);
                 labels.addView(meta);
                 row.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
+
+                boolean favorite=favoriteIds.contains(r.baseId);
+                TextView star=text(favorite?"★":"☆",favorite?22:24,
+                        favorite?Color.rgb(206,145,0):Color.rgb(125,139,157),true);
+                star.setGravity(Gravity.CENTER);
+                star.setClickable(true);
+                star.setFocusable(false);
+                star.setContentDescription(favorite?"Убрать из избранного":"Добавить в избранное");
+                star.setOnClickListener(v -> {
+                    boolean now=db.toggleFavorite(r.baseId);
+                    if(now) favoriteIds.add(r.baseId); else favoriteIds.remove(r.baseId);
+                    star.setText(now?"★":"☆");
+                    star.setTextColor(now?Color.rgb(206,145,0):Color.rgb(125,139,157));
+                    star.setContentDescription(now?"Убрать из избранного":"Добавить в избранное");
+                    Toast.makeText(MainActivity.this,
+                            now?"Добавлено в избранное":"Удалено из избранного",
+                            Toast.LENGTH_SHORT).show();
+                    refreshAfterProfileChange();
+                });
+                row.addView(star,new LinearLayout.LayoutParams(dp(38),dp(48)));
 
                 TextView menu=text("⋮",24,Color.rgb(125,139,157),true);
                 menu.setGravity(Gravity.CENTER);
@@ -1886,7 +2004,7 @@ public class MainActivity extends Activity {
             closeSearchToProfiles();
             return;
         }
-        if(currentPage==PAGE_ABOUT) {
+        if(currentPage==PAGE_ABOUT || currentPage==PAGE_FAVORITES) {
             currentPage=PAGE_PROFILES;
             selectedProfile=null;
             renderCurrentPage(0);
