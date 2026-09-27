@@ -305,6 +305,59 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void fitSyncButton(TextView button,String preferredLabel) {
+        if(button==null) return;
+        button.setText(preferredLabel);
+        button.setSingleLine(true);
+        button.setEllipsize(null);
+
+        button.post(() -> {
+            int inner=button.getWidth()-button.getPaddingLeft()-button.getPaddingRight();
+            if(inner<=0) return;
+
+            String full=preferredLabel;
+            String fallback=full.contains("Провер") ? (full.contains("Проверяю")?"Проверяю…":"Проверить") : full;
+
+            // Measure in physical dp rather than scaled sp so a large system
+            // font cannot force the action label outside its button.
+            float maxDp=compactUi()?13f:14f;
+            float minDp=9f;
+            String chosen=full;
+            float chosenDp=maxDp;
+
+            android.graphics.Paint paint=new android.graphics.Paint(button.getPaint());
+            boolean fits=false;
+            for(float size=maxDp;size>=minDp;size-=0.5f) {
+                paint.setTextSize(dpFloat(size));
+                if(paint.measureText(full)<=inner) {
+                    chosenDp=size;
+                    fits=true;
+                    break;
+                }
+            }
+
+            if(!fits && !fallback.equals(full)) {
+                chosen=fallback;
+                for(float size=maxDp;size>=minDp;size-=0.5f) {
+                    paint.setTextSize(dpFloat(size));
+                    if(paint.measureText(fallback)<=inner) {
+                        chosenDp=size;
+                        fits=true;
+                        break;
+                    }
+                }
+            }
+
+            if(!fits) chosenDp=minDp;
+            button.setText(chosen);
+            button.setTextSize(TypedValue.COMPLEX_UNIT_DIP,chosenDp);
+        });
+    }
+
+    private float dpFloat(float value) {
+        return value*getResources().getDisplayMetrics().density;
+    }
+
     private void buildUi() {
         if(useTwoPaneUi()) {
             buildAdaptiveTwoPaneUi();
@@ -384,24 +437,20 @@ public class MainActivity extends Activity {
 
         TextView sync=text("↻  Проверить",responsive(12,13,14),BLUE,true);
         sync.setSingleLine(true);
-        sync.setTextSize(cappedChromeSp(responsive(12,13,14)));
         sync.setGravity(Gravity.CENTER);
-        sync.setPadding(dp(compact?8:12),dp(9),dp(compact?8:12),dp(9));
+        sync.setPadding(dp(compact?7:10),dp(9),dp(compact?7:10),dp(9));
         sync.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,14));
         sync.setClickable(true);
         sync.setFocusable(true);
         sync.setMinHeight(dp(44));
-        sync.setMaxWidth(dp(compact?112:132));
-        if(Build.VERSION.SDK_INT>=26) {
-            sync.setAutoSizeTextTypeUniformWithConfiguration(
-                    10,responsive(12,13,14),1,TypedValue.COMPLEX_UNIT_SP
-            );
-        }
+
+        int syncWidthDp=clampInt(Math.round(screenWidthDp()*0.33f),116,148);
         LinearLayout.LayoutParams syncLp=stackedHeader
                 ? new LinearLayout.LayoutParams(-1,-2)
-                : new LinearLayout.LayoutParams(-2,-2);
+                : new LinearLayout.LayoutParams(dp(syncWidthDp),-2);
         if(stackedHeader) syncLp.setMargins(0,dp(8),0,0);
         header.addView(sync,syncLp);
+        fitSyncButton(sync,"↻  Проверить");
         root.addView(header);
 
         status=text("",responsive(11,12,13),MUTED,false);
@@ -1957,7 +2006,7 @@ public class MainActivity extends Activity {
 
         syncInProgress=true;
         b.setEnabled(false);
-        b.setText(syncBusyLabel());
+        fitSyncButton(b,syncBusyLabel());
         status.setText("Проверяю обновления…");
         final ProgressDialog progress=new ProgressDialog(this);
         progress.setTitle(lowHeightUi()?"Проверка КР":"Проверка клинических рекомендаций");
@@ -1982,7 +2031,7 @@ public class MainActivity extends Activity {
                 try { if(progress.isShowing()) progress.dismiss(); } catch(Exception ignored) {}
                 if(isFinishing() || isDestroyed()) return;
                 b.setEnabled(true);
-                b.setText(syncIdleLabel());
+                fitSyncButton(b,syncIdleLabel());
                 try { reload(); } catch(Exception ignored) {}
                 showSyncResult(r);
             });
