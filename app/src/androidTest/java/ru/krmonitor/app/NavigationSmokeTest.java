@@ -157,22 +157,24 @@ public class NavigationSmokeTest {
     }
 
     private static void assertSyncButtonFits(Activity activity) {
-        List<TextView> texts=new ArrayList<>();
-        collectTextViews(activity.getWindow().getDecorView(),texts);
-        TextView sync=null;
-        for(TextView tv:texts) {
-            CharSequence value=tv.getText();
-            if(value!=null && value.toString().contains("Провер")) {
-                sync=tv;
-                break;
-            }
+        View root=activity.getWindow().getDecorView();
+        View found=findByDescription(root,"Проверить обновления");
+        assertNotNull("Sync button is missing",found);
+        assertTrue("Sync action is not a TextView",found instanceof TextView);
+
+        TextView sync=(TextView)found;
+        assertFullyInsideRoot(root,sync,"Sync button is outside the visible window");
+
+        String value=sync.getText()==null?"":sync.getText().toString();
+        if(value.contains("Провер")) {
+            assertTrue("Sync label lost the full word 'Проверить': "+value,
+                    value.contains("Проверить"));
+            assertTextFits(sync,"Sync button label is clipped");
+        } else {
+            // Compact landscape is intentionally icon-only. The action remains
+            // discoverable to accessibility services via contentDescription.
+            assertEquals("Compact sync control must be icon-only","↻",value.trim());
         }
-        assertNotNull("Sync button text is missing",sync);
-        assertTrue("Sync label lost the full word 'Проверить': "+sync.getText(),
-                sync.getText().toString().contains("Проверить"));
-        assertFullyInsideRoot(activity.getWindow().getDecorView(),sync,
-                "Sync button is outside the visible window");
-        assertTextFits(sync,"Sync button label is clipped");
     }
 
     private static void assertAllVisibleTextViewsStayInsideWindow(Activity activity) {
