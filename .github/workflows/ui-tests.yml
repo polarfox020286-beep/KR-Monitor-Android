@@ -86,7 +86,7 @@ jobs:
           disable-animations: true
           emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: |
-            set -euxo pipefail
+            set -eu
 
             adb shell wm size ${{ matrix.width }}x${{ matrix.height }}
             adb shell wm density 160
@@ -113,6 +113,9 @@ jobs:
         run: |
           OUT="ui-artifacts/${{ matrix.name }}"
           mkdir -p "$OUT"
+          printf 'device=%s\nsize=%sx%s\nfont_scale=%s\n' \
+            "${{ matrix.name }}" "${{ matrix.width }}" "${{ matrix.height }}" "${{ matrix.font_scale }}" \
+            > "$OUT/configuration.txt"
           if [ -d app/build/reports/androidTests ]; then
             cp -R app/build/reports/androidTests "$OUT/test-reports"
           fi
