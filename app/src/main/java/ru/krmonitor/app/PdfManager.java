@@ -60,16 +60,46 @@ public final class PdfManager {
         }
     }
     public static void open(Context c,Recommendation r) {
-        File f=file(c,r); if(!isPdf(f)) { Toast.makeText(c,"PDF ещё не скачан",Toast.LENGTH_SHORT).show(); return; }
-        Uri uri=Uri.parse("content://ru.krmonitor.app.pdf/pdf/"+Uri.encode(f.getName()));
-        Intent i=new Intent(Intent.ACTION_VIEW).setDataAndType(uri,"application/pdf").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_ACTIVITY_NEW_TASK);
+        File f=file(c,r);
+        if(!isPdf(f)) {
+            Toast.makeText(c,"PDF ещё не скачан",Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        Intent i=new Intent(c,PdfViewerActivity.class)
+                .putExtra("base_id",r.baseId)
+                .putExtra("rec_id",r.id)
+                .putExtra("title",r.title)
+                .putExtra("filename",r.filename);
+        if(!(c instanceof android.app.Activity)) i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
         try {
             c.startActivity(i);
             DbHelper historyDb=new DbHelper(c.getApplicationContext());
             historyDb.markViewed(r.baseId);
             historyDb.close();
         } catch(Exception e) {
-            Toast.makeText(c,"На устройстве нет приложения для просмотра PDF",Toast.LENGTH_LONG).show();
+            Toast.makeText(c,"Не удалось открыть встроенный просмотрщик PDF",Toast.LENGTH_LONG).show();
+        }
+    }
+
+    public static void openExternal(Context c,Recommendation r) {
+        File f=file(c,r);
+        if(!isPdf(f)) {
+            Toast.makeText(c,"PDF ещё не скачан",Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        Uri uri=Uri.parse("content://ru.krmonitor.app.pdf/pdf/"+Uri.encode(f.getName()));
+        Intent i=new Intent(Intent.ACTION_VIEW)
+                .setDataAndType(uri,"application/pdf")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        if(!(c instanceof android.app.Activity)) i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+        try {
+            c.startActivity(Intent.createChooser(i,"Открыть PDF с помощью"));
+        } catch(Exception e) {
+            Toast.makeText(c,"На устройстве нет внешнего приложения для просмотра PDF",Toast.LENGTH_LONG).show();
         }
     }
 }
