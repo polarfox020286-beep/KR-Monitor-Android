@@ -350,6 +350,11 @@ public class DbHelper extends SQLiteOpenHelper {
         return out;
     }
 
+    public void removeFromHistory(String baseId) {
+        if(baseId==null || baseId.trim().isEmpty()) return;
+        getWritableDatabase().delete("history","base_id=?",new String[]{baseId});
+    }
+
     public void clearHistory() { getWritableDatabase().delete("history",null,null); }
 
     private Recommendation fromCursor(Cursor c) {
