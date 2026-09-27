@@ -927,8 +927,7 @@ public class MainActivity extends Activity {
     }
 
     private View makeLandscapeHistoryPage() {
-        List<Recommendation> history=db.history(200);
-        return makeListPage("История",history);
+        return makeHistoryPage();
     }
 
     private void showRecentDialog() {
@@ -1753,7 +1752,8 @@ public class MainActivity extends Activity {
     }
 
     private View makeHistoryPage() {
-        List<Recommendation> history=db.history(200);
+        final List<Recommendation> history=db.history(200);
+
         LinearLayout outer=new LinearLayout(this);
         outer.setOrientation(LinearLayout.VERTICAL);
 
@@ -1761,23 +1761,166 @@ public class MainActivity extends Activity {
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.addView(pageTitle("История"),new LinearLayout.LayoutParams(0,-2,1));
-        TextView count=text(history.size()+" КР",compactSinglePaneUi()?10:responsive(10,11,12),MUTED,false);
+
+        TextView count=text(
+                history.size()+" КР",
+                compactSinglePaneUi()?10:responsive(10,11,12),
+                MUTED,false
+        );
+        count.setPadding(dp(6),0,0,0);
         head.addView(count);
         outer.addView(head);
 
-        if(!compactSinglePaneUi()) {
-            TextView caption=text("Все клинические рекомендации, которые вы открывали",12,MUTED,false);
-            caption.setPadding(dp(2),0,dp(2),dp(6));
-            outer.addView(caption);
-        }
+        TextView caption=text(
+                "Журнал просмотренных клинических рекомендаций. Очистка истории не удаляет скачанные PDF.",
+                compactChromeUi()?10:12,MUTED,false
+        );
+        caption.setLineSpacing(dp(2),1.05f);
+        caption.setPadding(dp(2),0,dp(2),dp(7));
+        outer.addView(caption);
 
         if(history.isEmpty()) {
-            TextView empty=text("История пока пуста.",compactSinglePaneUi()?12:14,MUTED,false);
+            TextView empty=text(
+                    "История пока пуста.",
+                    compactSinglePaneUi()?12:14,
+                    MUTED,false
+            );
             empty.setGravity(Gravity.CENTER);
             empty.setPadding(dp(8),dp(compactSinglePaneUi()?12:30),dp(8),dp(8));
             outer.addView(empty);
-        } else addRecommendationList(outer,history);
+            return outer;
+        }
+
+        TextView clearAll=dialogAction("Очистить всю историю",false);
+        clearAll.setGravity(Gravity.CENTER);
+        clearAll.setTextColor(Color.rgb(178,52,52));
+        clearAll.setContentDescription("Очистить всю историю");
+        clearAll.setOnClickListener(v -> confirmClearHistory(history.size()));
+        LinearLayout.LayoutParams clearLp=new LinearLayout.LayoutParams(-1,-2);
+        clearLp.setMargins(0,0,0,dp(5));
+        outer.addView(clearAll,clearLp);
+
+        final Set<String> favoriteIds=new LinkedHashSet<>(db.favoriteBaseIds());
+
+        ListView list=new ListView(this);
+        list.setDivider(null);
+        list.setDividerHeight(0);
+        list.setBackgroundColor(Color.TRANSPARENT);
+        list.setClipToPadding(false);
+        list.setPadding(0,0,0,dp(8));
+
+        list.setAdapter(new BaseAdapter(){
+            @Override public int getCount(){ return history.size(); }
+            @Override public Object getItem(int p){ return history.get(p); }
+            @Override public long getItemId(int p){ return p; }
+
+            @Override public View getView(int p,View convert,ViewGroup parent){
+                Recommendation r=history.get(p);
+
+                LinearLayout wrap=new LinearLayout(MainActivity.this);
+                wrap.setPadding(0,dp(3),0,dp(3));
+
+                LinearLayout row=new LinearLayout(MainActivity.this);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                row.setGravity(Gravity.CENTER_VERTICAL);
+
+                boolean dense=useTwoPaneUi() || compactSinglePaneUi();
+                int hPad=dense?(lowHeightUi()?7:9):responsive(9,12,14);
+                int vPad=dense?(lowHeightUi()?5:7):responsive(8,10,11);
+                row.setPadding(dp(hPad),dp(vPad),dp(hPad),dp(vPad));
+                row.setBackground(rounded(CARD,LINE,14));
+
+                LinearLayout labels=new LinearLayout(MainActivity.this);
+                labels.setOrientation(LinearLayout.VERTICAL);
+
+                TextView title=text(
+                        (favoriteIds.contains(r.baseId)?"★  ":"")+r.title,
+                        dense?(lowHeightUi()?12:13):responsive(13,14,15),
+                        TEXT,false
+                );
+                title.setMaxLines(largeFontUi()?(dense?3:5):(dense?2:3));
+                title.setEllipsize(TextUtils.TruncateAt.END);
+                labels.addView(title);
+
+                boolean downloaded=PdfManager.isPdf(PdfManager.file(MainActivity.this,r));
+                String metaText="КР "+r.id+(downloaded?"  •  PDF скачан":"");
+                TextView meta=text(
+                        metaText,
+                        dense?10:responsive(10,11,12),
+                        MUTED,false
+                );
+                meta.setPadding(0,dp(dense?2:4),0,0);
+                labels.addView(meta);
+
+                row.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
+
+                TextView remove=text(
+                        "Удалить",
+                        dense?9:10,
+                        Color.rgb(178,52,52),
+                        true
+                );
+                remove.setGravity(Gravity.CENTER);
+                remove.setPadding(dp(7),dp(7),dp(7),dp(7));
+                remove.setBackground(rounded(CARD,LINE,11));
+                remove.setClickable(true);
+                remove.setFocusable(false);
+                remove.setContentDescription("Удалить из истории "+r.title);
+                remove.setOnClickListener(v -> confirmRemoveHistoryItem(r));
+
+                LinearLayout.LayoutParams removeLp=new LinearLayout.LayoutParams(-2,-2);
+                removeLp.setMargins(dp(8),0,0,0);
+                row.addView(remove,removeLp);
+
+                wrap.addView(row,new LinearLayout.LayoutParams(-1,-2));
+                return wrap;
+            }
+        });
+
+        list.setOnItemClickListener((p,v,pos,id) -> downloadOrOpen(history.get(pos)));
+        outer.addView(list,new LinearLayout.LayoutParams(-1,0,1));
         return outer;
+    }
+
+    private void confirmRemoveHistoryItem(Recommendation r) {
+        boolean downloaded=PdfManager.isPdf(PdfManager.file(this,r));
+        StringBuilder message=new StringBuilder();
+        message.append("Удалить «").append(r.title).append("» только из истории просмотра?");
+        if(downloaded) {
+            message.append("\n\nСкачанный PDF останется на устройстве.");
+        }
+        message.append("\nИзбранное и сама клиническая рекомендация также сохранятся.");
+
+        AlertDialog dialog=new AlertDialog.Builder(this)
+                .setTitle("Удалить из истории?")
+                .setMessage(message.toString())
+                .setNegativeButton("Отмена",null)
+                .setPositiveButton("Удалить",(d,w) -> {
+                    db.removeFromHistory(r.baseId);
+                    Toast.makeText(this,"Удалено из истории",Toast.LENGTH_SHORT).show();
+                    renderCurrentPage(0);
+                })
+                .create();
+        dialog.setOnShowListener(d -> applyAdaptiveAlertWindow(dialog));
+        dialog.show();
+    }
+
+    private void confirmClearHistory(int count) {
+        AlertDialog dialog=new AlertDialog.Builder(this)
+                .setTitle("Очистить всю историю?")
+                .setMessage(
+                        "Будут удалены записи истории просмотра: "+count+
+                        ".\n\nСкачанные PDF, избранное, профили и каталог КР останутся без изменений."
+                )
+                .setNegativeButton("Отмена",null)
+                .setPositiveButton("Очистить",(d,w) -> {
+                    db.clearHistory();
+                    Toast.makeText(this,"История очищена. PDF сохранены.",Toast.LENGTH_LONG).show();
+                    renderCurrentPage(0);
+                })
+                .create();
+        dialog.setOnShowListener(d -> applyAdaptiveAlertWindow(dialog));
+        dialog.show();
     }
 
     private View makeFavoritesPage() {
