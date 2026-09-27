@@ -9,6 +9,7 @@ import android.net.Uri;
 import android.os.*;
 import android.text.InputType;
 import android.view.*;
+import android.util.TypedValue;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.*;
@@ -67,6 +68,45 @@ public class PdfViewerActivity extends Activity {
     private String recId="";
 
     private int dp(int v){ return (int)(v*getResources().getDisplayMetrics().density+0.5f); }
+
+    private int screenWidthDp() {
+        int value=getResources().getConfiguration().screenWidthDp;
+        if(value>0) return value;
+        return Math.round(getResources().getDisplayMetrics().widthPixels/getResources().getDisplayMetrics().density);
+    }
+
+    private int screenHeightDp() {
+        int value=getResources().getConfiguration().screenHeightDp;
+        if(value>0) return value;
+        return Math.round(getResources().getDisplayMetrics().heightPixels/getResources().getDisplayMetrics().density);
+    }
+
+    private float systemFontScale(){ return getResources().getConfiguration().fontScale; }
+    private boolean compactReaderUi(){ return screenWidthDp()<360 || screenHeightDp()<480; }
+    private int readerControlDp(){ return compactReaderUi()?40:44; }
+
+    private void applyReaderAlertWindow(AlertDialog dialog) {
+        Window w=dialog.getWindow();
+        if(w==null) return;
+
+        int margin=screenWidthDp()<360?24:40;
+        int widthDp=Math.min(Math.max(260,screenWidthDp()-margin),380);
+        final int width=dp(widthDp);
+        w.setLayout(width,WindowManager.LayoutParams.WRAP_CONTENT);
+        w.setGravity(Gravity.CENTER);
+
+        View decor=w.getDecorView();
+        decor.post(() -> {
+            if(dialog.getWindow()==null) return;
+            int capDp=Math.max(220,Math.min(520,Math.round(screenHeightDp()*(screenHeightDp()<480?0.88f:0.78f))));
+            int cap=dp(capDp);
+            dialog.getWindow().setLayout(
+                    width,
+                    decor.getHeight()>cap?cap:WindowManager.LayoutParams.WRAP_CONTENT
+            );
+            dialog.getWindow().setGravity(Gravity.CENTER);
+        });
+    }
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -145,19 +185,26 @@ public class PdfViewerActivity extends Activity {
         LinearLayout toolbar=new LinearLayout(this);
         toolbar.setOrientation(LinearLayout.HORIZONTAL);
         toolbar.setGravity(Gravity.CENTER_VERTICAL);
-        toolbar.setPadding(dp(6),dp(5),dp(6),dp(5));
+        toolbar.setPadding(dp(compactReaderUi()?4:6),dp(compactReaderUi()?3:5),
+                dp(compactReaderUi()?4:6),dp(compactReaderUi()?3:5));
         toolbar.setBackgroundColor(CARD);
 
         TextView back=action("‹",28,false);
+        back.setTextSize(TypedValue.COMPLEX_UNIT_DIP,compactReaderUi()?25:28);
         back.setContentDescription("Назад");
         back.setOnClickListener(v -> finish());
-        toolbar.addView(back,new LinearLayout.LayoutParams(dp(44),dp(44)));
+        toolbar.addView(back,new LinearLayout.LayoutParams(dp(readerControlDp()),dp(readerControlDp())));
 
         LinearLayout titles=new LinearLayout(this);
         titles.setOrientation(LinearLayout.VERTICAL);
         TextView mainTitle=text(title.isEmpty()?"Клиническая рекомендация":title,15,TEXT,true);
         mainTitle.setSingleLine(true);
         mainTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        if(Build.VERSION.SDK_INT>=26) {
+            mainTitle.setAutoSizeTextTypeUniformWithConfiguration(
+                    compactReaderUi()?10:11,15,1,TypedValue.COMPLEX_UNIT_SP
+            );
+        }
         TextView sub=text(recId.isEmpty()?"PDF":"КР "+recId,10,MUTED,false);
         sub.setPadding(0,dp(1),0,0);
         titles.addView(mainTitle);
@@ -167,20 +214,23 @@ public class PdfViewerActivity extends Activity {
         toolbar.addView(titles,titleLp);
 
         favoriteButton=action("☆",24,false);
+        favoriteButton.setTextSize(TypedValue.COMPLEX_UNIT_DIP,compactReaderUi()?21:24);
         favoriteButton.setContentDescription("Добавить в избранное");
         favoriteButton.setOnClickListener(v -> toggleFavorite());
-        toolbar.addView(favoriteButton,new LinearLayout.LayoutParams(dp(44),dp(44)));
+        toolbar.addView(favoriteButton,new LinearLayout.LayoutParams(dp(readerControlDp()),dp(readerControlDp())));
         refreshFavoriteButton();
 
         TextView find=action("⌕",23,false);
+        find.setTextSize(TypedValue.COMPLEX_UNIT_DIP,compactReaderUi()?20:23);
         find.setContentDescription("Поиск по тексту");
         find.setOnClickListener(v -> toggleSearch(true));
-        toolbar.addView(find,new LinearLayout.LayoutParams(dp(44),dp(44)));
+        toolbar.addView(find,new LinearLayout.LayoutParams(dp(readerControlDp()),dp(readerControlDp())));
 
         TextView more=action("⋮",24,false);
+        more.setTextSize(TypedValue.COMPLEX_UNIT_DIP,compactReaderUi()?21:24);
         more.setContentDescription("Дополнительные действия");
         more.setOnClickListener(this::showMenu);
-        toolbar.addView(more,new LinearLayout.LayoutParams(dp(44),dp(44)));
+        toolbar.addView(more,new LinearLayout.LayoutParams(dp(readerControlDp()),dp(readerControlDp())));
 
         root.addView(toolbar,new LinearLayout.LayoutParams(-1,-2));
 
@@ -216,9 +266,11 @@ public class PdfViewerActivity extends Activity {
         bottom.setBackgroundColor(CARD);
 
         TextView prev=action("‹",28,false);
+        prev.setTextSize(TypedValue.COMPLEX_UNIT_DIP,compactReaderUi()?25:28);
         prev.setContentDescription("Предыдущая страница");
         prev.setOnClickListener(v -> goToPage(currentPage-1));
-        bottom.addView(prev,new LinearLayout.LayoutParams(dp(52),dp(46)));
+        prev.setMinHeight(dp(46));
+        bottom.addView(prev,new LinearLayout.LayoutParams(dp(compactReaderUi()?46:52),-2));
 
         pageLabel=text("— / —",13,TEXT,true);
         pageLabel.setGravity(Gravity.CENTER);
@@ -227,14 +279,22 @@ public class PdfViewerActivity extends Activity {
         pageLabel.setContentDescription("Выбрать страницу");
         pageLabel.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,12));
         pageLabel.setOnClickListener(v -> showPagePicker());
-        LinearLayout.LayoutParams pageLp=new LinearLayout.LayoutParams(0,dp(40),1);
-        pageLp.setMargins(dp(8),dp(3),dp(8),dp(3));
+        pageLabel.setMinHeight(dp(40));
+        if(Build.VERSION.SDK_INT>=26) {
+            pageLabel.setAutoSizeTextTypeUniformWithConfiguration(
+                    10,13,1,TypedValue.COMPLEX_UNIT_SP
+            );
+        }
+        LinearLayout.LayoutParams pageLp=new LinearLayout.LayoutParams(0,-2,1);
+        pageLp.setMargins(dp(compactReaderUi()?4:8),dp(3),dp(compactReaderUi()?4:8),dp(3));
         bottom.addView(pageLabel,pageLp);
 
         TextView next=action("›",28,false);
+        next.setTextSize(TypedValue.COMPLEX_UNIT_DIP,compactReaderUi()?25:28);
         next.setContentDescription("Следующая страница");
         next.setOnClickListener(v -> goToPage(currentPage+1));
-        bottom.addView(next,new LinearLayout.LayoutParams(dp(52),dp(46)));
+        next.setMinHeight(dp(46));
+        bottom.addView(next,new LinearLayout.LayoutParams(dp(compactReaderUi()?46:52),-2));
 
         root.addView(bottom,new LinearLayout.LayoutParams(-1,-2));
 
@@ -262,16 +322,20 @@ public class PdfViewerActivity extends Activity {
         searchInput.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
         searchInput.setPadding(dp(11),0,dp(11),0);
         searchInput.setBackground(rounded(CARD,LINE,12));
-        first.addView(searchInput,new LinearLayout.LayoutParams(0,dp(42),1));
+        searchInput.setMinHeight(dp(42));
+        first.addView(searchInput,new LinearLayout.LayoutParams(0,-2,1));
 
         TextView run=action("Найти",12,true);
-        LinearLayout.LayoutParams runLp=new LinearLayout.LayoutParams(-2,dp(42));
+        run.setMinHeight(dp(42));
+        LinearLayout.LayoutParams runLp=new LinearLayout.LayoutParams(-2,-2);
         runLp.setMargins(dp(6),0,0,0);
         first.addView(run,runLp);
 
         TextView close=action("×",24,false);
+        close.setTextSize(TypedValue.COMPLEX_UNIT_DIP,22);
         close.setContentDescription("Закрыть поиск");
-        LinearLayout.LayoutParams closeLp=new LinearLayout.LayoutParams(dp(42),dp(42));
+        close.setMinHeight(dp(42));
+        LinearLayout.LayoutParams closeLp=new LinearLayout.LayoutParams(dp(42),-2);
         closeLp.setMargins(dp(3),0,0,0);
         first.addView(close,closeLp);
 
@@ -286,17 +350,22 @@ public class PdfViewerActivity extends Activity {
         searchStatus=text("Введите текст для поиска",11,MUTED,false);
         searchStatus.setSingleLine(true);
         searchStatus.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        second.addView(searchStatus,new LinearLayout.LayoutParams(0,dp(34),1));
+        searchStatus.setMinHeight(dp(34));
+        second.addView(searchStatus,new LinearLayout.LayoutParams(0,-2,1));
 
         previousMatch=action("‹",24,false);
+        previousMatch.setTextSize(TypedValue.COMPLEX_UNIT_DIP,22);
         previousMatch.setContentDescription("Предыдущее совпадение");
         previousMatch.setEnabled(false);
-        second.addView(previousMatch,new LinearLayout.LayoutParams(dp(42),dp(34)));
+        previousMatch.setMinHeight(dp(34));
+        second.addView(previousMatch,new LinearLayout.LayoutParams(dp(42),-2));
 
         nextMatch=action("›",24,false);
+        nextMatch.setTextSize(TypedValue.COMPLEX_UNIT_DIP,22);
         nextMatch.setContentDescription("Следующее совпадение");
         nextMatch.setEnabled(false);
-        second.addView(nextMatch,new LinearLayout.LayoutParams(dp(42),dp(34)));
+        nextMatch.setMinHeight(dp(34));
+        second.addView(nextMatch,new LinearLayout.LayoutParams(dp(42),-2));
 
         panel.addView(second,secondLp);
 
@@ -729,6 +798,7 @@ public class PdfViewerActivity extends Activity {
                 .create();
 
         dialog.setOnShowListener(d -> {
+            applyReaderAlertWindow(dialog);
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
                 String raw=input.getText().toString().trim();
                 int page;
