@@ -1,9 +1,10 @@
 name: Build APK
 
 on:
+  # Signed GitHub release builds are manual until persistent signing
+  # secrets are configured in the repository. Routine pushes use the
+  # unsigned export workflow plus local release signing.
   workflow_dispatch:
-  push:
-    branches: [ main ]
 
 jobs:
   build:
