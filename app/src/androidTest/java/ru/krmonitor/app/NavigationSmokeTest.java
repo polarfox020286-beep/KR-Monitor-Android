@@ -91,8 +91,21 @@ public class NavigationSmokeTest {
         waitForText("Избранное");
         screenshot("03_favorites");
 
+        DbHelper historyDb=new DbHelper(targetContext);
+        List<Recommendation> available=historyDb.all();
+        if(!available.isEmpty()) historyDb.markViewed(available.get(0).baseId);
+        historyDb.close();
+
         navigateTo("История");
         waitForText("История");
+        assertNotNull(
+                "Clear-history action is missing",
+                device.wait(Until.findObject(By.desc("Очистить всю историю")),TIMEOUT)
+        );
+        assertNotNull(
+                "Per-item history delete action is missing",
+                device.wait(Until.findObject(By.text("Удалить")),TIMEOUT)
+        );
         screenshot("04_history");
 
         // Return to the profile area. Phones use the persistent bottom bar;
