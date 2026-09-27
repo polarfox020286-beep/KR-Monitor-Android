@@ -10,6 +10,7 @@ on:
       - 'app/build.gradle'
       - 'build.gradle'
       - 'settings.gradle'
+      - 'gradle.properties'
       - '.github/workflows/ui-tests.yml'
 
 concurrency:
