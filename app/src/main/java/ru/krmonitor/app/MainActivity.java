@@ -8,8 +8,6 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.*;
-import android.provider.Settings;
-import android.net.Uri;
 import android.text.*;
 import android.view.*;
 import android.view.animation.TranslateAnimation;
@@ -63,7 +61,6 @@ public class MainActivity extends Activity {
         try { SeedImporter.ensureSeeded(this); } catch(Exception e) { Toast.makeText(this,"Ошибка исходного реестра: "+e.getMessage(),Toast.LENGTH_LONG).show(); }
         AlarmScheduler.scheduleNext(this);
         requestNotifyPermission();
-        requestExactAlarmPermission();
         buildUi();
         reload();
         if(b==null) runStartupSyncSilently();
@@ -2251,20 +2248,6 @@ public class MainActivity extends Activity {
             return nm==null || nm.areNotificationsEnabled();
         }
         return true;
-    }
-
-    private void requestExactAlarmPermission() {
-        if(Build.VERSION.SDK_INT>=31) {
-            android.app.AlarmManager am=(android.app.AlarmManager)getSystemService(ALARM_SERVICE);
-            boolean prompted=getSharedPreferences("prefs",MODE_PRIVATE).getBoolean("exact_prompted",false);
-            if(!am.canScheduleExactAlarms() && !prompted) {
-                getSharedPreferences("prefs",MODE_PRIVATE).edit().putBoolean("exact_prompted",true).apply();
-                try {
-                    Intent i=new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:"+getPackageName()));
-                    startActivity(i);
-                } catch(Exception ignored) {}
-            }
-        }
     }
 
     private void requestNotifyPermission() {
