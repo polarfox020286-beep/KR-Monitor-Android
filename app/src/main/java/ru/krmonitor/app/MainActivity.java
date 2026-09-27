@@ -31,6 +31,7 @@ public class MainActivity extends Activity {
     private EditText search;
     private FrameLayout contentHost;
     private LinearLayout landscapeSidebar;
+    private LinearLayout bottomNav;
     private List<Recommendation> all=new ArrayList<>();
 
     private static final int PAGE_ALL=0;
@@ -193,6 +194,70 @@ public class MainActivity extends Activity {
         return info;
     }
 
+    private LinearLayout buildBottomNavigation() {
+        LinearLayout bar=new LinearLayout(this);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(Gravity.CENTER);
+        int height=lowHeightUi()?48:58;
+        bar.setPadding(dp(3),dp(3),dp(3),dp(3));
+        bar.setBackground(rounded(CARD,LINE,16));
+        bottomNav=bar;
+        refreshBottomNavigation();
+        bar.setMinimumHeight(dp(height));
+        return bar;
+    }
+
+    private void refreshBottomNavigation() {
+        if(bottomNav==null) return;
+        bottomNav.removeAllViews();
+
+        bottomNav.addView(bottomNavItem("▤","Все КР",PAGE_ALL,currentPage==PAGE_ALL),
+                new LinearLayout.LayoutParams(0,-1,1));
+        bottomNav.addView(bottomNavItem("▦","Профили",PAGE_PROFILES,currentPage==PAGE_PROFILES),
+                new LinearLayout.LayoutParams(0,-1,1));
+        bottomNav.addView(bottomNavItem("★","Избранное",PAGE_FAVORITES,currentPage==PAGE_FAVORITES),
+                new LinearLayout.LayoutParams(0,-1,1));
+        bottomNav.addView(bottomNavItem("◷","История",PAGE_HISTORY,currentPage==PAGE_HISTORY),
+                new LinearLayout.LayoutParams(0,-1,1));
+    }
+
+    private View bottomNavItem(String icon,String label,int page,boolean selected) {
+        LinearLayout item=new LinearLayout(this);
+        item.setOrientation(LinearLayout.VERTICAL);
+        item.setGravity(Gravity.CENTER);
+        item.setPadding(dp(3),dp(lowHeightUi()?2:4),dp(3),dp(lowHeightUi()?2:4));
+        item.setBackground(rounded(selected?BLUE_SOFT:Color.TRANSPARENT,Color.TRANSPARENT,12));
+        item.setClickable(true);
+        item.setFocusable(true);
+        item.setContentDescription(label);
+        item.setOnClickListener(v -> navigateBottom(page));
+
+        TextView iconView=text(icon,lowHeightUi()?15:18,selected?BLUE:MUTED,selected);
+        iconView.setGravity(Gravity.CENTER);
+        iconView.setIncludeFontPadding(false);
+        item.addView(iconView,new LinearLayout.LayoutParams(-1,-2));
+
+        TextView labelView=text(label,lowHeightUi()?8:10,selected?BLUE:MUTED,selected);
+        labelView.setGravity(Gravity.CENTER);
+        labelView.setSingleLine(true);
+        labelView.setIncludeFontPadding(false);
+        LinearLayout.LayoutParams labelLp=new LinearLayout.LayoutParams(-1,-2);
+        labelLp.setMargins(0,dp(2),0,0);
+        item.addView(labelView,labelLp);
+        return item;
+    }
+
+    private void navigateBottom(int page) {
+        selectedProfile=null;
+        currentPage=page;
+
+        if(search!=null && search.getText()!=null && search.getText().length()>0) {
+            search.setText("");
+        } else {
+            renderCurrentPage(0);
+        }
+    }
+
     private void buildUi() {
         if(useTwoPaneUi()) {
             buildAdaptiveTwoPaneUi();
@@ -309,6 +374,12 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams contentLp=new LinearLayout.LayoutParams(-1,0,1);
         contentLp.setMargins(0,dp(6),0,0);
         root.addView(contentHost,contentLp);
+
+        LinearLayout nav=buildBottomNavigation();
+        LinearLayout.LayoutParams navLp=new LinearLayout.LayoutParams(-1,dp(58));
+        navLp.setMargins(0,dp(5),0,0);
+        root.addView(nav,navLp);
+
         setContentView(shell);
         if(Build.VERSION.SDK_INT>=30) shell.requestApplyInsets();
 
@@ -555,6 +626,11 @@ public class MainActivity extends Activity {
         contentLp.setMargins(0,dp(3),0,0);
         root.addView(contentHost,contentLp);
 
+        LinearLayout nav=buildBottomNavigation();
+        LinearLayout.LayoutParams navLp=new LinearLayout.LayoutParams(-1,dp(48));
+        navLp.setMargins(0,dp(3),0,0);
+        root.addView(nav,navLp);
+
         setContentView(shell);
         if(Build.VERSION.SDK_INT>=30) shell.requestApplyInsets();
 
@@ -706,21 +782,9 @@ public class MainActivity extends Activity {
     }
 
     @Override public boolean dispatchTouchEvent(android.view.MotionEvent e) {
-        if(useTwoPaneUi()) return super.dispatchTouchEvent(e);
-        if(contentHost!=null) {
-            int action=e.getActionMasked();
-            if(action==android.view.MotionEvent.ACTION_DOWN) {
-                swipeTracking=e.getY()>=contentHost.getTop();
-                swipeX=e.getX(); swipeY=e.getY();
-            } else if(action==android.view.MotionEvent.ACTION_UP && swipeTracking) {
-                float dx=e.getX()-swipeX, dy=e.getY()-swipeY;
-                swipeTracking=false;
-                if(search.getText().toString().trim().isEmpty() && Math.abs(dx)>dp(90) && Math.abs(dx)>Math.abs(dy)*1.35f) {
-                    if(dx>0) swipeRight(); else swipeLeft();
-                    return true;
-                }
-            }
-        }
+        // Navigation between main sections is now explicit through the
+        // persistent bottom bar. Horizontal swipes remain available to
+        // child controls but no longer change the current app section.
         return super.dispatchTouchEvent(e);
     }
 
@@ -806,6 +870,7 @@ public class MainActivity extends Activity {
     private void renderCurrentPage(int direction) {
         if(contentHost==null) return;
         searchShowsMkb=false;
+        refreshBottomNavigation();
 
         if(useTwoPaneUi()) {
             refreshLandscapeSidebar();
