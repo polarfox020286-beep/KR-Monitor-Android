@@ -600,6 +600,7 @@ public class MainActivity extends Activity {
         sync.setFocusable(true);
         sync.setMinHeight(dp(low?34:40));
         header.addView(sync,new LinearLayout.LayoutParams(-2,-2));
+        fitSyncButton(sync,low?"↻":"↻  Проверить");
         root.addView(header,new LinearLayout.LayoutParams(-1,-2));
 
         LinearLayout body=new LinearLayout(this);
@@ -728,6 +729,7 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams syncLp=new LinearLayout.LayoutParams(-2,-2);
         syncLp.setMargins(dp(6),0,0,0);
         header.addView(sync,syncLp);
+        fitSyncButton(sync,"↻");
         root.addView(header,new LinearLayout.LayoutParams(-1,-2));
 
         recentList=text("",10,TEXT,false);
