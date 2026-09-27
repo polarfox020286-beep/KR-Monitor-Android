@@ -1,0 +1,291 @@
+name: UI Quality Checks
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ui-extended-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    name: Select UI test matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - id: matrix
+        shell: bash
+        run: |
+          FAST='{"include":[
+            {"name":"phone-360x800-font160","width":360,"height":800,"font_scale":"1.6"},
+            {"name":"phone-393x873-font100","width":393,"height":873,"font_scale":"1.0"},
+            {"name":"landscape-800x400-font100","width":800,"height":400,"font_scale":"1.0"}
+          ]}'
+
+          EXTENDED='{"include":[
+            {"name":"phone-360x800-font160","width":360,"height":800,"font_scale":"1.6"},
+            {"name":"phone-393x873-font100","width":393,"height":873,"font_scale":"1.0"},
+            {"name":"landscape-800x400-font100","width":800,"height":400,"font_scale":"1.0"},
+            {"name":"phone-320x700-font100","width":320,"height":700,"font_scale":"1.0"},
+            {"name":"phone-430x932-font130","width":430,"height":932,"font_scale":"1.3"},
+            {"name":"tablet-800x1280-font100","width":800,"height":1280,"font_scale":"1.0"}
+          ]}'
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.suite }}" == "extended" ]]; then
+            MATRIX="$EXTENDED"
+          else
+            MATRIX="$FAST"
+          fi
+
+          echo "matrix=$(echo "$MATRIX" | tr -d '\n ')" >> "$GITHUB_OUTPUT"
+
+  ui-smoke:
+    name: ${{ matrix.name }}
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Prepare local catalog
+        run: |
+          mkdir -p app/src/main/assets
+          test -s data/catalog.json
+          cp data/catalog.json app/src/main/assets/seed_catalog.json
+
+      - name: Assemble launcher icon
+        run: |
+          mkdir -p app/src/main/res/mipmap-xxxhdpi
+          cat .github/icon-parts-valid/01.txt .github/icon-parts-valid/02.txt .github/icon-parts-valid/03.txt .github/icon-parts-valid/04.txt | tr -d '\n\r ' | base64 -d > app/src/main/res/mipmap-xxxhdpi/kr_launcher.png
+          echo 'e5f879c76f6511515b6c550feac54a0dee4de2ef99ad75108066f2de7a83566a  app/src/main/res/mipmap-xxxhdpi/kr_launcher.png' | sha256sum -c -
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run UI smoke test on ${{ matrix.name }}
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: |
+            set -eu
+
+            adb shell wm size ${{ matrix.width }}x${{ matrix.height }}
+            adb shell wm density 160
+            adb shell settings put system font_scale ${{ matrix.font_scale }}
+            sleep 2
+
+            echo "=== Effective display ==="
+            adb shell wm size
+            adb shell wm density
+            adb shell settings get system font_scale
+
+            gradle :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            adb shell am instrument -w -r -e class ru.krmonitor.app.NavigationSmokeTest ru.krmonitor.app.test/androidx.test.runner.AndroidJUnitRunner
+
+            mkdir -p "$GITHUB_WORKSPACE/ui-artifacts/${{ matrix.name }}"
+
+            adb pull /sdcard/Android/data/ru.krmonitor.app/files/ui-screenshots "$GITHUB_WORKSPACE/ui-artifacts/${{ matrix.name }}/screenshots" || true
+            adb exec-out screencap -p > "$GITHUB_WORKSPACE/ui-artifacts/${{ matrix.name }}/final-screen.png" || true
+            adb shell uiautomator dump /sdcard/window.xml || true
+            adb pull /sdcard/window.xml "$GITHUB_WORKSPACE/ui-artifacts/${{ matrix.name }}/window.xml" || true
+
+      - name: Collect Android test reports
+        if: always()
+        run: |
+          OUT="ui-artifacts/${{ matrix.name }}"
+          mkdir -p "$OUT"
+          printf 'device=%s\nsize=%sx%s\nfont_scale=%s\n' \
+            "${{ matrix.name }}" "${{ matrix.width }}" "${{ matrix.height }}" "${{ matrix.font_scale }}" \
+            > "$OUT/configuration.txt"
+          if [ -d app/build/reports/androidTests ]; then
+            cp -R app/build/reports/androidTests "$OUT/test-reports"
+          fi
+          if [ -d app/build/outputs/androidTest-results ]; then
+            cp -R app/build/outputs/androidTest-results "$OUT/test-results"
+          fi
+
+      - name: Upload UI screenshots and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-${{ matrix.name }}
+          path: ui-artifacts/${{ matrix.name }}
+          if-no-files-found: warn
+          retention-days: 14      matrix:
+        include:
+          - name: stress-320x700-font100
+            width: 320
+            height: 700
+            font_scale: '1.0'
+          - name: phone-384x824-font100
+            width: 384
+            height: 824
+            font_scale: '1.0'
+          - name: phone-393x873-font100
+            width: 393
+            height: 873
+            font_scale: '1.0'
+          - name: phone-430x932-font130
+            width: 430
+            height: 932
+            font_scale: '1.3'
+          - name: landscape-900x400-font130
+            width: 900
+            height: 400
+            font_scale: '1.3'
+          - name: tablet-800x1280-font100
+            width: 800
+            height: 1280
+            font_scale: '1.0'
+          - name: tablet-landscape-1280x800-font100
+            width: 1280
+            height: 800
+            font_scale: '1.0'
+
+    steps:
+      - id: matrix
+        shell: bash
+        run: |
+          FAST='{"include":[
+            {"name":"phone-360x800-font160","width":360,"height":800,"font_scale":"1.6"},
+            {"name":"phone-393x873-font100","width":393,"height":873,"font_scale":"1.0"},
+            {"name":"landscape-800x400-font100","width":800,"height":400,"font_scale":"1.0"}
+          ]}'
+
+          EXTENDED='{"include":[
+            {"name":"phone-360x800-font160","width":360,"height":800,"font_scale":"1.6"},
+            {"name":"phone-393x873-font100","width":393,"height":873,"font_scale":"1.0"},
+            {"name":"landscape-800x400-font100","width":800,"height":400,"font_scale":"1.0"},
+            {"name":"phone-320x700-font100","width":320,"height":700,"font_scale":"1.0"},
+            {"name":"phone-430x932-font130","width":430,"height":932,"font_scale":"1.3"},
+            {"name":"tablet-800x1280-font100","width":800,"height":1280,"font_scale":"1.0"}
+          ]}'
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.suite }}" == "extended" ]]; then
+            MATRIX="$EXTENDED"
+          else
+            MATRIX="$FAST"
+          fi
+
+          echo "matrix=$(echo "$MATRIX" | tr -d '\n ')" >> "$GITHUB_OUTPUT"
+
+  ui-smoke:
+    name: ${{ matrix.name }}
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Prepare local catalog
+        run: |
+          mkdir -p app/src/main/assets
+          test -s data/catalog.json
+          cp data/catalog.json app/src/main/assets/seed_catalog.json
+
+      - name: Assemble launcher icon
+        run: |
+          mkdir -p app/src/main/res/mipmap-xxxhdpi
+          cat .github/icon-parts-valid/01.txt .github/icon-parts-valid/02.txt .github/icon-parts-valid/03.txt .github/icon-parts-valid/04.txt | tr -d '\n\r ' | base64 -d > app/src/main/res/mipmap-xxxhdpi/kr_launcher.png
+          echo 'e5f879c76f6511515b6c550feac54a0dee4de2ef99ad75108066f2de7a83566a  app/src/main/res/mipmap-xxxhdpi/kr_launcher.png' | sha256sum -c -
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run UI smoke test on ${{ matrix.name }}
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: |
+            set -eu
+
+            adb shell wm size ${{ matrix.width }}x${{ matrix.height }}
+            adb shell wm density 160
+            adb shell settings put system font_scale ${{ matrix.font_scale }}
+            sleep 2
+
+            echo "=== Effective display ==="
+            adb shell wm size
+            adb shell wm density
+            adb shell settings get system font_scale
+
+            gradle :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            adb shell am instrument -w -r -e class ru.krmonitor.app.NavigationSmokeTest ru.krmonitor.app.test/androidx.test.runner.AndroidJUnitRunner
+
+            mkdir -p "$GITHUB_WORKSPACE/ui-artifacts/${{ matrix.name }}"
+
+            adb pull /sdcard/Android/data/ru.krmonitor.app/files/ui-screenshots "$GITHUB_WORKSPACE/ui-artifacts/${{ matrix.name }}/screenshots" || true
+            adb exec-out screencap -p > "$GITHUB_WORKSPACE/ui-artifacts/${{ matrix.name }}/final-screen.png" || true
+            adb shell uiautomator dump /sdcard/window.xml || true
+            adb pull /sdcard/window.xml "$GITHUB_WORKSPACE/ui-artifacts/${{ matrix.name }}/window.xml" || true
+
+      - name: Collect Android test reports
+        if: always()
+        run: |
+          OUT="ui-artifacts/${{ matrix.name }}"
+          mkdir -p "$OUT"
+          printf 'device=%s\nsize=%sx%s\nfont_scale=%s\n' \
+            "${{ matrix.name }}" "${{ matrix.width }}" "${{ matrix.height }}" "${{ matrix.font_scale }}" \
+            > "$OUT/configuration.txt"
+          if [ -d app/build/reports/androidTests ]; then
+            cp -R app/build/reports/androidTests "$OUT/test-reports"
+          fi
+          if [ -d app/build/outputs/androidTest-results ]; then
+            cp -R app/build/outputs/androidTest-results "$OUT/test-results"
+          fi
+
+      - name: Upload UI screenshots and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-${{ matrix.name }}
+          path: ui-artifacts/${{ matrix.name }}
+          if-no-files-found: warn
+          retention-days: 14
