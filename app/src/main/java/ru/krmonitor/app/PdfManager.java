@@ -20,6 +20,16 @@ public final class PdfManager {
         File d=new File(root,"KR_Monitor/Archive"); d.mkdirs(); return d;
     }
     public static File file(Context c,Recommendation r) { return new File(pdfDir(c),r.filename); }
+    public static long sizeBytes(Context c,Recommendation r) {
+        File f=file(c,r);
+        return isPdf(f)?f.length():0L;
+    }
+    public static boolean delete(Context c,Recommendation r) {
+        File f=file(c,r);
+        File part=new File(f.getAbsolutePath()+".part");
+        if(part.exists()) part.delete();
+        return !f.exists() || f.delete();
+    }
     public static boolean isPdf(File f) {
         if(!f.isFile()||f.length()<1024) return false;
         try(FileInputStream in=new FileInputStream(f)) { byte[] b=new byte[5]; return in.read(b)==5 && new String(b,"US-ASCII").equals("%PDF-"); }
