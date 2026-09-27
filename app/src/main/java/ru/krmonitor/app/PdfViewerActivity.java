@@ -16,6 +16,7 @@ import android.widget.*;
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader;
 import com.tom_roush.pdfbox.pdmodel.PDDocument;
 import com.tom_roush.pdfbox.text.PDFTextStripper;
+import com.tom_roush.pdfbox.text.TextPosition;
 
 import java.io.*;
 import java.util.*;
@@ -56,6 +57,8 @@ public class PdfViewerActivity extends Activity {
     private int searchIndex=-1;
     private volatile List<String> pageTexts=null;
     private volatile boolean indexingText=false;
+    private volatile String activeSearchQuery="";
+    private final Map<String,List<RectF>> highlightCache=new ConcurrentHashMap<>();
 
     private String baseId="";
     private String title="";
@@ -316,6 +319,15 @@ public class PdfViewerActivity extends Activity {
             searchPanel.setVisibility(View.GONE);
             InputMethodManager imm=(InputMethodManager)getSystemService(INPUT_METHOD_SERVICE);
             if(imm!=null) imm.hideSoftInputFromWindow(searchPanel.getWindowToken(),0);
+
+            boolean hadHighlight=activeSearchQuery!=null && !activeSearchQuery.isEmpty();
+            activeSearchQuery="";
+            searchPages.clear();
+            searchIndex=-1;
+            highlightCache.clear();
+            previousMatch.setEnabled(false);
+            nextMatch.setEnabled(false);
+            if(hadHighlight && renderer!=null && pageCount>0) renderPage(currentPage);
         }
     }
 
@@ -333,6 +345,8 @@ public class PdfViewerActivity extends Activity {
         indexingText=true;
         previousMatch.setEnabled(false);
         nextMatch.setEnabled(false);
+        activeSearchQuery="";
+        highlightCache.clear();
         searchStatus.setText(pageTexts==null?"Извлекаю текст из PDF…":"Ищу…");
         hideKeyboard();
 
@@ -358,12 +372,15 @@ public class PdfViewerActivity extends Activity {
                     searchPages=matches;
                     if(matches.isEmpty()) {
                         searchIndex=-1;
+                        activeSearchQuery="";
                         searchStatus.setText("Совпадений не найдено");
                         previousMatch.setEnabled(false);
                         nextMatch.setEnabled(false);
+                        if(renderer!=null && pageCount>0) renderPage(currentPage);
                         return;
                     }
 
+                    activeSearchQuery=query;
                     int index=0;
                     for(int i=0;i<matches.size();i++) {
                         if(matches.get(i)>=currentPage) { index=i; break; }
@@ -378,6 +395,8 @@ public class PdfViewerActivity extends Activity {
                     indexingText=false;
                     searchPages.clear();
                     searchIndex=-1;
+                    activeSearchQuery="";
+                    highlightCache.clear();
                     searchStatus.setText("Не удалось выполнить поиск");
                     Toast.makeText(this,"Ошибка поиска в PDF: "+safeMessage(e),Toast.LENGTH_LONG).show();
                 });
@@ -404,7 +423,7 @@ public class PdfViewerActivity extends Activity {
         return texts;
     }
 
-    private String normalizeSearchText(String value) {
+    private static String normalizeSearchText(String value) {
         if(value==null) return "";
         return value.toLowerCase(Locale.ROOT)
                 .replace('ё','е')
@@ -425,7 +444,12 @@ public class PdfViewerActivity extends Activity {
         if(searchIndex<0 || searchIndex>=searchPages.size()) return;
         int page=searchPages.get(searchIndex);
         searchStatus.setText("Совпадение "+(searchIndex+1)+" из "+searchPages.size()+" · стр. "+(page+1));
-        goToPage(page);
+        if(page==currentPage) {
+            updatePageControls();
+            renderPage(page);
+        } else {
+            goToPage(page);
+        }
     }
 
     private void goToPage(int page) {
@@ -463,6 +487,15 @@ public class PdfViewerActivity extends Activity {
                     bitmap=Bitmap.createBitmap(targetWidth,targetHeight,Bitmap.Config.ARGB_8888);
                     bitmap.eraseColor(Color.WHITE);
                     page.render(bitmap,null,null,PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
+
+                    String query=activeSearchQuery;
+                    if(query!=null && !query.trim().isEmpty()) {
+                        List<RectF> highlights=findHighlightRects(pageIndex,query);
+                        if(!highlights.isEmpty()) {
+                            drawHighlights(bitmap,highlights,
+                                    page.getWidth(),page.getHeight());
+                        }
+                    }
                 } finally {
                     page.close();
                 }
@@ -484,6 +517,162 @@ public class PdfViewerActivity extends Activity {
                 });
             }
         });
+    }
+
+    private void drawHighlights(Bitmap bitmap,List<RectF> source,float pageWidth,float pageHeight) {
+        if(bitmap==null || source==null || source.isEmpty() || pageWidth<=0 || pageHeight<=0) return;
+
+        float sx=bitmap.getWidth()/pageWidth;
+        float sy=bitmap.getHeight()/pageHeight;
+        Canvas canvas=new Canvas(bitmap);
+        Paint fill=new Paint(Paint.ANTI_ALIAS_FLAG);
+        fill.setColor(Color.argb(112,255,213,45));
+
+        Paint stroke=new Paint(Paint.ANTI_ALIAS_FLAG);
+        stroke.setStyle(Paint.Style.STROKE);
+        stroke.setStrokeWidth(Math.max(2f,2f*getResources().getDisplayMetrics().density));
+        stroke.setColor(Color.argb(180,224,155,0));
+
+        for(RectF raw:source) {
+            if(raw==null) continue;
+            float left=Math.max(0,raw.left*sx-dp(2));
+            float top=Math.max(0,raw.top*sy-dp(2));
+            float right=Math.min(bitmap.getWidth(),raw.right*sx+dp(2));
+            float bottom=Math.min(bitmap.getHeight(),raw.bottom*sy+dp(2));
+            if(right<=left || bottom<=top) continue;
+
+            RectF r=new RectF(left,top,right,bottom);
+            float radius=Math.max(3f,3f*getResources().getDisplayMetrics().density);
+            canvas.drawRoundRect(r,radius,radius,fill);
+            canvas.drawRoundRect(r,radius,radius,stroke);
+        }
+    }
+
+    private List<RectF> findHighlightRects(int pageIndex,String query) {
+        String needle=normalizeSearchText(query);
+        if(needle.isEmpty()) return Collections.emptyList();
+
+        String key=pageIndex+"|"+needle;
+        List<RectF> cached=highlightCache.get(key);
+        if(cached!=null) return cached;
+
+        ArrayList<RectF> result=new ArrayList<>();
+        try(PDDocument document=PDDocument.load(pdfFile)) {
+            HighlightStripper stripper=new HighlightStripper();
+            stripper.setStartPage(pageIndex+1);
+            stripper.setEndPage(pageIndex+1);
+            stripper.setSortByPosition(true);
+            stripper.getText(document);
+            result.addAll(stripper.findMatches(needle));
+        } catch(Exception ignored) {
+        }
+
+        List<RectF> safe=Collections.unmodifiableList(result);
+        highlightCache.put(key,safe);
+        return safe;
+    }
+
+    private static char normalizedSearchChar(char ch) {
+        char lower=Character.toLowerCase(ch);
+        if(lower=='ё') lower='е';
+        if((lower>='а' && lower<='я') ||
+                (lower>='a' && lower<='z') ||
+                (lower>='0' && lower<='9')) return lower;
+        return ' ';
+    }
+
+    private static final class HighlightStripper extends PDFTextStripper {
+        private final StringBuilder normalized=new StringBuilder();
+        private final ArrayList<RectF> boxes=new ArrayList<>();
+
+        HighlightStripper() throws IOException {
+            super();
+            setSortByPosition(true);
+        }
+
+        @Override protected void writeString(String text,List<TextPosition> positions) throws IOException {
+            appendSeparator();
+
+            if(positions!=null) {
+                for(TextPosition p:positions) {
+                    if(p==null) continue;
+                    String unicode=p.getUnicode();
+                    if(unicode==null || unicode.isEmpty()) continue;
+
+                    float x=p.getX();
+                    float y=p.getY();
+                    float width=Math.max(1f,p.getWidth());
+                    float height=Math.max(1f,p.getHeight());
+                    RectF box=new RectF(
+                            x,
+                            Math.max(0f,y-height),
+                            x+width,
+                            y+Math.max(1f,height*0.15f)
+                    );
+
+                    for(int i=0;i<unicode.length();i++) {
+                        appendChar(normalizedSearchChar(unicode.charAt(i)),box);
+                    }
+                }
+            }
+
+            super.writeString(text,positions);
+        }
+
+        private void appendSeparator() {
+            appendChar(' ',null);
+        }
+
+        private void appendChar(char ch,RectF rect) {
+            if(ch==' ') {
+                if(normalized.length()==0 || normalized.charAt(normalized.length()-1)==' ') return;
+                normalized.append(' ');
+                boxes.add(null);
+                return;
+            }
+
+            normalized.append(ch);
+            boxes.add(rect==null?null:new RectF(rect));
+        }
+
+        List<RectF> findMatches(String needle) {
+            ArrayList<RectF> out=new ArrayList<>();
+            if(needle==null || needle.isEmpty()) return out;
+
+            String haystack=normalized.toString();
+            int from=0;
+            while(from<haystack.length()) {
+                int start=haystack.indexOf(needle,from);
+                if(start<0) break;
+                int end=Math.min(boxes.size(),start+needle.length());
+
+                RectF current=null;
+                for(int i=start;i<end;i++) {
+                    RectF r=boxes.get(i);
+                    if(r==null) continue;
+
+                    if(current==null) {
+                        current=new RectF(r);
+                        continue;
+                    }
+
+                    float tolerance=Math.max(current.height(),r.height())*0.85f;
+                    boolean sameLine=Math.abs(current.centerY()-r.centerY())<=tolerance;
+                    boolean closeEnough=r.left<=current.right+Math.max(4f,tolerance);
+
+                    if(sameLine && closeEnough) {
+                        current.union(r);
+                    } else {
+                        if(current.width()>0 && current.height()>0) out.add(current);
+                        current=new RectF(r);
+                    }
+                }
+
+                if(current!=null && current.width()>0 && current.height()>0) out.add(current);
+                from=start+Math.max(1,needle.length());
+            }
+            return out;
+        }
     }
 
     private void updatePageControls() {
