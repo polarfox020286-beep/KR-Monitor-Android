@@ -511,10 +511,22 @@ public class MainActivity extends Activity {
         recentList=text("",responsive(12,13,14),TEXT,false);
         recentList.setLineSpacing(dp(2),1f);
         recentList.setPadding(dp(responsive(9,11,13)),dp(9),dp(responsive(9,11,13)),dp(9));
-        recentList.setBackground(rounded(CARD,LINE,14));
-        LinearLayout.LayoutParams recentLp=new LinearLayout.LayoutParams(-1,-2);
+        recentList.setBackgroundColor(Color.TRANSPARENT);
+
+        // Keep the "Изменения" card at a stable height. When there are many
+        // new/updated recommendations, only the contents inside the card scroll.
+        ScrollView recentScroll=new ScrollView(this);
+        recentScroll.setFillViewport(false);
+        recentScroll.setVerticalScrollBarEnabled(true);
+        recentScroll.setScrollbarFadingEnabled(true);
+        recentScroll.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+        recentScroll.setBackground(rounded(CARD,LINE,14));
+        recentScroll.addView(recentList,new ScrollView.LayoutParams(-1,-2));
+
+        int recentHeightDp=responsive(92,96,104);
+        LinearLayout.LayoutParams recentLp=new LinearLayout.LayoutParams(-1,dp(recentHeightDp));
         recentLp.setMargins(0,dp(5),0,dp(responsive(8,10,12)));
-        root.addView(recentList,recentLp);
+        root.addView(recentScroll,recentLp);
 
         search=new EditText(this);
         search.setHint(compact?"Название, № КР или МКБ-10":"Название, номер КР или код МКБ-10");
@@ -1007,7 +1019,7 @@ public class MainActivity extends Activity {
     }
 
     private void renderRecent() {
-        List<DbHelper.ChangeEvent> recent=changesForLastScan(compactChromeUi()?30:5);
+        List<DbHelper.ChangeEvent> recent=changesForLastScan(compactChromeUi()?30:100);
         if(recent.isEmpty()) {
             recentList.setText(compactChromeUi()?"Изменения за 48 ч: нет":"За 48 часов до последней проверки новых или обновлённых КР не обнаружено.");
             recentList.setTextColor(MUTED);
@@ -1027,8 +1039,7 @@ public class MainActivity extends Activity {
         }
 
         StringBuilder sb=new StringBuilder();
-        int max=Math.min(3,recent.size());
-        for(int i=0;i<max;i++) {
+        for(int i=0;i<recent.size();i++) {
             DbHelper.ChangeEvent e=recent.get(i);
             if(i>0) sb.append("\n");
             if("NEW".equals(e.type)) {
@@ -1039,8 +1050,14 @@ public class MainActivity extends Activity {
                 sb.append(e.newId);
             }
         }
-        if(recent.size()>max) sb.append("\nЕщё ").append(recent.size()-max).append("…");
         recentList.setText(sb.toString());
+
+        // After refresh start from the newest change at the top of the fixed
+        // scrollable card.
+        recentList.post(() -> {
+            ViewParent parent=recentList.getParent();
+            if(parent instanceof ScrollView) ((ScrollView)parent).scrollTo(0,0);
+        });
     }
 
     private void renderCurrentPage(int direction) {
