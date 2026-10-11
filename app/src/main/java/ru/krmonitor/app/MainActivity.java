@@ -31,6 +31,8 @@ public class MainActivity extends Activity {
     private DbHelper db;
     private TextView status;
     private TextView recentList;
+    private ScrollView recentScroll;
+    private LinearLayout recentChangesContainer;
     private EditText search;
     private FrameLayout contentHost;
     private LinearLayout landscapeSidebar;
@@ -56,7 +58,7 @@ public class MainActivity extends Activity {
     private ReviewInfo reviewInfo;
     private boolean reviewRequestInProgress=false;
 
-    private static final int BG=Color.rgb(242,247,255);
+    private static final int BG=Color.rgb(246,249,253);
     private static final int CARD=Color.WHITE;
     private static final int BLUE=Color.rgb(24,105,235);
     private static final int BLUE_DARK=Color.rgb(18,63,142);
@@ -212,38 +214,46 @@ public class MainActivity extends Activity {
         return d;
     }
 
-    private int profileSoftColor(String profile) {
-        if(profile==null) return Color.rgb(239,245,255);
-        if(profile.contains("Кардио")) return Color.rgb(255,238,243);
-        if(profile.contains("Неврол")) return Color.rgb(239,237,255);
-        if(profile.contains("Нейрох")) return Color.rgb(244,238,255);
-        if(profile.contains("Травмат") || profile.contains("ортоп")) return Color.rgb(255,246,225);
-        if(profile.equals("Хирургия")) return Color.rgb(255,239,231);
-        if(profile.contains("Гастро")) return Color.rgb(231,248,239);
-        if(profile.contains("Пульмон")) return Color.rgb(228,247,251);
-        if(profile.contains("Эндокрин")) return Color.rgb(245,237,255);
-        if(profile.contains("Инфек")) return Color.rgb(232,249,237);
-        if(profile.contains("Гемат")) return Color.rgb(255,237,240);
-        if(profile.contains("Нефрол") || profile.contains("Уролог")) return Color.rgb(231,243,255);
-        if(profile.contains("Анестези")) return Color.rgb(228,240,255);
-        return Color.rgb(238,245,255);
-    }
-
     private int profileAccentColor(String profile) {
         if(profile==null) return BLUE;
-        if(profile.contains("Кардио")) return Color.rgb(210,55,88);
-        if(profile.contains("Неврол")) return Color.rgb(92,74,205);
-        if(profile.contains("Нейрох")) return Color.rgb(124,69,190);
-        if(profile.contains("Травмат") || profile.contains("ортоп")) return Color.rgb(196,137,29);
-        if(profile.equals("Хирургия")) return Color.rgb(215,91,48);
-        if(profile.contains("Гастро")) return Color.rgb(35,139,88);
-        if(profile.contains("Пульмон")) return Color.rgb(30,139,165);
-        if(profile.contains("Эндокрин")) return Color.rgb(142,76,190);
-        if(profile.contains("Инфек")) return Color.rgb(39,145,73);
-        if(profile.contains("Гемат")) return Color.rgb(183,57,79);
-        if(profile.contains("Нефрол") || profile.contains("Уролог")) return Color.rgb(39,111,190);
-        if(profile.contains("Анестези")) return Color.rgb(40,102,199);
-        return BLUE;
+        switch(profile) {
+            case "Кардиология": return Color.rgb(205,57,91);
+            case "Сердечно-сосудистая хирургия": return Color.rgb(28,119,197);
+            case "Неврология": return Color.rgb(93,76,201);
+            case "Нейрохирургия": return Color.rgb(132,74,184);
+            case "Травматология и ортопедия": return Color.rgb(191,132,28);
+            case "Хирургия": return Color.rgb(211,87,50);
+            case "Гастроэнтерология": return Color.rgb(42,139,89);
+            case "Пульмонология": return Color.rgb(26,142,165);
+            case "Эндокринология": return Color.rgb(157,79,181);
+            case "Инфекционные болезни": return Color.rgb(42,145,71);
+            case "Гематология": return Color.rgb(179,58,82);
+            case "Ревматология": return Color.rgb(129,100,43);
+            case "Нефрология": return Color.rgb(42,107,187);
+            case "Урология": return Color.rgb(39,128,152);
+            case "Акушерство и гинекология": return Color.rgb(192,75,137);
+            case "Педиатрия и неонатология": return Color.rgb(219,124,45);
+            case "Онкология": return Color.rgb(111,83,164);
+            case "Офтальмология": return Color.rgb(46,133,177);
+            case "Оториноларингология": return Color.rgb(75,122,176);
+            case "Дерматология": return Color.rgb(176,103,64);
+            case "Психиатрия и наркология": return Color.rgb(89,100,181);
+            case "Аллергология и иммунология": return Color.rgb(47,151,124);
+            case "Стоматология и ЧЛХ": return Color.rgb(29,137,175);
+            case "Анестезиология и реаниматология": return Color.rgb(36,91,190);
+            case "Медицинская реабилитация": return Color.rgb(56,142,101);
+            case "Общие и междисциплинарные": return Color.rgb(91,103,122);
+            default: return Color.rgb(63,112,181);
+        }
+    }
+
+    private int profileSoftColor(String profile) {
+        int c=profileAccentColor(profile);
+        return Color.rgb(
+                236+(Color.red(c)*19/255),
+                236+(Color.green(c)*19/255),
+                236+(Color.blue(c)*19/255)
+        );
     }
 
     private int translucent(int color,int alpha) {
@@ -559,23 +569,22 @@ public class MainActivity extends Activity {
         recentHeader.addView(recentCaption);
         root.addView(recentHeader);
 
+        // Dummy text view is kept for the compact/tablet header variant.
         recentList=text("",responsive(12,13,14),TEXT,false);
-        recentList.setLineSpacing(dp(2),1f);
-        recentList.setPadding(dp(responsive(9,11,13)),dp(9),dp(responsive(9,11,13)),dp(9));
-        recentList.setBackgroundColor(Color.TRANSPARENT);
 
-        // Keep the "Изменения" card at a stable height. When there are many
-        // new/updated recommendations, only the contents inside the card scroll.
-        ScrollView recentScroll=new ScrollView(this);
+        recentChangesContainer=new LinearLayout(this);
+        recentChangesContainer.setOrientation(LinearLayout.VERTICAL);
+        recentChangesContainer.setPadding(dp(10),dp(7),dp(10),dp(7));
+
+        recentScroll=new ScrollView(this);
         recentScroll.setFillViewport(false);
-        recentScroll.setVerticalScrollBarEnabled(true);
+        recentScroll.setVerticalScrollBarEnabled(false);
         recentScroll.setScrollbarFadingEnabled(true);
         recentScroll.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
-        recentScroll.setBackground(rounded(CARD,translucent(BLUE,70),14));
-        recentScroll.addView(recentList,new ScrollView.LayoutParams(-1,-2));
+        recentScroll.setBackground(rounded(CARD,translucent(BLUE,60),14));
+        recentScroll.addView(recentChangesContainer,new ScrollView.LayoutParams(-1,-2));
 
-        int recentHeightDp=responsive(92,96,104);
-        LinearLayout.LayoutParams recentLp=new LinearLayout.LayoutParams(-1,dp(recentHeightDp));
+        LinearLayout.LayoutParams recentLp=new LinearLayout.LayoutParams(-1,dp(52));
         recentLp.setMargins(0,dp(5),0,dp(responsive(8,10,12)));
         root.addView(recentScroll,recentLp);
 
@@ -1069,16 +1078,78 @@ public class MainActivity extends Activity {
         return db.recentChangesWithinHoursAt(last,48,limit);
     }
 
+    private View recentChangeRow(DbHelper.ChangeEvent e) {
+        LinearLayout row=new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.TOP);
+        row.setPadding(dp(2),dp(4),dp(2),dp(4));
+
+        boolean isNew="NEW".equals(e.type);
+        int accent=isNew?NEW_GREEN:UPDATE_ORANGE;
+        int soft=isNew?Color.rgb(233,249,240):Color.rgb(255,244,232);
+
+        TextView badge=text(isNew?"НОВАЯ":"ОБНОВЛЕНА",10,accent,true);
+        badge.setGravity(Gravity.CENTER);
+        badge.setPadding(dp(7),dp(3),dp(7),dp(3));
+        badge.setBackground(rounded(soft,Color.TRANSPARENT,10));
+        LinearLayout.LayoutParams badgeLp=new LinearLayout.LayoutParams(-2,-2);
+        badgeLp.setMargins(0,dp(1),dp(8),0);
+        row.addView(badge,badgeLp);
+
+        StringBuilder value=new StringBuilder(e.title);
+        value.append("  ·  ");
+        if(!isNew && e.oldId!=null && !e.oldId.isEmpty()) {
+            value.append(e.oldId).append(" → ");
+        }
+        value.append(e.newId);
+
+        TextView title=text(value.toString(),responsive(11,12,13),TEXT,false);
+        title.setMaxLines(2);
+        title.setEllipsize(TextUtils.TruncateAt.END);
+        title.setLineSpacing(dp(1),1f);
+        row.addView(title,new LinearLayout.LayoutParams(0,-2,1));
+        return row;
+    }
+
+    private void resizeRecentChangesCard() {
+        if(recentScroll==null || recentChangesContainer==null) return;
+        recentChangesContainer.post(() -> {
+            int count=recentChangesContainer.getChildCount();
+            if(count<=0) return;
+
+            int visible=Math.min(4,count);
+            int wanted=recentChangesContainer.getPaddingTop()+recentChangesContainer.getPaddingBottom();
+            for(int i=0;i<visible;i++) {
+                View child=recentChangesContainer.getChildAt(i);
+                wanted+=child.getMeasuredHeight();
+                ViewGroup.LayoutParams raw=child.getLayoutParams();
+                if(raw instanceof LinearLayout.LayoutParams) {
+                    LinearLayout.LayoutParams lp=(LinearLayout.LayoutParams)raw;
+                    wanted+=lp.topMargin+lp.bottomMargin;
+                }
+            }
+
+            int minHeight=dp(46);
+            wanted=Math.max(minHeight,wanted);
+            ViewGroup.LayoutParams lp=recentScroll.getLayoutParams();
+            lp.height=wanted;
+            recentScroll.setLayoutParams(lp);
+            recentScroll.setVerticalScrollBarEnabled(count>4);
+            recentScroll.setOverScrollMode(count>4?View.OVER_SCROLL_IF_CONTENT_SCROLLS:View.OVER_SCROLL_NEVER);
+            recentScroll.scrollTo(0,0);
+        });
+    }
+
     private void renderRecent() {
         List<DbHelper.ChangeEvent> recent=changesForLastScan(compactChromeUi()?30:100);
-        if(recent.isEmpty()) {
-            recentList.setText(compactChromeUi()?"Изменения за 48 ч: нет":"За 48 часов до последней проверки новых или обновлённых КР не обнаружено.");
-            recentList.setTextColor(MUTED);
-            return;
-        }
-        recentList.setTextColor(TEXT);
 
         if(compactChromeUi()) {
+            if(recent.isEmpty()) {
+                recentList.setText("Изменения за 48 ч: нет");
+                recentList.setTextColor(MUTED);
+                return;
+            }
+            recentList.setTextColor(TEXT);
             DbHelper.ChangeEvent e=recent.get(0);
             StringBuilder compact=new StringBuilder("Изменения 48 ч: ");
             if("NEW".equals(e.type)) compact.append("НОВАЯ — ");
@@ -1089,36 +1160,27 @@ public class MainActivity extends Activity {
             return;
         }
 
-        android.text.SpannableStringBuilder sb=new android.text.SpannableStringBuilder();
-        for(int i=0;i<recent.size();i++) {
-            DbHelper.ChangeEvent e=recent.get(i);
-            if(i>0) sb.append("\n");
-            int start=sb.length();
-            if("NEW".equals(e.type)) {
-                sb.append("●  НОВАЯ");
-                sb.setSpan(new android.text.style.ForegroundColorSpan(NEW_GREEN),
-                        start,sb.length(),android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            } else {
-                sb.append("●  ОБНОВЛЕНА");
-                sb.setSpan(new android.text.style.ForegroundColorSpan(UPDATE_ORANGE),
-                        start,sb.length(),android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            }
-            sb.setSpan(new android.text.style.StyleSpan(Typeface.BOLD),
-                    start,sb.length(),android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            sb.append("  ").append(e.title).append("  ·  ");
-            if(!"NEW".equals(e.type) && e.oldId!=null && !e.oldId.isEmpty()) {
-                sb.append(e.oldId).append(" → ");
-            }
-            sb.append(e.newId);
-        }
-        recentList.setText(sb);
+        if(recentChangesContainer==null || recentScroll==null) return;
+        recentChangesContainer.removeAllViews();
 
-        // After refresh start from the newest change at the top of the fixed
-        // scrollable card.
-        recentList.post(() -> {
-            ViewParent parent=recentList.getParent();
-            if(parent instanceof ScrollView) ((ScrollView)parent).scrollTo(0,0);
-        });
+        if(recent.isEmpty()) {
+            TextView empty=text(
+                    "За последние 48 часов новых или обновлённых КР не обнаружено.",
+                    responsive(11,12,13),MUTED,false
+            );
+            empty.setPadding(dp(2),dp(5),dp(2),dp(5));
+            recentChangesContainer.addView(empty,new LinearLayout.LayoutParams(-1,-2));
+            resizeRecentChangesCard();
+            return;
+        }
+
+        for(int i=0;i<recent.size();i++) {
+            View row=recentChangeRow(recent.get(i));
+            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
+            if(i<recent.size()-1) lp.setMargins(0,0,0,dp(2));
+            recentChangesContainer.addView(row,lp);
+        }
+        resizeRecentChangesCard();
     }
 
     private void renderCurrentPage(int direction) {
@@ -1890,12 +1952,13 @@ public class MainActivity extends Activity {
         int cardPad=responsive(7,9,11);
         card.setPadding(dp(cardPad),dp(cardPad),dp(cardPad),dp(responsive(7,8,9)));
         int accent=profileAccentColor(profile);
-        card.setBackground(rounded(profileSoftColor(profile),translucent(accent,75),18));
-        if(Build.VERSION.SDK_INT>=21) card.setElevation(dp(3));
+        int soft=profileSoftColor(profile);
+        card.setBackground(rounded(CARD,translucent(accent,75),18));
+        if(Build.VERSION.SDK_INT>=21) card.setElevation(dp(2));
         card.setClickable(true);
         card.setFocusable(true);
 
-        ProfileIconView icon=new ProfileIconView(this,profile);
+        ProfileIconView icon=new ProfileIconView(this,profile,accent,soft);
         int iconSize=responsive(36,40,46);
         LinearLayout.LayoutParams iconLp=new LinearLayout.LayoutParams(dp(iconSize),dp(iconSize));
         iconLp.setMargins(0,0,0,dp(6));
@@ -1920,7 +1983,7 @@ public class MainActivity extends Activity {
         number.setGravity(Gravity.CENTER);
         number.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
         number.setPadding(dp(8),dp(4),dp(8),dp(4));
-        number.setBackground(rounded(translucent(Color.WHITE,185),Color.TRANSPARENT,11));
+        number.setBackground(rounded(soft,Color.TRANSPARENT,11));
         LinearLayout.LayoutParams numberLp=new LinearLayout.LayoutParams(-2,-2);
         numberLp.setMargins(0,dp(5),0,0);
         card.addView(number,numberLp);
@@ -2971,7 +3034,7 @@ public class MainActivity extends Activity {
 
     @Override protected void onResume() {
         super.onResume();
-        if(db!=null && recentList!=null) reload();
+        if(db!=null && (recentList!=null || recentChangesContainer!=null)) reload();
         maybeLaunchReviewFlow();
     }
 
