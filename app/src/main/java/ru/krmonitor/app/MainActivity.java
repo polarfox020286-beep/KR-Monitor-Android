@@ -58,7 +58,7 @@ public class MainActivity extends Activity {
     private ReviewInfo reviewInfo;
     private boolean reviewRequestInProgress=false;
 
-    private static final int BG=Color.rgb(246,249,253);
+    private static final int BG=Color.rgb(247,249,252);
     private static final int CARD=Color.WHITE;
     private static final int BLUE=Color.rgb(24,105,235);
     private static final int BLUE_DARK=Color.rgb(18,63,142);
@@ -213,6 +213,15 @@ public class MainActivity extends Activity {
         if(stroke!=Color.TRANSPARENT) d.setStroke(dp(1),stroke);
         return d;
     }
+    private GradientDrawable roundedGradient(int start,int end,int radius) {
+        GradientDrawable d=new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                new int[]{start,end}
+        );
+        d.setCornerRadius(dp(radius));
+        return d;
+    }
+
 
     private int profileAccentColor(String profile) {
         if(profile==null) return BLUE;
@@ -325,19 +334,19 @@ public class MainActivity extends Activity {
         item.setOrientation(LinearLayout.VERTICAL);
         item.setGravity(Gravity.CENTER);
         item.setPadding(dp(3),dp(lowHeightUi()?2:4),dp(3),dp(lowHeightUi()?2:4));
-        item.setBackground(rounded(selected?BLUE:Color.TRANSPARENT,Color.TRANSPARENT,12));
+        item.setBackground(rounded(selected?BLUE_SOFT:Color.TRANSPARENT,Color.TRANSPARENT,12));
         item.setClickable(true);
         item.setFocusable(true);
         item.setContentDescription(label);
         item.setOnClickListener(v -> navigateBottom(page));
 
-        TextView iconView=text(icon,lowHeightUi()?15:18,selected?Color.WHITE:MUTED,selected);
+        TextView iconView=text(icon,lowHeightUi()?15:18,selected?BLUE:MUTED,selected);
         iconView.setTextSize(TypedValue.COMPLEX_UNIT_DIP,lowHeightUi()?15:18);
         iconView.setGravity(Gravity.CENTER);
         iconView.setIncludeFontPadding(true);
         item.addView(iconView,new LinearLayout.LayoutParams(-1,-2));
 
-        TextView labelView=text(label,lowHeightUi()?8:10,selected?Color.WHITE:MUTED,selected);
+        TextView labelView=text(label,lowHeightUi()?8:10,selected?BLUE:MUTED,selected);
         labelView.setGravity(Gravity.CENTER);
         labelView.setSingleLine(true);
         labelView.setIncludeFontPadding(true);
@@ -537,7 +546,8 @@ public class MainActivity extends Activity {
         sync.setSingleLine(true);
         sync.setGravity(Gravity.CENTER);
         sync.setPadding(dp(compact?7:10),dp(9),dp(compact?7:10),dp(9));
-        sync.setBackground(rounded(BLUE,Color.TRANSPARENT,14));
+        sync.setBackground(roundedGradient(Color.rgb(29,112,235),Color.rgb(24,88,205),14));
+        if(Build.VERSION.SDK_INT>=21) sync.setElevation(dp(2));
         sync.setClickable(true);
         sync.setFocusable(true);
         sync.setContentDescription("Проверить обновления");
@@ -581,7 +591,8 @@ public class MainActivity extends Activity {
         recentScroll.setVerticalScrollBarEnabled(false);
         recentScroll.setScrollbarFadingEnabled(true);
         recentScroll.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
-        recentScroll.setBackground(rounded(CARD,translucent(BLUE,60),14));
+        recentScroll.setBackground(rounded(CARD,Color.rgb(210,223,241),14));
+        if(Build.VERSION.SDK_INT>=21) recentScroll.setElevation(dp(1));
         recentScroll.addView(recentChangesContainer,new ScrollView.LayoutParams(-1,-2));
 
         LinearLayout.LayoutParams recentLp=new LinearLayout.LayoutParams(-1,dp(52));
@@ -595,7 +606,7 @@ public class MainActivity extends Activity {
         search.setTextSize(TypedValue.COMPLEX_UNIT_DIP,responsive(14,15,16));
         search.setSingleLine(true);
         search.setPadding(dp(responsive(11,14,16)),0,dp(responsive(11,14,16)),0);
-        search.setBackground(rounded(CARD,translucent(BLUE,60),15));
+        search.setBackground(rounded(CARD,Color.rgb(215,224,237),15));
         search.setMinHeight(dp(responsive(46,48,52)));
         root.addView(search,new LinearLayout.LayoutParams(-1,-2));
         fitSearchField(search,responsive(14,15,16),10f);
@@ -1082,7 +1093,7 @@ public class MainActivity extends Activity {
         LinearLayout row=new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.TOP);
-        row.setPadding(dp(2),dp(4),dp(2),dp(4));
+        row.setPadding(dp(2),dp(3),dp(2),dp(3));
 
         boolean isNew="NEW".equals(e.type);
         int accent=isNew?NEW_GREEN:UPDATE_ORANGE;
@@ -1090,7 +1101,7 @@ public class MainActivity extends Activity {
 
         TextView badge=text(isNew?"НОВАЯ":"ОБНОВЛЕНА",10,accent,true);
         badge.setGravity(Gravity.CENTER);
-        badge.setPadding(dp(7),dp(3),dp(7),dp(3));
+        badge.setPadding(dp(7),dp(2),dp(7),dp(2));
         badge.setBackground(rounded(soft,Color.TRANSPARENT,10));
         LinearLayout.LayoutParams badgeLp=new LinearLayout.LayoutParams(-2,-2);
         badgeLp.setMargins(0,dp(1),dp(8),0);
@@ -1951,14 +1962,12 @@ public class MainActivity extends Activity {
         card.setGravity(Gravity.CENTER);
         int cardPad=responsive(7,9,11);
         card.setPadding(dp(cardPad),dp(cardPad),dp(cardPad),dp(responsive(7,8,9)));
-        int accent=profileAccentColor(profile);
-        int soft=profileSoftColor(profile);
-        card.setBackground(rounded(CARD,translucent(accent,75),18));
-        if(Build.VERSION.SDK_INT>=21) card.setElevation(dp(2));
+        card.setBackground(rounded(CARD,LINE,16));
+        if(Build.VERSION.SDK_INT>=21) card.setElevation(dp(1));
         card.setClickable(true);
         card.setFocusable(true);
 
-        ProfileIconView icon=new ProfileIconView(this,profile,accent,soft);
+        ProfileIconView icon=new ProfileIconView(this,profile);
         int iconSize=responsive(36,40,46);
         LinearLayout.LayoutParams iconLp=new LinearLayout.LayoutParams(dp(iconSize),dp(iconSize));
         iconLp.setMargins(0,0,0,dp(6));
@@ -1979,14 +1988,11 @@ public class MainActivity extends Activity {
         }
         card.addView(name,new LinearLayout.LayoutParams(-1,-2));
 
-        TextView number=text(count+" КР",responsive(10,11,12),accent,true);
+        TextView number=text(count+" КР",responsive(10,11,12),MUTED,false);
         number.setGravity(Gravity.CENTER);
         number.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
-        number.setPadding(dp(8),dp(4),dp(8),dp(4));
-        number.setBackground(rounded(soft,Color.TRANSPARENT,11));
-        LinearLayout.LayoutParams numberLp=new LinearLayout.LayoutParams(-2,-2);
-        numberLp.setMargins(0,dp(5),0,0);
-        card.addView(number,numberLp);
+        number.setPadding(0,dp(5),0,0);
+        card.addView(number,new LinearLayout.LayoutParams(-1,-2));
 
         name.post(() -> fitProfileName(name,displayProfile));
         card.setOnClickListener(v -> { selectedProfile=profile; renderCurrentPage(0); });
