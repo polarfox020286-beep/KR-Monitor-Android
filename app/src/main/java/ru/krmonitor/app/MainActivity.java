@@ -33,6 +33,8 @@ public class MainActivity extends Activity {
     private TextView recentList;
     private ScrollView recentScroll;
     private LinearLayout recentChangesContainer;
+    private LinearLayout dashboardStats;
+    private TextView changesBadge;
     private EditText search;
     private FrameLayout contentHost;
     private LinearLayout landscapeSidebar;
@@ -269,6 +271,87 @@ public class MainActivity extends Activity {
         return Color.argb(alpha,Color.red(color),Color.green(color),Color.blue(color));
     }
 
+    private void addPressAnimation(View v) {
+        if(v==null) return;
+        v.setOnTouchListener((view,event) -> {
+            if(event.getAction()==android.view.MotionEvent.ACTION_DOWN) {
+                view.animate().scaleX(0.97f).scaleY(0.97f).setDuration(80).start();
+            } else if(event.getAction()==android.view.MotionEvent.ACTION_UP ||
+                      event.getAction()==android.view.MotionEvent.ACTION_CANCEL) {
+                view.animate().scaleX(1f).scaleY(1f).setDuration(120).start();
+            }
+            return false;
+        });
+    }
+
+    private TextView statChip(String value,String label,int accent) {
+        TextView chip=text(value+"\n"+label,12,TEXT,true);
+        chip.setGravity(Gravity.CENTER);
+        chip.setLineSpacing(dp(1),1f);
+        chip.setPadding(dp(6),dp(7),dp(6),dp(7));
+        chip.setBackground(rounded(CARD,translucent(accent,55),13));
+        chip.setContentDescription(value+" "+label);
+        return chip;
+    }
+
+    private void refreshDashboardStats(List<DbHelper.ChangeEvent> recent) {
+        if(dashboardStats==null) return;
+        dashboardStats.removeAllViews();
+        int newCount=0, updatedCount=0;
+        if(recent!=null) {
+            for(DbHelper.ChangeEvent e:recent) {
+                if("NEW".equals(e.type)) newCount++; else updatedCount++;
+            }
+        }
+
+        String last=getSharedPreferences("prefs",MODE_PRIVATE).getString("last_sync","—");
+        TextView total=statChip(String.valueOf(all.size()),"КР",BLUE);
+        TextView changes=statChip(String.valueOf(newCount+updatedCount),"изменений",
+                (newCount+updatedCount)>0?UPDATE_ORANGE:BLUE);
+        TextView checked=statChip(last==null||last.isEmpty()?"—":last,"проверено",NEW_GREEN);
+        checked.setMaxLines(2);
+        checked.setEllipsize(TextUtils.TruncateAt.END);
+
+        LinearLayout.LayoutParams lp1=new LinearLayout.LayoutParams(0,-2,1);
+        lp1.setMargins(0,0,dp(4),0);
+        LinearLayout.LayoutParams lp2=new LinearLayout.LayoutParams(0,-2,1);
+        lp2.setMargins(dp(4),0,dp(4),0);
+        LinearLayout.LayoutParams lp3=new LinearLayout.LayoutParams(0,-2,1);
+        lp3.setMargins(dp(4),0,0,0);
+        dashboardStats.addView(total,lp1);
+        dashboardStats.addView(changes,lp2);
+        dashboardStats.addView(checked,lp3);
+    }
+
+    private void showRecentLoadingSkeleton() {
+        if(recentChangesContainer==null) return;
+        recentChangesContainer.removeAllViews();
+        for(int i=0;i<3;i++) {
+            LinearLayout line=new LinearLayout(this);
+            line.setOrientation(LinearLayout.VERTICAL);
+            line.setPadding(dp(3),dp(6),dp(3),dp(6));
+
+            View bar1=new View(this);
+            bar1.setBackground(rounded(Color.rgb(230,235,243),Color.TRANSPARENT,6));
+            line.addView(bar1,new LinearLayout.LayoutParams(i==0?dp(150):dp(120),dp(10)));
+
+            View bar2=new View(this);
+            bar2.setBackground(rounded(Color.rgb(238,242,247),Color.TRANSPARENT,6));
+            LinearLayout.LayoutParams b2=new LinearLayout.LayoutParams(-1,dp(8));
+            b2.setMargins(0,dp(6),0,0);
+            line.addView(bar2,b2);
+            recentChangesContainer.addView(line,new LinearLayout.LayoutParams(-1,-2));
+
+            line.setAlpha(0.45f);
+            line.animate().alpha(0.85f).setDuration(550).setStartDelay(i*100L).start();
+        }
+        if(recentScroll!=null) {
+            ViewGroup.LayoutParams lp=recentScroll.getLayoutParams();
+            lp.height=dp(150);
+            recentScroll.setLayoutParams(lp);
+        }
+    }
+
     private TextView text(String value,float size,int color,boolean bold) {
         TextView t=new TextView(this);
         t.setText(value);
@@ -338,6 +421,7 @@ public class MainActivity extends Activity {
         item.setClickable(true);
         item.setFocusable(true);
         item.setContentDescription(label);
+        addPressAnimation(item);
         item.setOnClickListener(v -> navigateBottom(page));
 
         TextView iconView=text(icon,lowHeightUi()?15:18,selected?BLUE:MUTED,selected);
@@ -353,6 +437,13 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams labelLp=new LinearLayout.LayoutParams(-1,-2);
         labelLp.setMargins(0,dp(1),0,0);
         item.addView(labelView,labelLp);
+        if(selected) {
+            View indicator=new View(this);
+            indicator.setBackground(rounded(BLUE,Color.TRANSPARENT,2));
+            LinearLayout.LayoutParams indicatorLp=new LinearLayout.LayoutParams(dp(22),dp(3));
+            indicatorLp.setMargins(0,dp(3),0,0);
+            item.addView(indicator,indicatorLp);
+        }
         fitBottomNavigationLabel(labelView);
         return item;
     }
@@ -563,15 +654,35 @@ public class MainActivity extends Activity {
         root.addView(header);
 
         status=text("",responsive(11,12,13),MUTED,false);
-        status.setPadding(0,dp(responsive(7,9,10)),0,dp(responsive(7,9,10)));
+        status.setPadding(0,dp(responsive(7,9,10)),0,dp(6));
         status.setLineSpacing(dp(1),1f);
         root.addView(status);
+
+        dashboardStats=new LinearLayout(this);
+        dashboardStats.setOrientation(LinearLayout.HORIZONTAL);
+        dashboardStats.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams dashboardLp=new LinearLayout.LayoutParams(-1,-2);
+        dashboardLp.setMargins(0,0,0,dp(8));
+        root.addView(dashboardStats,dashboardLp);
 
         LinearLayout recentHeader=new LinearLayout(this);
         recentHeader.setOrientation(compact?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);
         recentHeader.setGravity(compact?Gravity.LEFT:Gravity.CENTER_VERTICAL);
+        LinearLayout recentTitleRow=new LinearLayout(this);
+        recentTitleRow.setOrientation(LinearLayout.HORIZONTAL);
+        recentTitleRow.setGravity(Gravity.CENTER_VERTICAL);
         TextView recentTitle=text("Изменения",responsive(14,15,16),BLUE_DARK,true);
-        recentHeader.addView(recentTitle,compact
+        recentTitleRow.addView(recentTitle,new LinearLayout.LayoutParams(-2,-2));
+        changesBadge=text("",10,Color.WHITE,true);
+        changesBadge.setGravity(Gravity.CENTER);
+        changesBadge.setMinWidth(dp(22));
+        changesBadge.setPadding(dp(6),dp(2),dp(6),dp(2));
+        changesBadge.setBackground(rounded(UPDATE_ORANGE,Color.TRANSPARENT,10));
+        changesBadge.setVisibility(View.GONE);
+        LinearLayout.LayoutParams badgeLp=new LinearLayout.LayoutParams(-2,-2);
+        badgeLp.setMargins(dp(6),0,0,0);
+        recentTitleRow.addView(changesBadge,badgeLp);
+        recentHeader.addView(recentTitleRow,compact
                 ? new LinearLayout.LayoutParams(-1,-2)
                 : new LinearLayout.LayoutParams(0,-2,1));
         TextView recentCaption=text("За последние 48 часов",responsive(10,11,12),MUTED,false);
@@ -624,6 +735,7 @@ public class MainActivity extends Activity {
         setContentView(shell);
         if(Build.VERSION.SDK_INT>=30) shell.requestApplyInsets();
 
+        addPressAnimation(sync);
         sync.setOnClickListener(v -> runSync(sync));
         search.addTextChangedListener(new TextWatcher(){
             public void beforeTextChanged(CharSequence s,int st,int c,int a){}
@@ -822,7 +934,7 @@ public class MainActivity extends Activity {
         LinearLayout titleRow=new LinearLayout(this);
         titleRow.setOrientation(LinearLayout.HORIZONTAL);
         titleRow.setGravity(Gravity.CENTER_VERTICAL);
-        TextView title=text("КР Навигатор",19,TEXT,true);
+        TextView title=text("КР Навигатор",19,BLUE_DARK,true);
         title.setSingleLine(true);
         title.setIncludeFontPadding(false);
         title.setMaxWidth(dp(Math.max(120,screenWidthDp()-105)));
@@ -1153,6 +1265,15 @@ public class MainActivity extends Activity {
 
     private void renderRecent() {
         List<DbHelper.ChangeEvent> recent=changesForLastScan(compactChromeUi()?30:100);
+        refreshDashboardStats(recent);
+        if(changesBadge!=null) {
+            if(recent.isEmpty()) {
+                changesBadge.setVisibility(View.GONE);
+            } else {
+                changesBadge.setText(String.valueOf(recent.size()));
+                changesBadge.setVisibility(View.VISIBLE);
+            }
+        }
 
         if(compactChromeUi()) {
             if(recent.isEmpty()) {
@@ -1853,6 +1974,7 @@ public class MainActivity extends Activity {
                 int vPad=compactChromeUi()?6:9;
                 row.setPadding(dp(hPad),dp(vPad),dp(hPad),dp(vPad));
                 row.setBackground(rounded(CARD,LINE,14));
+                if(Build.VERSION.SDK_INT>=21) row.setElevation(dp(1));
 
                 LinearLayout labels=new LinearLayout(MainActivity.this);
                 labels.setOrientation(LinearLayout.VERTICAL);
@@ -1995,6 +2117,7 @@ public class MainActivity extends Activity {
         card.addView(number,new LinearLayout.LayoutParams(-1,-2));
 
         name.post(() -> fitProfileName(name,displayProfile));
+        addPressAnimation(card);
         card.setOnClickListener(v -> { selectedProfile=profile; renderCurrentPage(0); });
         return card;
     }
@@ -2447,18 +2570,37 @@ public class MainActivity extends Activity {
                 labels.setOrientation(LinearLayout.VERTICAL);
                 TextView name=text(r.title,dense?(lowHeightUi()?12:13):responsive(13,14,15),TEXT,false);
                 name.setMaxLines(largeFontUi()?(dense?3:5):(dense?2:3));
-                String metaText="КР "+r.id+(PdfManager.isPdf(PdfManager.file(MainActivity.this,r))?"  •  PDF скачан":"");
+                boolean downloaded=PdfManager.isPdf(PdfManager.file(MainActivity.this,r));
+                String metaText="КР "+r.id;
                 if(profileRules.containsKey(r.baseId)) metaText += "  •  ✎ профиль настроен";
                 if(searchShowsMkb && r.mkbCodes!=null && !r.mkbCodes.isEmpty()) metaText += "  •  МКБ-10: "+r.mkbCodes;
                 TextView meta=text(metaText,(useTwoPaneUi()||compactSinglePaneUi())?10:responsive(10,11,12),MUTED,false);
                 meta.setPadding(0,dp((useTwoPaneUi()||compactSinglePaneUi())?2:4),0,0);
                 labels.addView(name);
                 labels.addView(meta);
+
+                String groups=joinProfiles(effectiveGroups(r));
+                if(groups!=null && !groups.isEmpty() && !dense) {
+                    TextView profileMeta=text(groups,10,BLUE_DARK,false);
+                    profileMeta.setSingleLine(true);
+                    profileMeta.setEllipsize(TextUtils.TruncateAt.END);
+                    profileMeta.setPadding(0,dp(3),0,0);
+                    labels.addView(profileMeta);
+                }
+
+                if(downloaded) {
+                    TextView pdfBadge=text("↓  PDF скачан",9,BLUE,true);
+                    pdfBadge.setPadding(dp(6),dp(2),dp(6),dp(2));
+                    pdfBadge.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,9));
+                    LinearLayout.LayoutParams pdfLp=new LinearLayout.LayoutParams(-2,-2);
+                    pdfLp.setMargins(0,dp(4),0,0);
+                    labels.addView(pdfBadge,pdfLp);
+                }
                 row.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
 
                 boolean favorite=favoriteIds.contains(r.baseId);
                 TextView star=text(favorite?"★":"☆",favorite?22:24,
-                        favorite?Color.rgb(206,145,0):Color.rgb(125,139,157),true);
+                        favorite?FAVORITE_GOLD:Color.rgb(125,139,157),true);
                 star.setGravity(Gravity.CENTER);
                 star.setClickable(true);
                 star.setFocusable(false);
@@ -2467,7 +2609,7 @@ public class MainActivity extends Activity {
                     boolean now=db.toggleFavorite(r.baseId);
                     if(now) favoriteIds.add(r.baseId); else favoriteIds.remove(r.baseId);
                     star.setText(now?"★":"☆");
-                    star.setTextColor(now?Color.rgb(206,145,0):Color.rgb(125,139,157));
+                    star.setTextColor(now?FAVORITE_GOLD:Color.rgb(125,139,157));
                     star.setContentDescription(now?"Убрать из избранного":"Добавить в избранное");
                     Toast.makeText(MainActivity.this,
                             now?"Добавлено в избранное":"Удалено из избранного",
@@ -2759,6 +2901,8 @@ public class MainActivity extends Activity {
     private void showContent(View view,int direction) {
         contentHost.removeAllViews();
         contentHost.addView(view,new FrameLayout.LayoutParams(-1,-1));
+        view.setAlpha(0f);
+        view.animate().alpha(1f).setDuration(160).start();
         if(direction!=0) {
             float width=getResources().getDisplayMetrics().widthPixels;
             float from=direction>0?width:-width;
@@ -2818,6 +2962,8 @@ public class MainActivity extends Activity {
         syncInProgress=true;
         b.setEnabled(false);
         fitSyncButton(b,syncBusyLabel());
+        b.animate().rotationBy(360f).setDuration(650).start();
+        showRecentLoadingSkeleton();
         status.setText("Проверяю обновления…");
         final ProgressDialog progress=new ProgressDialog(this);
         progress.setTitle(lowHeightUi()?"Проверка КР":"Проверка клинических рекомендаций");
