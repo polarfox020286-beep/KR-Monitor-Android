@@ -31,7 +31,7 @@ jobs:
       - name: Build unsigned release APK
         env:
           KR_VERSION_CODE: '2049'
-          KR_VERSION_NAME: '1.2.1'
+          KR_VERSION_NAME: '1.2.2'
         run: gradle :app:assembleRelease --stacktrace
       - name: Align unsigned release APK
         run: |
@@ -63,4 +63,4 @@ jobs:
           name: android-signing-tools
           path: exported-tools
 
-# build-trigger: 1.2.1 scrollable changes card
+# build-trigger: 1.2.2 reviews share qr
