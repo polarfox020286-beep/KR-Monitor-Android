@@ -15,17 +15,21 @@ public class ProfileIconView extends View {
     private final Paint soft = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path p = new Path();
 
-    private static final int BLUE = Color.rgb(37,99,199);
-    private static final int BLUE_SOFT = Color.rgb(235,243,255);
+    private static final int DEFAULT_BLUE = Color.rgb(37,99,199);
+    private static final int DEFAULT_SOFT = Color.rgb(235,243,255);
 
     public ProfileIconView(Context context, String profile) {
+        this(context,profile,DEFAULT_BLUE,DEFAULT_SOFT);
+    }
+
+    public ProfileIconView(Context context, String profile, int accentColor, int softColor) {
         super(context);
         this.profile = profile == null ? "" : profile;
-        line.setColor(BLUE);
+        line.setColor(accentColor);
         line.setStyle(Paint.Style.STROKE);
         line.setStrokeCap(Paint.Cap.ROUND);
         line.setStrokeJoin(Paint.Join.ROUND);
-        soft.setColor(BLUE_SOFT);
+        soft.setColor(softColor);
         soft.setStyle(Paint.Style.FILL);
     }
 
