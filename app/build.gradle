@@ -50,6 +50,7 @@ android {
 dependencies {
     implementation 'com.tom-roush:pdfbox-android:2.0.27.0'
     implementation 'ru.rustore.sdk:review:10.5.1'
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.9.24'
     implementation 'com.google.zxing:core:3.5.3'
 
     androidTestImplementation 'androidx.test:core:1.6.1'
