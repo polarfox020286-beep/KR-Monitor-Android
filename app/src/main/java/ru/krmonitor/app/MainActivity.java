@@ -17,6 +17,9 @@ import android.util.TypedValue;
 import java.text.DateFormat;
 import java.util.*;
 import java.util.concurrent.*;
+import ru.rustore.sdk.review.RuStoreReviewManager;
+import ru.rustore.sdk.review.RuStoreReviewManagerFactory;
+import ru.rustore.sdk.review.model.ReviewInfo;
 
 public class MainActivity extends Activity {
     private final ExecutorService executor=Executors.newSingleThreadExecutor();
@@ -47,6 +50,12 @@ public class MainActivity extends Activity {
     private boolean searchShowsMkb=false;
     private volatile boolean syncInProgress=false;
 
+    private static final String RUSTORE_APP_URL="https://www.rustore.ru/catalog/app/ru.krmonitor.app";
+    private static final long REVIEW_COOLDOWN_MS=30L*24L*60L*60L*1000L;
+    private RuStoreReviewManager reviewManager;
+    private ReviewInfo reviewInfo;
+    private boolean reviewRequestInProgress=false;
+
     private static final int BG=Color.rgb(247,249,252);
     private static final int CARD=Color.WHITE;
     private static final int BLUE=Color.rgb(37,99,199);
@@ -60,6 +69,7 @@ public class MainActivity extends Activity {
         super.onCreate(b);
         if(Build.VERSION.SDK_INT>=30) getWindow().setDecorFitsSystemWindows(false);
         db=new DbHelper(this);
+        try { reviewManager=RuStoreReviewManagerFactory.INSTANCE.create(getApplicationContext()); } catch(Throwable ignored) {}
         try { SeedImporter.ensureSeeded(this); } catch(Exception e) { Toast.makeText(this,"Ошибка исходного реестра: "+e.getMessage(),Toast.LENGTH_LONG).show(); }
         AlarmScheduler.scheduleNext(this);
         requestNotifyPermission();
@@ -1228,6 +1238,158 @@ public class MainActivity extends Activity {
         return outer;
     }
 
+
+    private void shareKrNavigator() {
+        Intent send=new Intent(Intent.ACTION_SEND);
+        send.setType("text/plain");
+        send.putExtra(Intent.EXTRA_SUBJECT,"КР Навигатор");
+        send.putExtra(Intent.EXTRA_TEXT,
+                "КР Навигатор — клинические рекомендации, обновления, поиск по МКБ-10 и PDF.\n"+
+                RUSTORE_APP_URL);
+        try {
+            startActivity(Intent.createChooser(send,"Поделиться КР Навигатором"));
+        } catch(Exception e) {
+            Toast.makeText(this,"Не удалось открыть меню «Поделиться»",Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private android.graphics.Bitmap makeQrBitmap(String value,int sizePx) throws Exception {
+        com.google.zxing.common.BitMatrix matrix=
+                new com.google.zxing.MultiFormatWriter().encode(
+                        value,com.google.zxing.BarcodeFormat.QR_CODE,sizePx,sizePx
+                );
+        int[] pixels=new int[sizePx*sizePx];
+        for(int y=0;y<sizePx;y++) {
+            int row=y*sizePx;
+            for(int x=0;x<sizePx;x++) {
+                pixels[row+x]=matrix.get(x,y)?Color.BLACK:Color.WHITE;
+            }
+        }
+        android.graphics.Bitmap bitmap=android.graphics.Bitmap.createBitmap(
+                sizePx,sizePx,android.graphics.Bitmap.Config.ARGB_8888
+        );
+        bitmap.setPixels(pixels,0,sizePx,0,0,sizePx,sizePx);
+        return bitmap;
+    }
+
+    private void showShareQrDialog() {
+        final Dialog dialog=new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setCancelable(true);
+
+        LinearLayout card=new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setGravity(Gravity.CENTER_HORIZONTAL);
+        card.setPadding(dp(18),dp(16),dp(18),dp(16));
+        card.setBackground(rounded(CARD,LINE,20));
+
+        TextView title=text("КР Навигатор для коллег",20,TEXT,true);
+        title.setGravity(Gravity.CENTER);
+        card.addView(title,new LinearLayout.LayoutParams(-1,-2));
+
+        TextView subtitle=text(
+                "Наведите камеру на QR-код, чтобы открыть страницу приложения в RuStore.",
+                13,MUTED,false
+        );
+        subtitle.setGravity(Gravity.CENTER);
+        subtitle.setPadding(0,dp(6),0,dp(12));
+        card.addView(subtitle,new LinearLayout.LayoutParams(-1,-2));
+
+        ImageView qr=new ImageView(this);
+        qr.setContentDescription("QR-код для скачивания КР Навигатора в RuStore");
+        qr.setAdjustViewBounds(true);
+        try {
+            qr.setImageBitmap(makeQrBitmap(RUSTORE_APP_URL,dp(240)));
+        } catch(Exception e) {
+            dialog.dismiss();
+            Toast.makeText(this,"Не удалось создать QR-код",Toast.LENGTH_SHORT).show();
+            return;
+        }
+        card.addView(qr,new LinearLayout.LayoutParams(dp(240),dp(240)));
+
+        TextView share=dialogAction("Поделиться ссылкой",true);
+        share.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams shareLp=new LinearLayout.LayoutParams(-1,-2);
+        shareLp.setMargins(0,dp(14),0,0);
+        card.addView(share,shareLp);
+        share.setOnClickListener(v -> shareKrNavigator());
+
+        TextView close=dialogAction("Закрыть",false);
+        close.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams closeLp=new LinearLayout.LayoutParams(-1,-2);
+        closeLp.setMargins(0,dp(7),0,0);
+        card.addView(close,closeLp);
+        close.setOnClickListener(v -> dialog.dismiss());
+
+        dialog.setContentView(card);
+        dialog.show();
+        applyAdaptiveDialogWindow(dialog,true);
+    }
+
+    private void prepareReviewFlow() {
+        if(reviewManager==null || reviewInfo!=null || reviewRequestInProgress) return;
+        reviewRequestInProgress=true;
+        try {
+            reviewManager.requestReviewFlow()
+                    .addOnSuccessListener(info -> {
+                        reviewRequestInProgress=false;
+                        reviewInfo=info;
+                    })
+                    .addOnFailureListener(t -> reviewRequestInProgress=false);
+        } catch(Throwable ignored) {
+            reviewRequestInProgress=false;
+        }
+    }
+
+    private void recordUsefulActionForReview() {
+        SharedPreferences prefs=getSharedPreferences("prefs",MODE_PRIVATE);
+        int count=prefs.getInt("review_useful_actions",0)+1;
+        SharedPreferences.Editor editor=prefs.edit().putInt("review_useful_actions",count);
+        if(count>=5) editor.putBoolean("review_pending",true);
+        editor.apply();
+        if(count>=4) prepareReviewFlow();
+    }
+
+    private void maybeLaunchReviewFlow() {
+        if(reviewManager==null) return;
+        SharedPreferences prefs=getSharedPreferences("prefs",MODE_PRIVATE);
+        if(!prefs.getBoolean("review_pending",false)) return;
+
+        long now=System.currentTimeMillis();
+        long last=prefs.getLong("review_last_attempt_ms",0L);
+        if(last>0L && now-last<REVIEW_COOLDOWN_MS) return;
+
+        if(reviewInfo==null) {
+            if(reviewRequestInProgress) return;
+            reviewRequestInProgress=true;
+            try {
+                reviewManager.requestReviewFlow()
+                        .addOnSuccessListener(info -> {
+                            reviewRequestInProgress=false;
+                            reviewInfo=info;
+                            maybeLaunchReviewFlow();
+                        })
+                        .addOnFailureListener(t -> reviewRequestInProgress=false);
+            } catch(Throwable ignored) {
+                reviewRequestInProgress=false;
+            }
+            return;
+        }
+
+        ReviewInfo info=reviewInfo;
+        reviewInfo=null;
+        prefs.edit()
+                .putBoolean("review_pending",false)
+                .putLong("review_last_attempt_ms",now)
+                .apply();
+
+        try {
+            reviewManager.launchReviewFlow(info)
+                    .addOnSuccessListener(unit -> {})
+                    .addOnFailureListener(t -> {});
+        } catch(Throwable ignored) {}
+    }
+
     private String appVersionName() {
         try {
             return getPackageManager().getPackageInfo(getPackageName(),0).versionName;
@@ -1313,6 +1475,39 @@ public class MainActivity extends Activity {
         ));
 
         body.addView(downloadsEntryCard());
+
+        body.addView(aboutSection(
+                "Рекомендуйте коллегам",
+                "Отправьте коллегам ссылку на КР Навигатор или покажите QR-код для быстрого перехода в RuStore."
+        ));
+
+        LinearLayout shareRow=new LinearLayout(this);
+        shareRow.setOrientation(screenWidthDp()<360?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);
+
+        TextView shareApp=dialogAction("Поделиться приложением",true);
+        shareApp.setGravity(Gravity.CENTER);
+        shareApp.setOnClickListener(v -> shareKrNavigator());
+
+        TextView qrApp=dialogAction("QR-код для коллег",false);
+        qrApp.setGravity(Gravity.CENTER);
+        qrApp.setOnClickListener(v -> showShareQrDialog());
+
+        if(screenWidthDp()<360) {
+            shareRow.addView(shareApp,new LinearLayout.LayoutParams(-1,-2));
+            LinearLayout.LayoutParams qrLp=new LinearLayout.LayoutParams(-1,-2);
+            qrLp.setMargins(0,dp(6),0,0);
+            shareRow.addView(qrApp,qrLp);
+        } else {
+            LinearLayout.LayoutParams shareLp=new LinearLayout.LayoutParams(0,-2,1);
+            shareLp.setMargins(0,0,dp(4),0);
+            shareRow.addView(shareApp,shareLp);
+            LinearLayout.LayoutParams qrLp=new LinearLayout.LayoutParams(0,-2,1);
+            qrLp.setMargins(dp(4),0,0,0);
+            shareRow.addView(qrApp,qrLp);
+        }
+        LinearLayout.LayoutParams shareRowLp=new LinearLayout.LayoutParams(-1,-2);
+        shareRowLp.setMargins(0,0,0,dp(8));
+        body.addView(shareRow,shareRowLp);
 
         body.addView(aboutSection("Состояние каталога",state));
 
@@ -2577,6 +2772,7 @@ public class MainActivity extends Activity {
     private void downloadOrOpen(Recommendation r) {
         if(PdfManager.isPdf(PdfManager.file(this,r))) {
             db.markViewed(r.baseId);
+            recordUsefulActionForReview();
             PdfManager.open(this,r);
             return;
         }
@@ -2591,6 +2787,7 @@ public class MainActivity extends Activity {
                 try { if(progress.isShowing()) progress.dismiss(); } catch(Exception ignored) {}
                 if(ok){
                     db.markViewed(r.baseId);
+                    recordUsefulActionForReview();
                     reload();
                     PdfManager.open(this,r);
                 } else {
@@ -2720,6 +2917,7 @@ public class MainActivity extends Activity {
     @Override protected void onResume() {
         super.onResume();
         if(db!=null && recentList!=null) reload();
+        maybeLaunchReviewFlow();
     }
 
     @Override protected void onStop() {
