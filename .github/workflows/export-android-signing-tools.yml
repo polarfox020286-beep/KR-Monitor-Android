@@ -63,4 +63,4 @@ jobs:
           name: android-signing-tools
           path: exported-tools
 
-# build-trigger: 1.2.2 reviews share qr
+# build-trigger: 1.2.2 reviews share qr retry
