@@ -620,8 +620,8 @@ public class MainActivity extends Activity {
         infoLp.setMargins(dp(5),0,0,0);
         titleRow.addView(info,infoLp);
 
-        TextView subtitle=text("Клинические рекомендации",responsive(14,15,16),Color.rgb(66,88,121),false);
-        subtitle.setTextSize(cappedChromeSp(responsive(14,15,16)));
+        TextView subtitle=text("Клинические рекомендации",responsive(16,17,18),Color.rgb(66,88,121),true);
+        subtitle.setTextSize(cappedChromeSp(responsive(16,17,18)));
         subtitle.setPadding(0,dp(1),0,0);
         subtitle.setMaxLines(2);
         heading.addView(titleRow,new LinearLayout.LayoutParams(-1,-2));
@@ -949,7 +949,7 @@ public class MainActivity extends Activity {
         infoLp.setMargins(dp(3),0,0,0);
         titleRow.addView(info,infoLp);
         heading.addView(titleRow,new LinearLayout.LayoutParams(-1,-2));
-        TextView compactSubtitle=text("Клинические рекомендации",11,Color.rgb(66,88,121),false);
+        TextView compactSubtitle=text("Клинические рекомендации",13,Color.rgb(66,88,121),true);
         compactSubtitle.setSingleLine(true);
         compactSubtitle.setEllipsize(TextUtils.TruncateAt.END);
         compactSubtitle.setPadding(0,dp(1),0,0);
