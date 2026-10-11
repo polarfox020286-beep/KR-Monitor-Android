@@ -31,6 +31,9 @@ public class MainActivity extends Activity {
     private DbHelper db;
     private TextView status;
     private TextView recentList;
+    private ScrollView recentScroll;
+    private LinearLayout recentChangesContainer;
+    private TextView changesBadge;
     private EditText search;
     private FrameLayout contentHost;
     private LinearLayout landscapeSidebar;
@@ -58,12 +61,15 @@ public class MainActivity extends Activity {
 
     private static final int BG=Color.rgb(247,249,252);
     private static final int CARD=Color.WHITE;
-    private static final int BLUE=Color.rgb(37,99,199);
-    private static final int BLUE_DARK=Color.rgb(25,70,145);
-    private static final int BLUE_SOFT=Color.rgb(235,243,255);
-    private static final int TEXT=Color.rgb(29,38,52);
-    private static final int MUTED=Color.rgb(104,115,132);
-    private static final int LINE=Color.rgb(228,233,240);
+    private static final int BLUE=Color.rgb(24,105,235);
+    private static final int BLUE_DARK=Color.rgb(18,63,142);
+    private static final int BLUE_SOFT=Color.rgb(225,239,255);
+    private static final int TEXT=Color.rgb(22,35,58);
+    private static final int MUTED=Color.rgb(91,108,132);
+    private static final int LINE=Color.rgb(207,221,241);
+    private static final int NEW_GREEN=Color.rgb(25,145,82);
+    private static final int UPDATE_ORANGE=Color.rgb(225,117,30);
+    private static final int FAVORITE_GOLD=Color.rgb(196,142,22);
 
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
@@ -208,6 +214,103 @@ public class MainActivity extends Activity {
         if(stroke!=Color.TRANSPARENT) d.setStroke(dp(1),stroke);
         return d;
     }
+    private GradientDrawable roundedGradient(int start,int end,int radius) {
+        GradientDrawable d=new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                new int[]{start,end}
+        );
+        d.setCornerRadius(dp(radius));
+        return d;
+    }
+
+
+    private int profileAccentColor(String profile) {
+        if(profile==null) return BLUE;
+        switch(profile) {
+            case "Кардиология": return Color.rgb(205,57,91);
+            case "Сердечно-сосудистая хирургия": return Color.rgb(28,119,197);
+            case "Неврология": return Color.rgb(93,76,201);
+            case "Нейрохирургия": return Color.rgb(132,74,184);
+            case "Травматология и ортопедия": return Color.rgb(191,132,28);
+            case "Хирургия": return Color.rgb(211,87,50);
+            case "Гастроэнтерология": return Color.rgb(42,139,89);
+            case "Пульмонология": return Color.rgb(26,142,165);
+            case "Эндокринология": return Color.rgb(157,79,181);
+            case "Инфекционные болезни": return Color.rgb(42,145,71);
+            case "Гематология": return Color.rgb(179,58,82);
+            case "Ревматология": return Color.rgb(129,100,43);
+            case "Нефрология": return Color.rgb(42,107,187);
+            case "Урология": return Color.rgb(39,128,152);
+            case "Акушерство и гинекология": return Color.rgb(192,75,137);
+            case "Педиатрия и неонатология": return Color.rgb(219,124,45);
+            case "Онкология": return Color.rgb(111,83,164);
+            case "Офтальмология": return Color.rgb(46,133,177);
+            case "Оториноларингология": return Color.rgb(75,122,176);
+            case "Дерматология": return Color.rgb(176,103,64);
+            case "Психиатрия и наркология": return Color.rgb(89,100,181);
+            case "Аллергология и иммунология": return Color.rgb(47,151,124);
+            case "Стоматология и ЧЛХ": return Color.rgb(29,137,175);
+            case "Анестезиология и реаниматология": return Color.rgb(36,91,190);
+            case "Медицинская реабилитация": return Color.rgb(56,142,101);
+            case "Общие и междисциплинарные": return Color.rgb(91,103,122);
+            default: return Color.rgb(63,112,181);
+        }
+    }
+
+    private int profileSoftColor(String profile) {
+        int c=profileAccentColor(profile);
+        return Color.rgb(
+                236+(Color.red(c)*19/255),
+                236+(Color.green(c)*19/255),
+                236+(Color.blue(c)*19/255)
+        );
+    }
+
+    private int translucent(int color,int alpha) {
+        return Color.argb(alpha,Color.red(color),Color.green(color),Color.blue(color));
+    }
+
+    private void addPressAnimation(View v) {
+        if(v==null) return;
+        v.setOnTouchListener((view,event) -> {
+            if(event.getAction()==android.view.MotionEvent.ACTION_DOWN) {
+                view.animate().scaleX(0.97f).scaleY(0.97f).setDuration(80).start();
+            } else if(event.getAction()==android.view.MotionEvent.ACTION_UP ||
+                      event.getAction()==android.view.MotionEvent.ACTION_CANCEL) {
+                view.animate().scaleX(1f).scaleY(1f).setDuration(120).start();
+            }
+            return false;
+        });
+    }
+
+    private void showRecentLoadingSkeleton() {
+        if(recentChangesContainer==null) return;
+        recentChangesContainer.removeAllViews();
+        for(int i=0;i<3;i++) {
+            LinearLayout line=new LinearLayout(this);
+            line.setOrientation(LinearLayout.VERTICAL);
+            line.setPadding(dp(3),dp(6),dp(3),dp(6));
+
+            View bar1=new View(this);
+            bar1.setBackground(rounded(Color.rgb(230,235,243),Color.TRANSPARENT,6));
+            line.addView(bar1,new LinearLayout.LayoutParams(i==0?dp(150):dp(120),dp(10)));
+
+            View bar2=new View(this);
+            bar2.setBackground(rounded(Color.rgb(238,242,247),Color.TRANSPARENT,6));
+            LinearLayout.LayoutParams b2=new LinearLayout.LayoutParams(-1,dp(8));
+            b2.setMargins(0,dp(6),0,0);
+            line.addView(bar2,b2);
+            recentChangesContainer.addView(line,new LinearLayout.LayoutParams(-1,-2));
+
+            line.setAlpha(0.45f);
+            line.animate().alpha(0.85f).setDuration(550).setStartDelay(i*100L).start();
+        }
+        if(recentScroll!=null) {
+            ViewGroup.LayoutParams lp=recentScroll.getLayoutParams();
+            lp.height=dp(150);
+            recentScroll.setLayoutParams(lp);
+        }
+    }
 
     private TextView text(String value,float size,int color,boolean bold) {
         TextView t=new TextView(this);
@@ -278,6 +381,7 @@ public class MainActivity extends Activity {
         item.setClickable(true);
         item.setFocusable(true);
         item.setContentDescription(label);
+        addPressAnimation(item);
         item.setOnClickListener(v -> navigateBottom(page));
 
         TextView iconView=text(icon,lowHeightUi()?15:18,selected?BLUE:MUTED,selected);
@@ -293,6 +397,13 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams labelLp=new LinearLayout.LayoutParams(-1,-2);
         labelLp.setMargins(0,dp(1),0,0);
         item.addView(labelView,labelLp);
+        if(selected) {
+            View indicator=new View(this);
+            indicator.setBackground(rounded(BLUE,Color.TRANSPARENT,2));
+            LinearLayout.LayoutParams indicatorLp=new LinearLayout.LayoutParams(dp(22),dp(3));
+            indicatorLp.setMargins(0,dp(3),0,0);
+            item.addView(indicator,indicatorLp);
+        }
         fitBottomNavigationLabel(labelView);
         return item;
     }
@@ -452,7 +563,7 @@ public class MainActivity extends Activity {
         LinearLayout titleRow=new LinearLayout(this);
         titleRow.setOrientation(LinearLayout.HORIZONTAL);
         titleRow.setGravity(Gravity.CENTER_VERTICAL);
-        TextView title=text("КР Навигатор",responsive(21,23,26),TEXT,true);
+        TextView title=text("КР Навигатор",responsive(21,23,26),BLUE_DARK,true);
         title.setSingleLine(true);
         title.setEllipsize(TextUtils.TruncateAt.END);
         title.setTextSize(cappedChromeSp(responsive(21,23,26)));
@@ -469,9 +580,9 @@ public class MainActivity extends Activity {
         infoLp.setMargins(dp(5),0,0,0);
         titleRow.addView(info,infoLp);
 
-        TextView subtitle=text("Клинические рекомендации",responsive(11,12,13),MUTED,false);
-        subtitle.setTextSize(cappedChromeSp(responsive(11,12,13)));
-        subtitle.setPadding(0,dp(2),0,0);
+        TextView subtitle=text("Клинические рекомендации",responsive(16,17,18),Color.rgb(66,88,121),true);
+        subtitle.setTextSize(cappedChromeSp(responsive(16,17,18)));
+        subtitle.setPadding(0,dp(1),0,0);
         subtitle.setMaxLines(2);
         heading.addView(titleRow,new LinearLayout.LayoutParams(-1,-2));
         heading.addView(subtitle);
@@ -482,11 +593,12 @@ public class MainActivity extends Activity {
             header.addView(heading,new LinearLayout.LayoutParams(0,-2,1));
         }
 
-        TextView sync=text("↻  Проверить",responsive(12,13,14),BLUE,true);
+        TextView sync=text("↻  Проверить",responsive(12,13,14),Color.WHITE,true);
         sync.setSingleLine(true);
         sync.setGravity(Gravity.CENTER);
         sync.setPadding(dp(compact?7:10),dp(9),dp(compact?7:10),dp(9));
-        sync.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,14));
+        sync.setBackground(roundedGradient(Color.rgb(29,112,235),Color.rgb(24,88,205),14));
+        if(Build.VERSION.SDK_INT>=21) sync.setElevation(dp(2));
         sync.setClickable(true);
         sync.setFocusable(true);
         sync.setContentDescription("Проверить обновления");
@@ -502,15 +614,28 @@ public class MainActivity extends Activity {
         root.addView(header);
 
         status=text("",responsive(11,12,13),MUTED,false);
-        status.setPadding(0,dp(responsive(7,9,10)),0,dp(responsive(7,9,10)));
+        status.setPadding(0,dp(responsive(7,9,10)),0,dp(responsive(5,6,7)));
         status.setLineSpacing(dp(1),1f);
         root.addView(status);
 
         LinearLayout recentHeader=new LinearLayout(this);
         recentHeader.setOrientation(compact?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);
         recentHeader.setGravity(compact?Gravity.LEFT:Gravity.CENTER_VERTICAL);
-        TextView recentTitle=text("Изменения",responsive(14,15,16),TEXT,true);
-        recentHeader.addView(recentTitle,compact
+        LinearLayout recentTitleRow=new LinearLayout(this);
+        recentTitleRow.setOrientation(LinearLayout.HORIZONTAL);
+        recentTitleRow.setGravity(Gravity.CENTER_VERTICAL);
+        TextView recentTitle=text("Изменения",responsive(14,15,16),BLUE_DARK,true);
+        recentTitleRow.addView(recentTitle,new LinearLayout.LayoutParams(-2,-2));
+        changesBadge=text("",10,Color.WHITE,true);
+        changesBadge.setGravity(Gravity.CENTER);
+        changesBadge.setMinWidth(dp(22));
+        changesBadge.setPadding(dp(6),dp(2),dp(6),dp(2));
+        changesBadge.setBackground(rounded(UPDATE_ORANGE,Color.TRANSPARENT,10));
+        changesBadge.setVisibility(View.GONE);
+        LinearLayout.LayoutParams badgeLp=new LinearLayout.LayoutParams(-2,-2);
+        badgeLp.setMargins(dp(6),0,0,0);
+        recentTitleRow.addView(changesBadge,badgeLp);
+        recentHeader.addView(recentTitleRow,compact
                 ? new LinearLayout.LayoutParams(-1,-2)
                 : new LinearLayout.LayoutParams(0,-2,1));
         TextView recentCaption=text("За последние 48 часов",responsive(10,11,12),MUTED,false);
@@ -518,23 +643,23 @@ public class MainActivity extends Activity {
         recentHeader.addView(recentCaption);
         root.addView(recentHeader);
 
+        // Dummy text view is kept for the compact/tablet header variant.
         recentList=text("",responsive(12,13,14),TEXT,false);
-        recentList.setLineSpacing(dp(2),1f);
-        recentList.setPadding(dp(responsive(9,11,13)),dp(9),dp(responsive(9,11,13)),dp(9));
-        recentList.setBackgroundColor(Color.TRANSPARENT);
 
-        // Keep the "Изменения" card at a stable height. When there are many
-        // new/updated recommendations, only the contents inside the card scroll.
-        ScrollView recentScroll=new ScrollView(this);
+        recentChangesContainer=new LinearLayout(this);
+        recentChangesContainer.setOrientation(LinearLayout.VERTICAL);
+        recentChangesContainer.setPadding(dp(10),dp(7),dp(10),dp(7));
+
+        recentScroll=new ScrollView(this);
         recentScroll.setFillViewport(false);
-        recentScroll.setVerticalScrollBarEnabled(true);
+        recentScroll.setVerticalScrollBarEnabled(false);
         recentScroll.setScrollbarFadingEnabled(true);
         recentScroll.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
-        recentScroll.setBackground(rounded(CARD,LINE,14));
-        recentScroll.addView(recentList,new ScrollView.LayoutParams(-1,-2));
+        recentScroll.setBackground(rounded(CARD,Color.rgb(210,223,241),14));
+        if(Build.VERSION.SDK_INT>=21) recentScroll.setElevation(dp(1));
+        recentScroll.addView(recentChangesContainer,new ScrollView.LayoutParams(-1,-2));
 
-        int recentHeightDp=responsive(92,96,104);
-        LinearLayout.LayoutParams recentLp=new LinearLayout.LayoutParams(-1,dp(recentHeightDp));
+        LinearLayout.LayoutParams recentLp=new LinearLayout.LayoutParams(-1,dp(52));
         recentLp.setMargins(0,dp(5),0,dp(responsive(8,10,12)));
         root.addView(recentScroll,recentLp);
 
@@ -545,7 +670,7 @@ public class MainActivity extends Activity {
         search.setTextSize(TypedValue.COMPLEX_UNIT_DIP,responsive(14,15,16));
         search.setSingleLine(true);
         search.setPadding(dp(responsive(11,14,16)),0,dp(responsive(11,14,16)),0);
-        search.setBackground(rounded(CARD,LINE,15));
+        search.setBackground(rounded(CARD,Color.rgb(215,224,237),15));
         search.setMinHeight(dp(responsive(46,48,52)));
         root.addView(search,new LinearLayout.LayoutParams(-1,-2));
         fitSearchField(search,responsive(14,15,16),10f);
@@ -563,6 +688,7 @@ public class MainActivity extends Activity {
         setContentView(shell);
         if(Build.VERSION.SDK_INT>=30) shell.requestApplyInsets();
 
+        addPressAnimation(sync);
         sync.setOnClickListener(v -> runSync(sync));
         search.addTextChangedListener(new TextWatcher(){
             public void beforeTextChanged(CharSequence s,int st,int c,int a){}
@@ -761,7 +887,7 @@ public class MainActivity extends Activity {
         LinearLayout titleRow=new LinearLayout(this);
         titleRow.setOrientation(LinearLayout.HORIZONTAL);
         titleRow.setGravity(Gravity.CENTER_VERTICAL);
-        TextView title=text("КР Навигатор",19,TEXT,true);
+        TextView title=text("КР Навигатор",19,BLUE_DARK,true);
         title.setSingleLine(true);
         title.setIncludeFontPadding(false);
         title.setMaxWidth(dp(Math.max(120,screenWidthDp()-105)));
@@ -776,6 +902,11 @@ public class MainActivity extends Activity {
         infoLp.setMargins(dp(3),0,0,0);
         titleRow.addView(info,infoLp);
         heading.addView(titleRow,new LinearLayout.LayoutParams(-1,-2));
+        TextView compactSubtitle=text("Клинические рекомендации",13,Color.rgb(66,88,121),true);
+        compactSubtitle.setSingleLine(true);
+        compactSubtitle.setEllipsize(TextUtils.TruncateAt.END);
+        compactSubtitle.setPadding(0,dp(1),0,0);
+        heading.addView(compactSubtitle,new LinearLayout.LayoutParams(-1,-2));
 
         status=text("",9,MUTED,false);
         status.setSingleLine(true);
@@ -1028,16 +1159,86 @@ public class MainActivity extends Activity {
         return db.recentChangesWithinHoursAt(last,48,limit);
     }
 
+    private View recentChangeRow(DbHelper.ChangeEvent e) {
+        LinearLayout row=new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.TOP);
+        row.setPadding(dp(2),dp(3),dp(2),dp(3));
+
+        boolean isNew="NEW".equals(e.type);
+        int accent=isNew?NEW_GREEN:UPDATE_ORANGE;
+        int soft=isNew?Color.rgb(233,249,240):Color.rgb(255,244,232);
+
+        TextView badge=text(isNew?"НОВАЯ":"ОБНОВЛЕНА",10,accent,true);
+        badge.setGravity(Gravity.CENTER);
+        badge.setPadding(dp(7),dp(2),dp(7),dp(2));
+        badge.setBackground(rounded(soft,Color.TRANSPARENT,10));
+        LinearLayout.LayoutParams badgeLp=new LinearLayout.LayoutParams(-2,-2);
+        badgeLp.setMargins(0,dp(1),dp(8),0);
+        row.addView(badge,badgeLp);
+
+        StringBuilder value=new StringBuilder(e.title);
+        value.append("  ·  ");
+        if(!isNew && e.oldId!=null && !e.oldId.isEmpty()) {
+            value.append(e.oldId).append(" → ");
+        }
+        value.append(e.newId);
+
+        TextView title=text(value.toString(),responsive(11,12,13),TEXT,false);
+        title.setMaxLines(2);
+        title.setEllipsize(TextUtils.TruncateAt.END);
+        title.setLineSpacing(dp(1),1f);
+        row.addView(title,new LinearLayout.LayoutParams(0,-2,1));
+        return row;
+    }
+
+    private void resizeRecentChangesCard() {
+        if(recentScroll==null || recentChangesContainer==null) return;
+        recentChangesContainer.post(() -> {
+            int count=recentChangesContainer.getChildCount();
+            if(count<=0) return;
+
+            int visible=Math.min(4,count);
+            int wanted=recentChangesContainer.getPaddingTop()+recentChangesContainer.getPaddingBottom();
+            for(int i=0;i<visible;i++) {
+                View child=recentChangesContainer.getChildAt(i);
+                wanted+=child.getMeasuredHeight();
+                ViewGroup.LayoutParams raw=child.getLayoutParams();
+                if(raw instanceof LinearLayout.LayoutParams) {
+                    LinearLayout.LayoutParams lp=(LinearLayout.LayoutParams)raw;
+                    wanted+=lp.topMargin+lp.bottomMargin;
+                }
+            }
+
+            int minHeight=dp(46);
+            wanted=Math.max(minHeight,wanted);
+            ViewGroup.LayoutParams lp=recentScroll.getLayoutParams();
+            lp.height=wanted;
+            recentScroll.setLayoutParams(lp);
+            recentScroll.setVerticalScrollBarEnabled(count>4);
+            recentScroll.setOverScrollMode(count>4?View.OVER_SCROLL_IF_CONTENT_SCROLLS:View.OVER_SCROLL_NEVER);
+            recentScroll.scrollTo(0,0);
+        });
+    }
+
     private void renderRecent() {
         List<DbHelper.ChangeEvent> recent=changesForLastScan(compactChromeUi()?30:100);
-        if(recent.isEmpty()) {
-            recentList.setText(compactChromeUi()?"Изменения за 48 ч: нет":"За 48 часов до последней проверки новых или обновлённых КР не обнаружено.");
-            recentList.setTextColor(MUTED);
-            return;
+        if(changesBadge!=null) {
+            if(recent.isEmpty()) {
+                changesBadge.setVisibility(View.GONE);
+            } else {
+                changesBadge.setText(String.valueOf(recent.size()));
+                changesBadge.setVisibility(View.VISIBLE);
+            }
         }
-        recentList.setTextColor(TEXT);
 
         if(compactChromeUi()) {
+            if(recent.isEmpty()) {
+                recentList.setText("Изменения за 48 ч: нет");
+                recentList.setTextColor(MUTED);
+                return;
+            }
+            recentList.setTextColor(TEXT);
             DbHelper.ChangeEvent e=recent.get(0);
             StringBuilder compact=new StringBuilder("Изменения 48 ч: ");
             if("NEW".equals(e.type)) compact.append("НОВАЯ — ");
@@ -1048,26 +1249,27 @@ public class MainActivity extends Activity {
             return;
         }
 
-        StringBuilder sb=new StringBuilder();
-        for(int i=0;i<recent.size();i++) {
-            DbHelper.ChangeEvent e=recent.get(i);
-            if(i>0) sb.append("\n");
-            if("NEW".equals(e.type)) {
-                sb.append("НОВАЯ  ").append(e.title).append("  ·  ").append(e.newId);
-            } else {
-                sb.append("ОБНОВЛЕНА  ").append(e.title).append("  ·  ");
-                if(e.oldId!=null && !e.oldId.isEmpty()) sb.append(e.oldId).append(" → ");
-                sb.append(e.newId);
-            }
-        }
-        recentList.setText(sb.toString());
+        if(recentChangesContainer==null || recentScroll==null) return;
+        recentChangesContainer.removeAllViews();
 
-        // After refresh start from the newest change at the top of the fixed
-        // scrollable card.
-        recentList.post(() -> {
-            ViewParent parent=recentList.getParent();
-            if(parent instanceof ScrollView) ((ScrollView)parent).scrollTo(0,0);
-        });
+        if(recent.isEmpty()) {
+            TextView empty=text(
+                    "За последние 48 часов новых или обновлённых КР не обнаружено.",
+                    responsive(11,12,13),MUTED,false
+            );
+            empty.setPadding(dp(2),dp(5),dp(2),dp(5));
+            recentChangesContainer.addView(empty,new LinearLayout.LayoutParams(-1,-2));
+            resizeRecentChangesCard();
+            return;
+        }
+
+        for(int i=0;i<recent.size();i++) {
+            View row=recentChangeRow(recent.get(i));
+            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
+            if(i<recent.size()-1) lp.setMargins(0,0,0,dp(2));
+            recentChangesContainer.addView(row,lp);
+        }
+        resizeRecentChangesCard();
     }
 
     private void renderCurrentPage(int direction) {
@@ -1645,7 +1847,7 @@ public class MainActivity extends Activity {
         LinearLayout summary=new LinearLayout(this);
         summary.setOrientation(LinearLayout.VERTICAL);
         summary.setPadding(dp(12),dp(9),dp(12),dp(9));
-        summary.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,14));
+        summary.setBackground(rounded(BLUE_SOFT,translucent(BLUE,60),16));
 
         TextView summaryTitle=text(
                 downloaded.size()+" скачанных КР",
@@ -1729,6 +1931,7 @@ public class MainActivity extends Activity {
                 int vPad=compactChromeUi()?6:9;
                 row.setPadding(dp(hPad),dp(vPad),dp(hPad),dp(vPad));
                 row.setBackground(rounded(CARD,LINE,14));
+                if(Build.VERSION.SDK_INT>=21) row.setElevation(dp(1));
 
                 LinearLayout labels=new LinearLayout(MainActivity.this);
                 labels.setOrientation(LinearLayout.VERTICAL);
@@ -1871,6 +2074,7 @@ public class MainActivity extends Activity {
         card.addView(number,new LinearLayout.LayoutParams(-1,-2));
 
         name.post(() -> fitProfileName(name,displayProfile));
+        addPressAnimation(card);
         card.setOnClickListener(v -> { selectedProfile=profile; renderCurrentPage(0); });
         return card;
     }
@@ -2323,18 +2527,37 @@ public class MainActivity extends Activity {
                 labels.setOrientation(LinearLayout.VERTICAL);
                 TextView name=text(r.title,dense?(lowHeightUi()?12:13):responsive(13,14,15),TEXT,false);
                 name.setMaxLines(largeFontUi()?(dense?3:5):(dense?2:3));
-                String metaText="КР "+r.id+(PdfManager.isPdf(PdfManager.file(MainActivity.this,r))?"  •  PDF скачан":"");
+                boolean downloaded=PdfManager.isPdf(PdfManager.file(MainActivity.this,r));
+                String metaText="КР "+r.id;
                 if(profileRules.containsKey(r.baseId)) metaText += "  •  ✎ профиль настроен";
                 if(searchShowsMkb && r.mkbCodes!=null && !r.mkbCodes.isEmpty()) metaText += "  •  МКБ-10: "+r.mkbCodes;
                 TextView meta=text(metaText,(useTwoPaneUi()||compactSinglePaneUi())?10:responsive(10,11,12),MUTED,false);
                 meta.setPadding(0,dp((useTwoPaneUi()||compactSinglePaneUi())?2:4),0,0);
                 labels.addView(name);
                 labels.addView(meta);
+
+                String groups=joinProfiles(effectiveGroups(r));
+                if(groups!=null && !groups.isEmpty() && !dense) {
+                    TextView profileMeta=text(groups,10,BLUE_DARK,false);
+                    profileMeta.setSingleLine(true);
+                    profileMeta.setEllipsize(TextUtils.TruncateAt.END);
+                    profileMeta.setPadding(0,dp(3),0,0);
+                    labels.addView(profileMeta);
+                }
+
+                if(downloaded) {
+                    TextView pdfBadge=text("↓  PDF скачан",9,BLUE,true);
+                    pdfBadge.setPadding(dp(6),dp(2),dp(6),dp(2));
+                    pdfBadge.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,9));
+                    LinearLayout.LayoutParams pdfLp=new LinearLayout.LayoutParams(-2,-2);
+                    pdfLp.setMargins(0,dp(4),0,0);
+                    labels.addView(pdfBadge,pdfLp);
+                }
                 row.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
 
                 boolean favorite=favoriteIds.contains(r.baseId);
                 TextView star=text(favorite?"★":"☆",favorite?22:24,
-                        favorite?Color.rgb(206,145,0):Color.rgb(125,139,157),true);
+                        favorite?FAVORITE_GOLD:Color.rgb(125,139,157),true);
                 star.setGravity(Gravity.CENTER);
                 star.setClickable(true);
                 star.setFocusable(false);
@@ -2343,7 +2566,7 @@ public class MainActivity extends Activity {
                     boolean now=db.toggleFavorite(r.baseId);
                     if(now) favoriteIds.add(r.baseId); else favoriteIds.remove(r.baseId);
                     star.setText(now?"★":"☆");
-                    star.setTextColor(now?Color.rgb(206,145,0):Color.rgb(125,139,157));
+                    star.setTextColor(now?FAVORITE_GOLD:Color.rgb(125,139,157));
                     star.setContentDescription(now?"Убрать из избранного":"Добавить в избранное");
                     Toast.makeText(MainActivity.this,
                             now?"Добавлено в избранное":"Удалено из избранного",
@@ -2627,7 +2850,7 @@ public class MainActivity extends Activity {
     }
 
     private TextView pageTitle(String value) {
-        TextView t=text(value,responsive(16,18,20),TEXT,true);
+        TextView t=text(value,responsive(16,18,20),BLUE_DARK,true);
         t.setPadding(dp(2),dp(7),dp(2),dp(7));
         return t;
     }
@@ -2635,6 +2858,8 @@ public class MainActivity extends Activity {
     private void showContent(View view,int direction) {
         contentHost.removeAllViews();
         contentHost.addView(view,new FrameLayout.LayoutParams(-1,-1));
+        view.setAlpha(0f);
+        view.animate().alpha(1f).setDuration(160).start();
         if(direction!=0) {
             float width=getResources().getDisplayMetrics().widthPixels;
             float from=direction>0?width:-width;
@@ -2694,6 +2919,8 @@ public class MainActivity extends Activity {
         syncInProgress=true;
         b.setEnabled(false);
         fitSyncButton(b,syncBusyLabel());
+        b.animate().rotationBy(360f).setDuration(650).start();
+        showRecentLoadingSkeleton();
         status.setText("Проверяю обновления…");
         final ProgressDialog progress=new ProgressDialog(this);
         progress.setTitle(lowHeightUi()?"Проверка КР":"Проверка клинических рекомендаций");
@@ -2916,7 +3143,7 @@ public class MainActivity extends Activity {
 
     @Override protected void onResume() {
         super.onResume();
-        if(db!=null && recentList!=null) reload();
+        if(db!=null && (recentList!=null || recentChangesContainer!=null)) reload();
         maybeLaunchReviewFlow();
     }
 
