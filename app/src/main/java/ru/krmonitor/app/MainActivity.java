@@ -33,7 +33,6 @@ public class MainActivity extends Activity {
     private TextView recentList;
     private ScrollView recentScroll;
     private LinearLayout recentChangesContainer;
-    private LinearLayout dashboardStats;
     private TextView changesBadge;
     private EditText search;
     private FrameLayout contentHost;
@@ -282,45 +281,6 @@ public class MainActivity extends Activity {
             }
             return false;
         });
-    }
-
-    private TextView statChip(String value,String label,int accent) {
-        TextView chip=text(value+"\n"+label,12,TEXT,true);
-        chip.setGravity(Gravity.CENTER);
-        chip.setLineSpacing(dp(1),1f);
-        chip.setPadding(dp(6),dp(7),dp(6),dp(7));
-        chip.setBackground(rounded(CARD,translucent(accent,55),13));
-        chip.setContentDescription(value+" "+label);
-        return chip;
-    }
-
-    private void refreshDashboardStats(List<DbHelper.ChangeEvent> recent) {
-        if(dashboardStats==null) return;
-        dashboardStats.removeAllViews();
-        int newCount=0, updatedCount=0;
-        if(recent!=null) {
-            for(DbHelper.ChangeEvent e:recent) {
-                if("NEW".equals(e.type)) newCount++; else updatedCount++;
-            }
-        }
-
-        String last=getSharedPreferences("prefs",MODE_PRIVATE).getString("last_sync","—");
-        TextView total=statChip(String.valueOf(all.size()),"КР",BLUE);
-        TextView changes=statChip(String.valueOf(newCount+updatedCount),"изменений",
-                (newCount+updatedCount)>0?UPDATE_ORANGE:BLUE);
-        TextView checked=statChip(last==null||last.isEmpty()?"—":last,"проверено",NEW_GREEN);
-        checked.setMaxLines(2);
-        checked.setEllipsize(TextUtils.TruncateAt.END);
-
-        LinearLayout.LayoutParams lp1=new LinearLayout.LayoutParams(0,-2,1);
-        lp1.setMargins(0,0,dp(4),0);
-        LinearLayout.LayoutParams lp2=new LinearLayout.LayoutParams(0,-2,1);
-        lp2.setMargins(dp(4),0,dp(4),0);
-        LinearLayout.LayoutParams lp3=new LinearLayout.LayoutParams(0,-2,1);
-        lp3.setMargins(dp(4),0,0,0);
-        dashboardStats.addView(total,lp1);
-        dashboardStats.addView(changes,lp2);
-        dashboardStats.addView(checked,lp3);
     }
 
     private void showRecentLoadingSkeleton() {
@@ -654,16 +614,9 @@ public class MainActivity extends Activity {
         root.addView(header);
 
         status=text("",responsive(11,12,13),MUTED,false);
-        status.setPadding(0,dp(responsive(7,9,10)),0,dp(6));
+        status.setPadding(0,dp(responsive(7,9,10)),0,dp(responsive(5,6,7)));
         status.setLineSpacing(dp(1),1f);
         root.addView(status);
-
-        dashboardStats=new LinearLayout(this);
-        dashboardStats.setOrientation(LinearLayout.HORIZONTAL);
-        dashboardStats.setGravity(Gravity.CENTER_VERTICAL);
-        LinearLayout.LayoutParams dashboardLp=new LinearLayout.LayoutParams(-1,-2);
-        dashboardLp.setMargins(0,0,0,dp(8));
-        root.addView(dashboardStats,dashboardLp);
 
         LinearLayout recentHeader=new LinearLayout(this);
         recentHeader.setOrientation(compact?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);
@@ -1270,7 +1223,6 @@ public class MainActivity extends Activity {
 
     private void renderRecent() {
         List<DbHelper.ChangeEvent> recent=changesForLastScan(compactChromeUi()?30:100);
-        refreshDashboardStats(recent);
         if(changesBadge!=null) {
             if(recent.isEmpty()) {
                 changesBadge.setVisibility(View.GONE);
