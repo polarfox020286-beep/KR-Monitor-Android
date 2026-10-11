@@ -56,14 +56,17 @@ public class MainActivity extends Activity {
     private ReviewInfo reviewInfo;
     private boolean reviewRequestInProgress=false;
 
-    private static final int BG=Color.rgb(247,249,252);
+    private static final int BG=Color.rgb(242,247,255);
     private static final int CARD=Color.WHITE;
-    private static final int BLUE=Color.rgb(37,99,199);
-    private static final int BLUE_DARK=Color.rgb(25,70,145);
-    private static final int BLUE_SOFT=Color.rgb(235,243,255);
-    private static final int TEXT=Color.rgb(29,38,52);
-    private static final int MUTED=Color.rgb(104,115,132);
-    private static final int LINE=Color.rgb(228,233,240);
+    private static final int BLUE=Color.rgb(24,105,235);
+    private static final int BLUE_DARK=Color.rgb(18,63,142);
+    private static final int BLUE_SOFT=Color.rgb(225,239,255);
+    private static final int TEXT=Color.rgb(22,35,58);
+    private static final int MUTED=Color.rgb(91,108,132);
+    private static final int LINE=Color.rgb(207,221,241);
+    private static final int NEW_GREEN=Color.rgb(25,145,82);
+    private static final int UPDATE_ORANGE=Color.rgb(225,117,30);
+    private static final int FAVORITE_GOLD=Color.rgb(196,142,22);
 
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
@@ -209,6 +212,44 @@ public class MainActivity extends Activity {
         return d;
     }
 
+    private int profileSoftColor(String profile) {
+        if(profile==null) return Color.rgb(239,245,255);
+        if(profile.contains("Кардио")) return Color.rgb(255,238,243);
+        if(profile.contains("Неврол")) return Color.rgb(239,237,255);
+        if(profile.contains("Нейрох")) return Color.rgb(244,238,255);
+        if(profile.contains("Травмат") || profile.contains("ортоп")) return Color.rgb(255,246,225);
+        if(profile.equals("Хирургия")) return Color.rgb(255,239,231);
+        if(profile.contains("Гастро")) return Color.rgb(231,248,239);
+        if(profile.contains("Пульмон")) return Color.rgb(228,247,251);
+        if(profile.contains("Эндокрин")) return Color.rgb(245,237,255);
+        if(profile.contains("Инфек")) return Color.rgb(232,249,237);
+        if(profile.contains("Гемат")) return Color.rgb(255,237,240);
+        if(profile.contains("Нефрол") || profile.contains("Уролог")) return Color.rgb(231,243,255);
+        if(profile.contains("Анестези")) return Color.rgb(228,240,255);
+        return Color.rgb(238,245,255);
+    }
+
+    private int profileAccentColor(String profile) {
+        if(profile==null) return BLUE;
+        if(profile.contains("Кардио")) return Color.rgb(210,55,88);
+        if(profile.contains("Неврол")) return Color.rgb(92,74,205);
+        if(profile.contains("Нейрох")) return Color.rgb(124,69,190);
+        if(profile.contains("Травмат") || profile.contains("ортоп")) return Color.rgb(196,137,29);
+        if(profile.equals("Хирургия")) return Color.rgb(215,91,48);
+        if(profile.contains("Гастро")) return Color.rgb(35,139,88);
+        if(profile.contains("Пульмон")) return Color.rgb(30,139,165);
+        if(profile.contains("Эндокрин")) return Color.rgb(142,76,190);
+        if(profile.contains("Инфек")) return Color.rgb(39,145,73);
+        if(profile.contains("Гемат")) return Color.rgb(183,57,79);
+        if(profile.contains("Нефрол") || profile.contains("Уролог")) return Color.rgb(39,111,190);
+        if(profile.contains("Анестези")) return Color.rgb(40,102,199);
+        return BLUE;
+    }
+
+    private int translucent(int color,int alpha) {
+        return Color.argb(alpha,Color.red(color),Color.green(color),Color.blue(color));
+    }
+
     private TextView text(String value,float size,int color,boolean bold) {
         TextView t=new TextView(this);
         t.setText(value);
@@ -274,19 +315,19 @@ public class MainActivity extends Activity {
         item.setOrientation(LinearLayout.VERTICAL);
         item.setGravity(Gravity.CENTER);
         item.setPadding(dp(3),dp(lowHeightUi()?2:4),dp(3),dp(lowHeightUi()?2:4));
-        item.setBackground(rounded(selected?BLUE_SOFT:Color.TRANSPARENT,Color.TRANSPARENT,12));
+        item.setBackground(rounded(selected?BLUE:Color.TRANSPARENT,Color.TRANSPARENT,12));
         item.setClickable(true);
         item.setFocusable(true);
         item.setContentDescription(label);
         item.setOnClickListener(v -> navigateBottom(page));
 
-        TextView iconView=text(icon,lowHeightUi()?15:18,selected?BLUE:MUTED,selected);
+        TextView iconView=text(icon,lowHeightUi()?15:18,selected?Color.WHITE:MUTED,selected);
         iconView.setTextSize(TypedValue.COMPLEX_UNIT_DIP,lowHeightUi()?15:18);
         iconView.setGravity(Gravity.CENTER);
         iconView.setIncludeFontPadding(true);
         item.addView(iconView,new LinearLayout.LayoutParams(-1,-2));
 
-        TextView labelView=text(label,lowHeightUi()?8:10,selected?BLUE:MUTED,selected);
+        TextView labelView=text(label,lowHeightUi()?8:10,selected?Color.WHITE:MUTED,selected);
         labelView.setGravity(Gravity.CENTER);
         labelView.setSingleLine(true);
         labelView.setIncludeFontPadding(true);
@@ -452,7 +493,7 @@ public class MainActivity extends Activity {
         LinearLayout titleRow=new LinearLayout(this);
         titleRow.setOrientation(LinearLayout.HORIZONTAL);
         titleRow.setGravity(Gravity.CENTER_VERTICAL);
-        TextView title=text("КР Навигатор",responsive(21,23,26),TEXT,true);
+        TextView title=text("КР Навигатор",responsive(21,23,26),BLUE_DARK,true);
         title.setSingleLine(true);
         title.setEllipsize(TextUtils.TruncateAt.END);
         title.setTextSize(cappedChromeSp(responsive(21,23,26)));
@@ -482,11 +523,11 @@ public class MainActivity extends Activity {
             header.addView(heading,new LinearLayout.LayoutParams(0,-2,1));
         }
 
-        TextView sync=text("↻  Проверить",responsive(12,13,14),BLUE,true);
+        TextView sync=text("↻  Проверить",responsive(12,13,14),Color.WHITE,true);
         sync.setSingleLine(true);
         sync.setGravity(Gravity.CENTER);
         sync.setPadding(dp(compact?7:10),dp(9),dp(compact?7:10),dp(9));
-        sync.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,14));
+        sync.setBackground(rounded(BLUE,Color.TRANSPARENT,14));
         sync.setClickable(true);
         sync.setFocusable(true);
         sync.setContentDescription("Проверить обновления");
@@ -509,7 +550,7 @@ public class MainActivity extends Activity {
         LinearLayout recentHeader=new LinearLayout(this);
         recentHeader.setOrientation(compact?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);
         recentHeader.setGravity(compact?Gravity.LEFT:Gravity.CENTER_VERTICAL);
-        TextView recentTitle=text("Изменения",responsive(14,15,16),TEXT,true);
+        TextView recentTitle=text("Изменения",responsive(14,15,16),BLUE_DARK,true);
         recentHeader.addView(recentTitle,compact
                 ? new LinearLayout.LayoutParams(-1,-2)
                 : new LinearLayout.LayoutParams(0,-2,1));
@@ -530,7 +571,7 @@ public class MainActivity extends Activity {
         recentScroll.setVerticalScrollBarEnabled(true);
         recentScroll.setScrollbarFadingEnabled(true);
         recentScroll.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
-        recentScroll.setBackground(rounded(CARD,LINE,14));
+        recentScroll.setBackground(rounded(CARD,translucent(BLUE,70),14));
         recentScroll.addView(recentList,new ScrollView.LayoutParams(-1,-2));
 
         int recentHeightDp=responsive(92,96,104);
@@ -545,7 +586,7 @@ public class MainActivity extends Activity {
         search.setTextSize(TypedValue.COMPLEX_UNIT_DIP,responsive(14,15,16));
         search.setSingleLine(true);
         search.setPadding(dp(responsive(11,14,16)),0,dp(responsive(11,14,16)),0);
-        search.setBackground(rounded(CARD,LINE,15));
+        search.setBackground(rounded(CARD,translucent(BLUE,60),15));
         search.setMinHeight(dp(responsive(46,48,52)));
         root.addView(search,new LinearLayout.LayoutParams(-1,-2));
         fitSearchField(search,responsive(14,15,16),10f);
@@ -1048,19 +1089,29 @@ public class MainActivity extends Activity {
             return;
         }
 
-        StringBuilder sb=new StringBuilder();
+        android.text.SpannableStringBuilder sb=new android.text.SpannableStringBuilder();
         for(int i=0;i<recent.size();i++) {
             DbHelper.ChangeEvent e=recent.get(i);
             if(i>0) sb.append("\n");
+            int start=sb.length();
             if("NEW".equals(e.type)) {
-                sb.append("НОВАЯ  ").append(e.title).append("  ·  ").append(e.newId);
+                sb.append("●  НОВАЯ");
+                sb.setSpan(new android.text.style.ForegroundColorSpan(NEW_GREEN),
+                        start,sb.length(),android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             } else {
-                sb.append("ОБНОВЛЕНА  ").append(e.title).append("  ·  ");
-                if(e.oldId!=null && !e.oldId.isEmpty()) sb.append(e.oldId).append(" → ");
-                sb.append(e.newId);
+                sb.append("●  ОБНОВЛЕНА");
+                sb.setSpan(new android.text.style.ForegroundColorSpan(UPDATE_ORANGE),
+                        start,sb.length(),android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
+            sb.setSpan(new android.text.style.StyleSpan(Typeface.BOLD),
+                    start,sb.length(),android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            sb.append("  ").append(e.title).append("  ·  ");
+            if(!"NEW".equals(e.type) && e.oldId!=null && !e.oldId.isEmpty()) {
+                sb.append(e.oldId).append(" → ");
+            }
+            sb.append(e.newId);
         }
-        recentList.setText(sb.toString());
+        recentList.setText(sb);
 
         // After refresh start from the newest change at the top of the fixed
         // scrollable card.
@@ -1645,7 +1696,7 @@ public class MainActivity extends Activity {
         LinearLayout summary=new LinearLayout(this);
         summary.setOrientation(LinearLayout.VERTICAL);
         summary.setPadding(dp(12),dp(9),dp(12),dp(9));
-        summary.setBackground(rounded(BLUE_SOFT,Color.TRANSPARENT,14));
+        summary.setBackground(rounded(BLUE_SOFT,translucent(BLUE,60),16));
 
         TextView summaryTitle=text(
                 downloaded.size()+" скачанных КР",
@@ -1838,8 +1889,9 @@ public class MainActivity extends Activity {
         card.setGravity(Gravity.CENTER);
         int cardPad=responsive(7,9,11);
         card.setPadding(dp(cardPad),dp(cardPad),dp(cardPad),dp(responsive(7,8,9)));
-        card.setBackground(rounded(CARD,LINE,16));
-        if(Build.VERSION.SDK_INT>=21) card.setElevation(dp(1));
+        int accent=profileAccentColor(profile);
+        card.setBackground(rounded(profileSoftColor(profile),translucent(accent,75),18));
+        if(Build.VERSION.SDK_INT>=21) card.setElevation(dp(3));
         card.setClickable(true);
         card.setFocusable(true);
 
@@ -1864,11 +1916,14 @@ public class MainActivity extends Activity {
         }
         card.addView(name,new LinearLayout.LayoutParams(-1,-2));
 
-        TextView number=text(count+" КР",responsive(10,11,12),MUTED,false);
+        TextView number=text(count+" КР",responsive(10,11,12),accent,true);
         number.setGravity(Gravity.CENTER);
         number.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
-        number.setPadding(0,dp(5),0,0);
-        card.addView(number,new LinearLayout.LayoutParams(-1,-2));
+        number.setPadding(dp(8),dp(4),dp(8),dp(4));
+        number.setBackground(rounded(translucent(Color.WHITE,185),Color.TRANSPARENT,11));
+        LinearLayout.LayoutParams numberLp=new LinearLayout.LayoutParams(-2,-2);
+        numberLp.setMargins(0,dp(5),0,0);
+        card.addView(number,numberLp);
 
         name.post(() -> fitProfileName(name,displayProfile));
         card.setOnClickListener(v -> { selectedProfile=profile; renderCurrentPage(0); });
@@ -2627,7 +2682,7 @@ public class MainActivity extends Activity {
     }
 
     private TextView pageTitle(String value) {
-        TextView t=text(value,responsive(16,18,20),TEXT,true);
+        TextView t=text(value,responsive(16,18,20),BLUE_DARK,true);
         t.setPadding(dp(2),dp(7),dp(2),dp(7));
         return t;
     }
