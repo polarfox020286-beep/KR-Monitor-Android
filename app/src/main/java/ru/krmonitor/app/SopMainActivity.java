@@ -82,15 +82,20 @@ public class SopMainActivity extends Activity {
         // New installs use the read-only public Yandex Disk folder automatically.
         // A previously selected source remains unchanged.
         SharedPreferences initialPrefs=getSharedPreferences("prefs",MODE_PRIVATE);
-        boolean sourceMissing=initialPrefs.getString("yandex_public_key","").trim().isEmpty()
-                &&initialPrefs.getString("tree_uri","").trim().isEmpty();
-        if(sourceMissing){
+        boolean sourceChanged=!DEFAULT_PUBLIC_YANDEX_FOLDER.equals(
+                initialPrefs.getString("yandex_public_key",""))
+                ||!initialPrefs.getString("tree_uri","").isEmpty();
+        if(sourceChanged){
             initialPrefs.edit()
                     .putString("yandex_public_key",DEFAULT_PUBLIC_YANDEX_FOLDER)
+                    .remove("tree_uri")
                     .putBoolean("baseline_done",false)
+                    .remove("last_sync_ms")
+                    .remove("last_sync_text")
                     .apply();
         }
         db=new SopDbHelper(this);
+        if(sourceChanged)db.clearAll();
         SopAlarmScheduler.scheduleNext(this);
         requestNotifyPermission();
         requestExactAlarmPermission();
@@ -196,7 +201,8 @@ public class SopMainActivity extends Activity {
         source=text("",10.3f,BLUE_DARK,true);
         source.setPadding(dp(8),dp(5),dp(8),dp(5));
         source.setGravity(Gravity.CENTER_VERTICAL);
-        source.setClickable(true); source.setFocusable(true);
+        // Informational status only: the source address and settings are not exposed.
+        source.setClickable(false); source.setFocusable(false);
         LinearLayout.LayoutParams sourceLp=new LinearLayout.LayoutParams(-1,-2);
         sourceLp.setMargins(0,dp(2),0,0);
         hero.addView(source,sourceLp);
@@ -316,11 +322,8 @@ public class SopMainActivity extends Activity {
 
         setContentView(root);
 
-        sync.setOnClickListener(v -> {
-            if(!hasFolder()) chooseFolder();
-            else runSync(sync);
-        });
-        source.setOnClickListener(v -> chooseFolder());
+        sync.setOnClickListener(v -> runSync(sync));
+        // Source status is deliberately not interactive.
 
         navAll.setOnClickListener(v->{personnelFilter=null;updatePersonnelChips();selectedCategory=null;currentPage=PAGE_ALL;renderCurrentPage(0);});
         navGroups.setOnClickListener(v->{personnelFilter=null;updatePersonnelChips();selectedCategory=null;currentPage=PAGE_GROUPS;renderCurrentPage(0);});
@@ -483,7 +486,10 @@ public class SopMainActivity extends Activity {
     }
 
     private void runSync(TextView button){
-        if(!hasFolder()){chooseFolder();return;}
+        if(!hasFolder()){
+            status.setText("Источник документов недоступен.");
+            return;
+        }
         if(button!=null){
             button.setEnabled(false);
             button.setText("…");
@@ -514,15 +520,15 @@ public class SopMainActivity extends Activity {
         status.setText(all.size()+" документов  ·  Проверено: "+lastText+"\nСледующая проверка: "+
                 DateFormat.getDateTimeInstance(DateFormat.MEDIUM,DateFormat.SHORT).format(new Date(next))+note);
         if(hasYandexSource()){
-            source.setText("●  Яндекс Диск · публичная папка    Изменить ›");
+            source.setText("●  Яндекс Диск подключён");
             source.setTextColor(SUCCESS);
             source.setBackground(rounded(SUCCESS_BG,Color.TRANSPARENT,12));
         }else if(hasFolder()){
-            source.setText("●  Google Drive · старый режим    Изменить ›");
+            source.setText("●  Источник документов подключён");
             source.setTextColor(WARN);
             source.setBackground(rounded(WARN_BG,Color.TRANSPARENT,12));
         }else{
-            source.setText("＋  Подключить общедоступную папку документов");
+            source.setText("●  Источник документов недоступен");
             source.setTextColor(WARN);
             source.setBackground(rounded(WARN_BG,Color.TRANSPARENT,12));
         }
