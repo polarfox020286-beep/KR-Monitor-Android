@@ -1,0 +1,32 @@
+name: Build Yandex PDF test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ sop-yandex-internal-pdf ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Prepare splash asset
+        run: |
+          mkdir -p app/src/main/assets
+          cp app/src/main/res/drawable-nodpi/sop_splash.webp app/src/main/assets/sop_splash.webp
+      - name: Build debug APK
+        env:
+          KR_VERSION_CODE: ${{ github.run_number }}
+          KR_VERSION_NAME: "yandex-pdf-test-${{ github.run_number }}"
+        run: gradle :app:assembleDebug --stacktrace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SOP-Navigator-Yandex-PDF-test
+          path: app/build/outputs/apk/debug/app-debug.apk
