@@ -38,6 +38,13 @@ jobs:
           export KR_VERSION_NAME="yandex-pdf-test-${RUN_NUM}"
           gradle :app:assembleDebug --stacktrace
 
+      - name: Make APK downloadable from GitHub Actions
+        uses: actions/upload-artifact@v4
+        with:
+          name: SOP-Navigator-Yandex-PDF-test
+          path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+
       - name: Publish APK on test branch
         run: |
           mkdir -p dist
