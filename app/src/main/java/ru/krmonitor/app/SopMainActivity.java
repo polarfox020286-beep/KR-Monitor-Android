@@ -86,7 +86,7 @@ public class SopMainActivity extends Activity {
         reload();
         if(!hasFolder()){
             source.postDelayed(() -> {
-                if(!isFinishing()) Toast.makeText(this,"Выберите папку СОПов на Google Drive один раз",Toast.LENGTH_LONG).show();
+                if(!isFinishing()) Toast.makeText(this,"Подключите общедоступную папку документов. Рекомендуется публичная папка Яндекс Диска.",Toast.LENGTH_LONG).show();
             },400);
         }
     }
@@ -384,10 +384,66 @@ public class SopMainActivity extends Activity {
     }
 
     private boolean hasFolder(){
-        return !getSharedPreferences("prefs",MODE_PRIVATE).getString("tree_uri","").isEmpty();
+        SharedPreferences p=getSharedPreferences("prefs",MODE_PRIVATE);
+        return !p.getString("yandex_public_key","").trim().isEmpty()||!p.getString("tree_uri","").isEmpty();
+    }
+
+    private boolean hasYandexSource(){
+        return !getSharedPreferences("prefs",MODE_PRIVATE).getString("yandex_public_key","").trim().isEmpty();
     }
 
     private void chooseFolder(){
+        SharedPreferences p=getSharedPreferences("prefs",MODE_PRIVATE);
+
+        LinearLayout body=new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(dp(18),dp(6),dp(18),0);
+
+        TextView info=text("Рекомендуемый режим: публичная папка Яндекс Диска. Пользователям приложения не потребуется выбирать папку или входить в ваш облачный аккаунт.",13,TEXT,false);
+        info.setLineSpacing(dp(2),1.05f);
+        body.addView(info);
+
+        EditText link=new EditText(this);
+        link.setHint("https://disk.yandex.ru/d/...");
+        link.setSingleLine(true);
+        link.setText(p.getString("yandex_public_key",""));
+        link.setTextSize(13);
+        link.setPadding(0,dp(10),0,dp(4));
+        body.addView(link,new LinearLayout.LayoutParams(-1,-2));
+
+        AlertDialog dialog=new AlertDialog.Builder(this)
+                .setTitle("Источник документов")
+                .setView(body)
+                .setPositiveButton("Подключить Яндекс Диск",null)
+                .setNeutralButton("Google Drive · старый режим",(d,w)->chooseGoogleDriveFolder())
+                .setNegativeButton("Отмена",null)
+                .create();
+
+        dialog.setOnShowListener(x -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String raw=link.getText().toString().trim();
+            if(raw.isEmpty()||!(raw.startsWith("https://")||raw.startsWith("http://"))){
+                link.setError("Вставьте публичную ссылку на папку Яндекс Диска");
+                return;
+            }
+            String low=raw.toLowerCase(Locale.ROOT);
+            if(!(low.contains("yandex.")||low.contains("yadi.sk"))){
+                link.setError("Нужна ссылка Яндекс Диска");
+                return;
+            }
+            p.edit()
+                    .putString("yandex_public_key",raw)
+                    .putBoolean("baseline_done",false)
+                    .remove("last_sync_text").remove("last_sync_ms")
+                    .apply();
+            db.clearAll();
+            dialog.dismiss();
+            reload();
+            runSync(null);
+        }));
+        dialog.show();
+    }
+
+    private void chooseGoogleDriveFolder(){
         Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
         i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION|Intent.FLAG_GRANT_PREFIX_URI_PERMISSION);
         startActivityForResult(i,REQ_TREE);
@@ -403,6 +459,7 @@ public class SopMainActivity extends Activity {
         }catch(Exception ignored){}
         getSharedPreferences("prefs",MODE_PRIVATE).edit()
                 .putString("tree_uri",uri.toString())
+                .remove("yandex_public_key")
                 .putBoolean("baseline_done",false)
                 .remove("last_sync_text").remove("last_sync_ms").apply();
         db.clearAll();
@@ -417,7 +474,7 @@ public class SopMainActivity extends Activity {
             button.setText("…");
             button.setAlpha(0.62f);
         }
-        status.setText("Проверяю папку Google Drive…");
+        status.setText(hasYandexSource()?"Проверяю публичную папку Яндекс Диска…":"Проверяю папку Google Drive…");
         executor.submit(() -> {
             SopSyncEngine.Result result=SopSyncEngine.sync(getApplicationContext());
             runOnUiThread(() -> {
@@ -441,12 +498,16 @@ public class SopMainActivity extends Activity {
         String note=notificationsEnabled()?"":"\n⚠ Уведомления Android отключены";
         status.setText(all.size()+" документов  ·  Проверено: "+lastText+"\nСледующая проверка: "+
                 DateFormat.getDateTimeInstance(DateFormat.MEDIUM,DateFormat.SHORT).format(new Date(next))+note);
-        if(hasFolder()){
-            source.setText("●  Google Drive подключён    Изменить папку ›");
+        if(hasYandexSource()){
+            source.setText("●  Яндекс Диск · публичная папка    Изменить ›");
             source.setTextColor(SUCCESS);
             source.setBackground(rounded(SUCCESS_BG,Color.TRANSPARENT,12));
+        }else if(hasFolder()){
+            source.setText("●  Google Drive · старый режим    Изменить ›");
+            source.setTextColor(WARN);
+            source.setBackground(rounded(WARN_BG,Color.TRANSPARENT,12));
         }else{
-            source.setText("＋  Подключить папку СОПов на Google Drive");
+            source.setText("＋  Подключить общедоступную папку документов");
             source.setTextColor(WARN);
             source.setBackground(rounded(WARN_BG,Color.TRANSPARENT,12));
         }
@@ -964,13 +1025,22 @@ public class SopMainActivity extends Activity {
         }
 
         db.markViewed(d.key);
-        Toast.makeText(this,"Загрузка в Downloads/СОП Навигатор…",Toast.LENGTH_SHORT).show();
+        Toast.makeText(this,"Загрузка документа…",Toast.LENGTH_SHORT).show();
         executor.submit(() -> {
             try{
                 Uri localUri=downloadToVisibleStorage(d);
                 String mime=d.mime==null||d.mime.trim().isEmpty()?mimeForFile(d.fileName):d.mime;
+                boolean pdf="application/pdf".equalsIgnoreCase(mime)||(d.fileName!=null&&d.fileName.toLowerCase(Locale.ROOT).endsWith(".pdf"));
                 runOnUiThread(() -> {
                     Toast.makeText(this,"Файл сохранён в Downloads/СОП Навигатор",Toast.LENGTH_SHORT).show();
+                    if(pdf){
+                        Intent i=new Intent(this,PdfViewerActivity.class);
+                        i.putExtra(PdfViewerActivity.EXTRA_URI,localUri.toString());
+                        i.putExtra(PdfViewerActivity.EXTRA_TITLE,d.title);
+                        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        startActivity(i);
+                        return;
+                    }
                     try{
                         Intent i=new Intent(Intent.ACTION_VIEW);
                         i.setDataAndType(localUri,mime);
@@ -989,7 +1059,7 @@ public class SopMainActivity extends Activity {
                 });
             }catch(Exception e){
                 String m=e.getMessage()==null?e.getClass().getSimpleName():e.getMessage();
-                runOnUiThread(() -> Toast.makeText(this,"Не удалось скачать документ из Google Drive. "+m,Toast.LENGTH_LONG).show());
+                runOnUiThread(() -> Toast.makeText(this,"Не удалось скачать документ из облака. "+m,Toast.LENGTH_LONG).show());
             }
         });
     }
@@ -1407,6 +1477,7 @@ class SopPersonnelIndex {
             default:return true;
         }
         if(set.contains(d.key))return true;
+        if(SopPersonnelNames.matches(d.fileName,group))return true;
 
         // Safe fallback for newly added documents whose title itself explicitly
         // contains the personnel group. Current files are indexed by Drive ID.
@@ -1599,8 +1670,11 @@ class SopClassifier {
 class SopScanner {
     static List<SopDocument> scan(Context c) throws Exception{
         SharedPreferences p=c.getSharedPreferences("prefs",Context.MODE_PRIVATE);
+        String yandex=p.getString("yandex_public_key","").trim();
+        if(!yandex.isEmpty())return YandexDiskSource.scan(c,yandex);
+
         String raw=p.getString("tree_uri","");
-        if(raw.isEmpty())throw new IllegalStateException("Папка Google Drive не подключена.");
+        if(raw.isEmpty())throw new IllegalStateException("Источник документов не подключён.");
 
         Uri tree=Uri.parse(raw);
         String parent=DocumentsContract.getTreeDocumentId(tree);
@@ -1897,7 +1971,7 @@ class SopSyncEngine {
             if(!baseline&&added+updated>0)notifyChanges(c,added,updated,changed);
             db.close();
 
-            if(baseline)return new Result(0,0,scanned.size(),"Папка подключена. В каталог добавлено "+scanned.size()+" документов.");
+            if(baseline)return new Result(0,0,scanned.size(),"Источник подключён. В каталог добавлено "+scanned.size()+" документов.");
             if(added==0&&updated==0&&removed==0)return new Result(0,0,scanned.size(),"Изменений не найдено.");
             String message="Проверка завершена. Новых: "+added+", обновлено: "+updated;
             if(removed>0)message+=", удалено: "+removed;
@@ -1905,7 +1979,7 @@ class SopSyncEngine {
             return new Result(added,updated,scanned.size(),message);
         }catch(Exception e){
             String m=e.getMessage()==null?e.getClass().getSimpleName():e.getMessage();
-            return new Result(0,0,0,"Не удалось проверить папку Google Drive.\n"+m);
+            return new Result(0,0,0,"Не удалось проверить источник документов.\n"+m);
         }
     }
 
