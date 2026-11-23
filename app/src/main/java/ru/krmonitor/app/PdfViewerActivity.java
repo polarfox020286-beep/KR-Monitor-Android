@@ -238,6 +238,9 @@ public final class PdfViewerActivity extends Activity {
         private float panX = 0f;
         private float panY = 0f;
         private final float margin = dp(5);
+        private float swipeStartX;
+        private float swipeStartY;
+        private boolean swipeHadMultiplePointers;
 
         PageCanvas() {
             super(PdfViewerActivity.this);
@@ -258,6 +261,9 @@ public final class PdfViewerActivity extends Activity {
                         @Override public boolean onScroll(MotionEvent first, MotionEvent second,
                                                           float distanceX, float distanceY) {
                             if (pinch.isInProgress()) return true;
+                            // At fit-width, horizontal gestures turn pages on finger release.
+                            // Do not pan the page sideways or interfere with vertical reading.
+                            if (zoom <= 1.04f && Math.abs(distanceX) > Math.abs(distanceY)) return true;
                             panX -= distanceX;
                             panY -= distanceY;
                             limitPan();
@@ -386,11 +392,37 @@ public final class PdfViewerActivity extends Activity {
         }
 
         @Override public boolean onTouchEvent(MotionEvent event) {
+            int action = event.getActionMasked();
+            if (action == MotionEvent.ACTION_DOWN) {
+                swipeStartX = event.getX();
+                swipeStartY = event.getY();
+                swipeHadMultiplePointers = false;
+            } else if (action == MotionEvent.ACTION_POINTER_DOWN) {
+                swipeHadMultiplePointers = true;
+            }
+            if (event.getPointerCount() > 1) swipeHadMultiplePointers = true;
+
             pinch.onTouchEvent(event);
-            if (event.getPointerCount() == 1 && !pinch.isInProgress()) {
+            if (event.getPointerCount() == 1 && !pinch.isInProgress()
+                    && !swipeHadMultiplePointers) {
                 gestures.onTouchEvent(event);
             }
-            if (event.getActionMasked() == MotionEvent.ACTION_UP) performClick();
+
+            if (action == MotionEvent.ACTION_UP) {
+                // Page turning works only when the entire page fits the viewport
+                // width. When zoomed in, swiping pans the document instead.
+                if (!swipeHadMultiplePointers && zoom <= 1.04f && rendered != null) {
+                    float dx = event.getX() - swipeStartX;
+                    float dy = event.getY() - swipeStartY;
+                    float minSwipe = Math.max(dp(65), getWidth() * 0.18f);
+                    if (Math.abs(dx) >= minSwipe && Math.abs(dx) > Math.abs(dy) * 1.35f) {
+                        nextPage(dx < 0 ? 1 : -1);
+                    }
+                }
+                performClick();
+            } else if (action == MotionEvent.ACTION_CANCEL) {
+                swipeHadMultiplePointers = true;
+            }
             return true;
         }
 
