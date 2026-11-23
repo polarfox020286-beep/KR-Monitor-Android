@@ -130,11 +130,9 @@ public class PdfViewerActivity extends Activity {
     }
 
     private final class PdfPageAdapter extends BaseAdapter {
-        private final android.util.LruCache<Integer,Bitmap> cache=new android.util.LruCache<Integer,Bitmap>(4){
-            @Override protected void entryRemoved(boolean evicted,Integer key,Bitmap oldValue,Bitmap newValue){
-                if(oldValue!=null&&oldValue!=newValue&&!oldValue.isRecycled())oldValue.recycle();
-            }
-        };
+        // Do not call Bitmap.recycle() on eviction: a visible ImageView can still
+        // be drawing that bitmap even after it leaves the small memory cache.
+        private final android.util.LruCache<Integer,Bitmap> cache=new android.util.LruCache<>(4);
 
         @Override public int getCount(){
             return renderer==null?0:renderer.getPageCount();
