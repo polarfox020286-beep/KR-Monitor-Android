@@ -33,6 +33,7 @@ import java.util.concurrent.*;
 
 public class SopMainActivity extends Activity {
     public static final String ACTION_SYNC_COMPLETE="ru.sopnavigator.app.SYNC_COMPLETE";
+    private static final String DEFAULT_PUBLIC_YANDEX_FOLDER="https://disk.yandex.ru/d/QMC9einrmwTE_Q";
     private static final int REQ_TREE=44;
     private static final int REQ_WRITE_DOWNLOADS=4402;
     private final ExecutorService executor=Executors.newSingleThreadExecutor();
@@ -78,12 +79,26 @@ public class SopMainActivity extends Activity {
 
     @Override protected void onCreate(Bundle b){
         super.onCreate(b);
+        // New installs use the read-only public Yandex Disk folder automatically.
+        // A previously selected source remains unchanged.
+        SharedPreferences initialPrefs=getSharedPreferences("prefs",MODE_PRIVATE);
+        boolean sourceMissing=initialPrefs.getString("yandex_public_key","").trim().isEmpty()
+                &&initialPrefs.getString("tree_uri","").trim().isEmpty();
+        if(sourceMissing){
+            initialPrefs.edit()
+                    .putString("yandex_public_key",DEFAULT_PUBLIC_YANDEX_FOLDER)
+                    .putBoolean("baseline_done",false)
+                    .apply();
+        }
         db=new SopDbHelper(this);
         SopAlarmScheduler.scheduleNext(this);
         requestNotifyPermission();
         requestExactAlarmPermission();
         buildUi();
         reload();
+        if(hasYandexSource() && getSharedPreferences("prefs",MODE_PRIVATE).getLong("last_sync_ms",0L)==0L){
+            runSync(null);
+        }
         if(!hasFolder()){
             source.postDelayed(() -> {
                 if(!isFinishing()) Toast.makeText(this,"Подключите общедоступную папку документов. Рекомендуется публичная папка Яндекс Диска.",Toast.LENGTH_LONG).show();
