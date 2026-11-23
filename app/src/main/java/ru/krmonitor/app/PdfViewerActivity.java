@@ -1,6 +1,7 @@
 package ru.krmonitor.app;
 
 import android.app.Activity;
+import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -188,7 +189,10 @@ public final class PdfViewerActivity extends Activity {
         loadPage();
     }
 
-    private void loadPage() {
+    private void loadPage() { loadPage(true); }
+
+    // When only the screen geometry changes, retain zoom and scroll position.
+    private void loadPage(boolean resetView) {
         if (pdf == null || pageCanvas == null || pageCanvas.getWidth() <= 0) return;
         PdfRenderer.Page page = null;
         Bitmap nextBitmap = null;
@@ -207,7 +211,7 @@ public final class PdfViewerActivity extends Activity {
 
             Bitmap oldBitmap = rendered;
             rendered = nextBitmap;
-            pageCanvas.show(rendered, aspect);
+            pageCanvas.show(rendered, aspect, resetView);
             if (oldBitmap != null && !oldBitmap.isRecycled()) oldBitmap.recycle();
             pageIndicator.setText((pageIndex + 1) + " / " + pdf.getPageCount());
             previous.setEnabled(pageIndex > 0);
@@ -302,11 +306,15 @@ public final class PdfViewerActivity extends Activity {
             return margin + panY;
         }
 
-        void show(Bitmap bitmap, float pageAspect) {
+        void show(Bitmap bitmap, float pageAspect, boolean resetView) {
             this.aspect = pageAspect;
-            this.zoom = 1f;
-            this.panX = 0f;
-            this.panY = 0f;
+            if (resetView) {
+                this.zoom = 1f;
+                this.panX = 0f;
+                this.panY = 0f;
+            } else {
+                limitPan();
+            }
             announceZoom();
             invalidate();
         }
@@ -375,9 +383,16 @@ public final class PdfViewerActivity extends Activity {
         }
 
         @Override protected void onSizeChanged(int width, int height, int oldW, int oldH) {
+            // Preserve the reader's relative reading position during rotation.
+            float oldPageWidth = Math.max(1f, oldW - margin * 2f) * zoom;
+            float newPageWidth = Math.max(1f, width - margin * 2f) * zoom;
+            float ratio = oldW > 0 ? newPageWidth / oldPageWidth : 1f;
+            float oldPanX = panX;
+            float oldPanY = panY;
             super.onSizeChanged(width, height, oldW, oldH);
-            panX = 0f;
-            panY = 0f;
+            panX = oldPanX * ratio;
+            panY = oldPanY * ratio;
+            limitPan();
             invalidate();
         }
 
@@ -429,6 +444,16 @@ public final class PdfViewerActivity extends Activity {
         @Override public boolean performClick() {
             super.performClick();
             return true;
+        }
+    }
+
+    @Override public void onConfigurationChanged(Configuration configuration) {
+        super.onConfigurationChanged(configuration);
+        // Keep the open PDF and page; rerender it for the new viewport size.
+        if (pageCanvas != null) {
+            pageCanvas.post(() -> {
+                if (!isFinishing() && pdf != null) loadPage(false);
+            });
         }
     }
 
