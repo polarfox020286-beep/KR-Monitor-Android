@@ -25,6 +25,27 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Verify public Yandex Disk folder without authentication
+        env:
+          YANDEX_PUBLIC_URL: https://disk.yandex.ru/d/QMC9einrmwTE_Q
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.parse, urllib.request
+          url = 'https://cloud-api.yandex.net/v1/disk/public/resources?' + urllib.parse.urlencode({
+              'public_key': os.environ['YANDEX_PUBLIC_URL'], 'limit': 10
+          })
+          request = urllib.request.Request(url, headers={'Accept':'application/json', 'User-Agent':'SOP-Navigator/2'})
+          with urllib.request.urlopen(request, timeout=35) as response:
+              data = json.load(response)
+          print('Public folder API accessible: true')
+          print('Folder type:', data.get('type'))
+          print('Folder name:', data.get('name'))
+          embedded = data.get('_embedded') or {}
+          print('Total files/folders:', embedded.get('total',0))
+          if data.get('type') != 'dir':
+              raise RuntimeError('Public URL does not point to a folder')
+          PY
+
       - name: Prepare splash asset
         run: |
           mkdir -p app/src/main/assets
