@@ -1100,9 +1100,9 @@ public class SopMainActivity extends Activity {
             // Same document name, but Drive version changed: overwrite the same
             // MediaStore item instead of inserting "filename (1).pdf".
             boolean written=false;
-            try(InputStream in=resolver.openInputStream(Uri.parse(d.uri));
+            try(InputStream in=SopStreams.open(this,d.uri);
                 OutputStream out=resolver.openOutputStream(existing,"wt")){
-                if(in==null)throw new IOException("Google Drive не предоставил поток файла.");
+                if(in==null)throw new IOException("Источник документов не предоставил поток файла.");
                 if(out==null)throw new IOException("Не удалось открыть существующий файл для обновления.");
                 byte[] buf=new byte[64*1024];
                 long total=0;
@@ -1134,9 +1134,9 @@ public class SopMainActivity extends Activity {
         if(target==null)throw new IOException("Android не создал файл в Downloads.");
 
         boolean ok=false;
-        try(InputStream in=resolver.openInputStream(Uri.parse(d.uri));
+        try(InputStream in=SopStreams.open(this,d.uri);
             OutputStream out=resolver.openOutputStream(target,"w")){
-            if(in==null)throw new IOException("Google Drive не предоставил поток файла.");
+            if(in==null)throw new IOException("Источник документов не предоставил поток файла.");
             if(out==null)throw new IOException("Не удалось открыть файл в Downloads для записи.");
             byte[] buf=new byte[64*1024];
             long total=0;
@@ -1233,8 +1233,8 @@ public class SopMainActivity extends Activity {
 
         File tmp=new File(dir,safe+".part");
         if(tmp.exists())tmp.delete();
-        try(InputStream in=getContentResolver().openInputStream(Uri.parse(d.uri))){
-            if(in==null)throw new IOException("Google Drive не предоставил поток файла.");
+        try(InputStream in=SopStreams.open(this,d.uri)){
+            if(in==null)throw new IOException("Источник документов не предоставил поток файла.");
             try(OutputStream out=new FileOutputStream(tmp)){
                 byte[] buf=new byte[64*1024];
                 int n;
