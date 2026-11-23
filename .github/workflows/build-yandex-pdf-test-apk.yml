@@ -45,5 +45,17 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add dist/SOP-Navigator-Yandex-PDF-test.apk
-          git commit -m "Publish Yandex PDF test APK [skip ci]" || exit 0
-          git push
+          git commit -m "Publish Yandex PDF test APK [skip ci]" || true
+          git push || true
+
+      - name: Publish test release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete sop-yandex-pdf-test -y --cleanup-tag || true
+          gh release create sop-yandex-pdf-test \
+            dist/SOP-Navigator-Yandex-PDF-test.apk \
+            --target "${GITHUB_SHA}" \
+            --title "SOP Navigator Yandex PDF test" \
+            --notes "Test build: built-in PDF viewer and public Yandex Disk source." \
+            --prerelease
