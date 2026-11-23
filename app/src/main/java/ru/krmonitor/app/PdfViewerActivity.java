@@ -1,244 +1,366 @@
 package ru.krmonitor.app;
 
-import android.app.*;
-import android.graphics.*;
+import android.app.Activity;
+import android.graphics.Bitmap;
+import android.graphics.Color;
+import android.graphics.Typeface;
 import android.graphics.pdf.PdfRenderer;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
-import android.os.*;
+import android.os.Bundle;
+import android.os.ParcelFileDescriptor;
 import android.text.TextUtils;
-import android.view.*;
-import android.widget.*;
+import android.view.GestureDetector;
+import android.view.Gravity;
+import android.view.MotionEvent;
+import android.view.ScaleGestureDetector;
+import android.view.View;
+import android.widget.HorizontalScrollView;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import android.widget.Toast;
 
-import java.io.*;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.Locale;
 
+/**
+ * Native PDF viewer. A document fits the screen width by default; image
+ * rasterization is intentionally higher-resolution than its display size.
+ * Both pan and pinch-to-zoom stay inside SOP Navigator.
+ */
 public class PdfViewerActivity extends Activity {
-    public static final String EXTRA_URI="pdf_uri";
-    public static final String EXTRA_TITLE="pdf_title";
+    public static final String EXTRA_URI = "pdf_uri";
+    public static final String EXTRA_TITLE = "pdf_title";
+
+    private static final int BACKGROUND = Color.rgb(237, 242, 247);
+    private static final int INK = Color.rgb(26, 47, 68);
+    private static final int BLUE = Color.rgb(15, 89, 160);
+    private static final int BORDER = Color.rgb(219, 228, 235);
+    private static final float MIN_ZOOM = 1f;
+    private static final float MAX_ZOOM = 3f;
 
     private ParcelFileDescriptor descriptor;
     private PdfRenderer renderer;
-    private PdfRenderer.Page page;
     private Bitmap bitmap;
     private ImageView image;
-    private TextView counter,prev,next,zoomText;
-    private ScrollView vertical;
+    private TextView pageCounter, previousButton, nextButton, zoomLabel;
     private HorizontalScrollView horizontal;
-    private int pageIndex=0;
-    private float zoom=1.0f;
+    private ScrollView vertical;
+    private ScaleGestureDetector pinchDetector;
+    private GestureDetector tapDetector;
+    private float gestureZoom = 1f;
+    private int pageIndex = 0;
+    private float zoom = 1f;
 
-    private static final int BG=Color.rgb(244,249,252);
-    private static final int BLUE_DARK=Color.rgb(10,71,146);
-    private static final int TEXT=Color.rgb(22,49,73);
-    private static final int LINE=Color.rgb(218,232,240);
-
-    @Override protected void onCreate(Bundle state){
-        super.onCreate(state);
-        if(state!=null){
-            pageIndex=state.getInt("page",0);
-            zoom=state.getFloat("zoom",1f);
-        }
-
-        String raw=getIntent().getStringExtra(EXTRA_URI);
-        String title=getIntent().getStringExtra(EXTRA_TITLE);
-        if(raw==null||raw.isEmpty()){
-            Toast.makeText(this,"Не удалось открыть PDF.",Toast.LENGTH_LONG).show();
-            finish();
-            return;
-        }
-
-        try{
-            descriptor=getContentResolver().openFileDescriptor(Uri.parse(raw),"r");
-            if(descriptor==null)throw new FileNotFoundException("Файл не найден");
-            renderer=new PdfRenderer(descriptor);
-            if(renderer.getPageCount()==0)throw new IOException("В PDF нет страниц");
-            if(pageIndex>=renderer.getPageCount())pageIndex=0;
-        }catch(Exception e){
-            Toast.makeText(this,"Не удалось открыть PDF: "+safeMessage(e),Toast.LENGTH_LONG).show();
-            closeRenderer();
-            finish();
-            return;
-        }
-
-        buildUi(title==null||title.trim().isEmpty()?"Документ PDF":title);
-        renderPage();
+    private int dp(int n) {
+        return Math.round(n * getResources().getDisplayMetrics().density);
     }
 
-    private int dp(int v){return (int)(v*getResources().getDisplayMetrics().density+0.5f);}
+    @Override protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        if (savedInstanceState != null) {
+            pageIndex = savedInstanceState.getInt("page", 0);
+            zoom = clamp(savedInstanceState.getFloat("zoom", 1f));
+        }
+        String rawUri = getIntent().getStringExtra(EXTRA_URI);
+        String documentTitle = getIntent().getStringExtra(EXTRA_TITLE);
+        if (rawUri == null || rawUri.isEmpty()) {
+            Toast.makeText(this, "Файл PDF не найден", Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
+        try {
+            descriptor = getContentResolver().openFileDescriptor(Uri.parse(rawUri), "r");
+            if (descriptor == null) throw new FileNotFoundException("Нет доступа к файлу");
+            renderer = new PdfRenderer(descriptor);
+            if (renderer.getPageCount() == 0) throw new IOException("Документ не содержит страниц");
+            pageIndex = Math.max(0, Math.min(renderer.getPageCount() - 1, pageIndex));
+        } catch (Exception e) {
+            Toast.makeText(this, "Не удалось открыть PDF: " + safeMessage(e), Toast.LENGTH_LONG).show();
+            closeResources();
+            finish();
+            return;
+        }
+        buildInterface(documentTitle == null || documentTitle.trim().isEmpty() ? "Документ PDF" : documentTitle);
+        horizontal.post(() -> renderPage(false, zoom));
+    }
 
-    private GradientDrawable rounded(int fill,int stroke,int radius){
-        GradientDrawable d=new GradientDrawable();
-        d.setColor(fill);
+    private GradientDrawable rounded(int color, int radius) {
+        GradientDrawable d = new GradientDrawable();
+        d.setColor(color);
         d.setCornerRadius(dp(radius));
-        if(stroke!=Color.TRANSPARENT)d.setStroke(dp(1),stroke);
         return d;
     }
 
-    private TextView button(String text){
-        TextView v=new TextView(this);
+    private TextView control(String text, String description) {
+        TextView v = new TextView(this);
         v.setText(text);
-        v.setTextSize(16);
-        v.setTextColor(BLUE_DARK);
+        v.setTextSize(19);
+        v.setTextColor(BLUE);
         v.setGravity(Gravity.CENTER);
-        v.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
-        v.setBackground(rounded(Color.WHITE,LINE,13));
+        v.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        v.setContentDescription(description);
+        v.setBackground(rounded(Color.WHITE, 10));
         v.setClickable(true);
         v.setFocusable(true);
         return v;
     }
 
-    private void buildUi(String documentTitle){
-        LinearLayout root=new LinearLayout(this);
+    private void buildInterface(String documentTitle) {
+        LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(BG);
+        root.setBackgroundColor(BACKGROUND);
 
-        LinearLayout top=new LinearLayout(this);
-        top.setOrientation(LinearLayout.HORIZONTAL);
-        top.setGravity(Gravity.CENTER_VERTICAL);
-        top.setPadding(dp(10),dp(8),dp(10),dp(8));
-        top.setBackgroundColor(Color.WHITE);
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setBackgroundColor(Color.WHITE);
+        header.setPadding(dp(7), dp(4), dp(7), dp(4));
 
-        TextView back=button("‹");
-        top.addView(back,new LinearLayout.LayoutParams(dp(44),dp(44)));
-
-        TextView title=new TextView(this);
+        TextView back = control("‹", "Назад к списку документов");
+        header.addView(back, new LinearLayout.LayoutParams(dp(42), dp(48)));
+        TextView title = new TextView(this);
         title.setText(documentTitle);
-        title.setTextSize(15);
-        title.setTextColor(TEXT);
-        title.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
-        title.setSingleLine(true);
+        title.setTextColor(INK);
+        title.setTextSize(13.5f);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        title.setMaxLines(2);
         title.setEllipsize(TextUtils.TruncateAt.END);
-        LinearLayout.LayoutParams titleLp=new LinearLayout.LayoutParams(0,-2,1);
-        titleLp.setMargins(dp(10),0,dp(8),0);
-        top.addView(title,titleLp);
+        title.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0, dp(50), 1f);
+        titleLp.setMargins(dp(7), 0, dp(6), 0);
+        header.addView(title, titleLp);
 
-        TextView minus=button("−");
-        zoomText=button("100%");
-        zoomText.setTextSize(11);
-        TextView plus=button("+");
-        top.addView(minus,new LinearLayout.LayoutParams(dp(42),dp(42)));
-        LinearLayout.LayoutParams zlp=new LinearLayout.LayoutParams(dp(54),dp(42));
-        zlp.setMargins(dp(5),0,dp(5),0);
-        top.addView(zoomText,zlp);
-        top.addView(plus,new LinearLayout.LayoutParams(dp(42),dp(42)));
-        root.addView(top,new LinearLayout.LayoutParams(-1,-2));
+        TextView fit = control("⤢", "По ширине экрана");
+        fit.setTextSize(23);
+        header.addView(fit, new LinearLayout.LayoutParams(dp(42), dp(48)));
+        root.addView(header, new LinearLayout.LayoutParams(-1, dp(58)));
 
-        horizontal=new HorizontalScrollView(this);
+        pinchDetector = new ScaleGestureDetector(this, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            @Override public boolean onScaleBegin(ScaleGestureDetector detector) {
+                gestureZoom = zoom;
+                return true;
+            }
+            @Override public boolean onScale(ScaleGestureDetector detector) {
+                gestureZoom = clamp(gestureZoom * detector.getScaleFactor());
+                zoomLabel.setText(String.format(Locale.ROOT, "%d%%", Math.round(gestureZoom * 100)));
+                return true;
+            }
+            @Override public void onScaleEnd(ScaleGestureDetector detector) {
+                if (Math.abs(gestureZoom - zoom) > 0.025f) {
+                    float oldZoom = zoom;
+                    zoom = gestureZoom;
+                    renderPage(true, oldZoom);
+                } else {
+                    updateControls();
+                }
+            }
+        });
+        tapDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
+            @Override public boolean onDown(MotionEvent e) { return true; }
+            @Override public boolean onDoubleTap(MotionEvent e) {
+                float oldZoom = zoom;
+                zoom = zoom > 1.05f ? MIN_ZOOM : 2f;
+                renderPage(zoom != MIN_ZOOM, oldZoom);
+                return true;
+            }
+        });
+
+        horizontal = new HorizontalScrollView(this) {
+            @Override public boolean dispatchTouchEvent(MotionEvent event) {
+                if (pinchDetector != null) pinchDetector.onTouchEvent(event);
+                if (tapDetector != null) tapDetector.onTouchEvent(event);
+                // During multi-touch avoid forwarding scaling gestures to scroll views.
+                if (event.getPointerCount() > 1 || (pinchDetector != null && pinchDetector.isInProgress())) {
+                    return true;
+                }
+                return super.dispatchTouchEvent(event);
+            }
+        };
         horizontal.setFillViewport(true);
-        horizontal.setBackgroundColor(Color.rgb(229,235,239));
+        horizontal.setHorizontalScrollBarEnabled(false);
+        horizontal.setBackgroundColor(BACKGROUND);
 
-        vertical=new ScrollView(this);
-        vertical.setFillViewport(true);
+        vertical = new ScrollView(this);
+        vertical.setFillViewport(false);
+        vertical.setVerticalScrollBarEnabled(true);
+        vertical.setBackgroundColor(BACKGROUND);
 
-        image=new ImageView(this);
+        image = new ImageView(this);
         image.setBackgroundColor(Color.WHITE);
         image.setScaleType(ImageView.ScaleType.FIT_XY);
-        vertical.addView(image,new ScrollView.LayoutParams(-2,-2));
-        horizontal.addView(vertical,new HorizontalScrollView.LayoutParams(-2,-1));
-        root.addView(horizontal,new LinearLayout.LayoutParams(-1,0,1));
+        image.setAdjustViewBounds(false);
+        vertical.addView(image, new ScrollView.LayoutParams(-2, -2));
+        horizontal.addView(vertical, new HorizontalScrollView.LayoutParams(-2, -1));
+        root.addView(horizontal, new LinearLayout.LayoutParams(-1, 0, 1f));
 
-        LinearLayout bottom=new LinearLayout(this);
-        bottom.setOrientation(LinearLayout.HORIZONTAL);
-        bottom.setGravity(Gravity.CENTER_VERTICAL);
-        bottom.setPadding(dp(10),dp(7),dp(10),dp(7));
-        bottom.setBackgroundColor(Color.WHITE);
+        LinearLayout toolbar = new LinearLayout(this);
+        toolbar.setGravity(Gravity.CENTER_VERTICAL);
+        toolbar.setOrientation(LinearLayout.HORIZONTAL);
+        toolbar.setBackgroundColor(Color.WHITE);
+        toolbar.setPadding(dp(8), dp(4), dp(8), dp(4));
 
-        prev=button("‹");
-        next=button("›");
-        counter=new TextView(this);
-        counter.setTextColor(TEXT);
-        counter.setTextSize(13);
-        counter.setGravity(Gravity.CENTER);
-        counter.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+        previousButton = control("‹", "Предыдущая страница");
+        nextButton = control("›", "Следующая страница");
+        TextView minus = control("−", "Уменьшить");
+        TextView plus = control("+", "Увеличить");
+        minus.setTextSize(21);
+        plus.setTextSize(21);
 
-        bottom.addView(prev,new LinearLayout.LayoutParams(dp(52),dp(44)));
-        bottom.addView(counter,new LinearLayout.LayoutParams(0,dp(44),1));
-        bottom.addView(next,new LinearLayout.LayoutParams(dp(52),dp(44)));
-        root.addView(bottom,new LinearLayout.LayoutParams(-1,-2));
+        pageCounter = new TextView(this);
+        pageCounter.setTextColor(INK);
+        pageCounter.setTextSize(14);
+        pageCounter.setGravity(Gravity.CENTER);
+        pageCounter.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+
+        zoomLabel = new TextView(this);
+        zoomLabel.setTextColor(INK);
+        zoomLabel.setTextSize(12);
+        zoomLabel.setGravity(Gravity.CENTER);
+        zoomLabel.setOnClickListener(v -> {
+            float old = zoom;
+            zoom = MIN_ZOOM;
+            renderPage(false, old);
+        });
+
+        toolbar.addView(previousButton, new LinearLayout.LayoutParams(dp(40), dp(44)));
+        toolbar.addView(pageCounter, new LinearLayout.LayoutParams(0, dp(44), 1f));
+        toolbar.addView(nextButton, new LinearLayout.LayoutParams(dp(40), dp(44)));
+        View separator = new View(this);
+        separator.setBackgroundColor(BORDER);
+        LinearLayout.LayoutParams sep = new LinearLayout.LayoutParams(dp(1), dp(26));
+        sep.setMargins(dp(6), 0, dp(6), 0);
+        toolbar.addView(separator, sep);
+        toolbar.addView(minus, new LinearLayout.LayoutParams(dp(36), dp(44)));
+        toolbar.addView(zoomLabel, new LinearLayout.LayoutParams(dp(50), dp(44)));
+        toolbar.addView(plus, new LinearLayout.LayoutParams(dp(36), dp(44)));
+        root.addView(toolbar, new LinearLayout.LayoutParams(-1, dp(52)));
 
         setContentView(root);
 
-        back.setOnClickListener(v->finish());
-        prev.setOnClickListener(v->{if(pageIndex>0){pageIndex--;renderPage();}});
-        next.setOnClickListener(v->{if(renderer!=null&&pageIndex<renderer.getPageCount()-1){pageIndex++;renderPage();}});
-        minus.setOnClickListener(v->{if(zoom>0.75f){zoom=Math.max(0.75f,zoom-0.25f);renderPage();}});
-        plus.setOnClickListener(v->{if(zoom<2.0f){zoom=Math.min(2.0f,zoom+0.25f);renderPage();}});
+        back.setOnClickListener(v -> finish());
+        fit.setOnClickListener(v -> {
+            float previous = zoom;
+            zoom = MIN_ZOOM;
+            renderPage(false, previous);
+        });
+        previousButton.setOnClickListener(v -> changePage(-1));
+        nextButton.setOnClickListener(v -> changePage(1));
+        minus.setOnClickListener(v -> changeZoom(-0.25f));
+        plus.setOnClickListener(v -> changeZoom(0.25f));
     }
 
-    private void renderPage(){
-        if(renderer==null)return;
-        try{
-            closePage();
-            page=renderer.openPage(pageIndex);
+    private float clamp(float value) {
+        return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, value));
+    }
 
-            int screen=getResources().getDisplayMetrics().widthPixels;
-            int width=(int)Math.max(dp(320),Math.min(2200,(screen-dp(24))*zoom));
-            int height=Math.round(width*(page.getHeight()/(float)page.getWidth()));
-            if(height>3400){
-                height=3400;
-                width=Math.round(height*(page.getWidth()/(float)page.getHeight()));
-            }
+    private void changeZoom(float difference) {
+        float oldZoom = zoom;
+        zoom = clamp(zoom + difference);
+        if (Math.abs(oldZoom - zoom) > 0.001f) renderPage(zoom != MIN_ZOOM, oldZoom);
+    }
 
-            recycleBitmap();
-            bitmap=Bitmap.createBitmap(width,height,Bitmap.Config.ARGB_8888);
-            bitmap.eraseColor(Color.WHITE);
-            page.render(bitmap,null,null,PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
+    private void changePage(int direction) {
+        if (renderer == null) return;
+        int target = pageIndex + direction;
+        if (target < 0 || target >= renderer.getPageCount()) return;
+        pageIndex = target;
+        renderPage(false, zoom);
+    }
 
+    private void updateControls() {
+        if (renderer == null || pageCounter == null) return;
+        pageCounter.setText((pageIndex + 1) + " / " + renderer.getPageCount());
+        zoomLabel.setText(Math.round(zoom * 100f) + "%");
+        previousButton.setEnabled(pageIndex > 0);
+        previousButton.setAlpha(pageIndex > 0 ? 1f : 0.3f);
+        nextButton.setEnabled(pageIndex < renderer.getPageCount() - 1);
+        nextButton.setAlpha(pageIndex < renderer.getPageCount() - 1 ? 1f : 0.3f);
+    }
+
+    /**
+     * Render at up to 2x physical display resolution for readable text.
+     * Bound bitmap pixels to prevent OOM on very large medical scans.
+     */
+    private void renderPage(boolean preservePosition, float previousZoom) {
+        if (renderer == null || horizontal == null || image == null) return;
+        int oldX = horizontal.getScrollX();
+        int oldY = vertical.getScrollY();
+        int viewportWidth = Math.max(dp(250), horizontal.getWidth());
+        int viewportHeight = Math.max(dp(250), horizontal.getHeight());
+
+        PdfRenderer.Page pdfPage = null;
+        Bitmap nextBitmap = null;
+        try {
+            pdfPage = renderer.openPage(pageIndex);
+            float aspect = pdfPage.getHeight() / (float) Math.max(1, pdfPage.getWidth());
+            int displayWidth = Math.round(Math.max(dp(220), viewportWidth - dp(4)) * zoom);
+            int displayHeight = Math.max(1, Math.round(displayWidth * aspect));
+
+            int bitmapWidth = Math.min(3500, Math.round(displayWidth * 2f));
+            bitmapWidth = Math.min(bitmapWidth, Math.max(1, (int) Math.sqrt(10000000.0 / Math.max(0.05f, aspect))));
+            int bitmapHeight = Math.max(1, Math.round(bitmapWidth * aspect));
+
+            nextBitmap = Bitmap.createBitmap(bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888);
+            nextBitmap.eraseColor(Color.WHITE);
+            pdfPage.render(nextBitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
+
+            Bitmap previousBitmap = bitmap;
+            bitmap = nextBitmap;
             image.setImageBitmap(bitmap);
-            image.setLayoutParams(new ScrollView.LayoutParams(width,height));
-            counter.setText((pageIndex+1)+" / "+renderer.getPageCount());
-            zoomText.setText(Math.round(zoom*100)+"%");
-            prev.setEnabled(pageIndex>0);
-            prev.setAlpha(pageIndex>0?1f:0.35f);
-            next.setEnabled(pageIndex<renderer.getPageCount()-1);
-            next.setAlpha(pageIndex<renderer.getPageCount()-1?1f:0.35f);
-            horizontal.post(()->horizontal.scrollTo(0,0));
-            vertical.post(()->vertical.scrollTo(0,0));
-        }catch(Exception e){
-            Toast.makeText(this,"Не удалось отобразить страницу: "+safeMessage(e),Toast.LENGTH_LONG).show();
+            image.setLayoutParams(new ScrollView.LayoutParams(displayWidth, displayHeight));
+            if (previousBitmap != null && previousBitmap != bitmap && !previousBitmap.isRecycled()) {
+                previousBitmap.recycle();
+            }
+            updateControls();
+
+            final float scale = previousZoom > 0 ? zoom / previousZoom : 1f;
+            final int newX = preservePosition ? Math.round((oldX + viewportWidth / 2f) * scale - viewportWidth / 2f) : 0;
+            final int newY = preservePosition ? Math.round((oldY + viewportHeight / 2f) * scale - viewportHeight / 2f) : 0;
+            horizontal.post(() -> horizontal.scrollTo(Math.max(0, newX), 0));
+            vertical.post(() -> vertical.scrollTo(0, Math.max(0, newY)));
+        } catch (Exception e) {
+            if (nextBitmap != null && nextBitmap != bitmap && !nextBitmap.isRecycled()) nextBitmap.recycle();
+            Toast.makeText(this, "Не удалось показать страницу: " + safeMessage(e), Toast.LENGTH_LONG).show();
+        } finally {
+            if (pdfPage != null) {
+                try { pdfPage.close(); } catch (Exception ignored) {}
+            }
         }
     }
 
-    @Override protected void onSaveInstanceState(Bundle out){
-        out.putInt("page",pageIndex);
-        out.putFloat("zoom",zoom);
+    @Override protected void onSaveInstanceState(Bundle out) {
+        out.putInt("page", pageIndex);
+        out.putFloat("zoom", zoom);
         super.onSaveInstanceState(out);
     }
 
-    @Override protected void onDestroy(){
-        closePage();
-        recycleBitmap();
-        closeRenderer();
+    @Override protected void onDestroy() {
+        if (image != null) image.setImageDrawable(null);
+        if (bitmap != null) {
+            if (!bitmap.isRecycled()) bitmap.recycle();
+            bitmap = null;
+        }
+        closeResources();
         super.onDestroy();
     }
 
-    private void closePage(){
-        if(page!=null){
-            try{page.close();}catch(Exception ignored){}
-            page=null;
+    private void closeResources() {
+        if (renderer != null) {
+            try { renderer.close(); } catch (Exception ignored) {}
+            renderer = null;
+        }
+        if (descriptor != null) {
+            try { descriptor.close(); } catch (Exception ignored) {}
+            descriptor = null;
         }
     }
 
-    private void recycleBitmap(){
-        if(bitmap!=null){
-            try{bitmap.recycle();}catch(Exception ignored){}
-            bitmap=null;
-        }
-    }
-
-    private void closeRenderer(){
-        if(renderer!=null){
-            try{renderer.close();}catch(Exception ignored){}
-            renderer=null;
-        }
-        if(descriptor!=null){
-            try{descriptor.close();}catch(Exception ignored){}
-            descriptor=null;
-        }
-    }
-
-    private String safeMessage(Exception e){
-        String m=e.getMessage();
-        return m==null||m.trim().isEmpty()?e.getClass().getSimpleName():m;
+    private String safeMessage(Exception e) {
+        String message = e.getMessage();
+        return message == null || message.trim().isEmpty() ? e.getClass().getSimpleName() : message;
     }
 }
