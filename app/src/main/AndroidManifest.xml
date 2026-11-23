@@ -29,6 +29,10 @@
             android:name=".SopMainActivity"
             android:exported="false"/>
 
+        <activity
+            android:name=".PdfViewerActivity"
+            android:exported="false"/>
+
         <receiver android:name=".SopAlarmReceiver" android:exported="false"/>
         <receiver android:name=".SopBootReceiver" android:exported="true">
             <intent-filter>
