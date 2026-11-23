@@ -4,6 +4,7 @@ import android.Manifest;
 import android.app.*;
 import android.content.*;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.database.Cursor;
 import android.database.ContentObserver;
 import android.database.sqlite.*;
@@ -99,7 +100,17 @@ public class SopMainActivity extends Activity {
         SopAlarmScheduler.scheduleNext(this);
         requestNotifyPermission();
         requestExactAlarmPermission();
+        if(b!=null) {
+            currentPage=b.getInt("sop_page",PAGE_GROUPS);
+            selectedCategory=b.getString("sop_category");
+            personnelFilter=b.getString("sop_personnel");
+        }
         buildUi();
+        if(b!=null) {
+            String restoredSearch=b.getString("sop_search","");
+            if(!restoredSearch.isEmpty()) search.setText(restoredSearch);
+        }
+        updatePersonnelChips();
         reload();
         if(hasYandexSource() && getSharedPreferences("prefs",MODE_PRIVATE).getLong("last_sync_ms",0L)==0L){
             runSync(null);
@@ -129,6 +140,47 @@ public class SopMainActivity extends Activity {
         super.onDestroy();
     }
 
+    @Override protected void onSaveInstanceState(Bundle state) {
+        state.putInt("sop_page",currentPage);
+        state.putString("sop_category",selectedCategory);
+        state.putString("sop_personnel",personnelFilter);
+        if(search!=null) state.putString("sop_search",search.getText().toString());
+        super.onSaveInstanceState(state);
+    }
+
+    @Override public void onConfigurationChanged(Configuration configuration) {
+        super.onConfigurationChanged(configuration);
+        // Keep the document list, active tab, filter and query. Do not restart sync.
+        String query=search==null?"":search.getText().toString();
+        boolean hadFocus=search!=null && search.hasFocus();
+        ScrollView oldScroll=findListScroll(contentHost);
+        int oldScrollY=oldScroll==null?0:oldScroll.getScrollY();
+        buildUi();
+        if(!query.isEmpty()) {
+            search.setText(query);
+            search.setSelection(search.length());
+        }
+        updatePersonnelChips();
+        reload();
+        if(hadFocus) search.requestFocus();
+        ScrollView newScroll=findListScroll(contentHost);
+        if(newScroll!=null && oldScrollY>0)
+            newScroll.post(() -> newScroll.scrollTo(0,oldScrollY));
+    }
+
+    private ScrollView findListScroll(View root) {
+        if(root==null) return null;
+        if(root instanceof ScrollView) return (ScrollView)root;
+        if(root instanceof ViewGroup) {
+            ViewGroup group=(ViewGroup)root;
+            for(int i=0;i<group.getChildCount();i++) {
+                ScrollView found=findListScroll(group.getChildAt(i));
+                if(found!=null) return found;
+            }
+        }
+        return null;
+    }
+
     private int dp(int v){return (int)(v*getResources().getDisplayMetrics().density+0.5f);}
 
     private GradientDrawable rounded(int fill,int stroke,int radius){
@@ -153,14 +205,16 @@ public class SopMainActivity extends Activity {
     }
 
     private void buildUi(){
+        boolean landscape=getResources().getConfiguration().orientation==Configuration.ORIENTATION_LANDSCAPE;
+        personnelChipViews.clear();
         LinearLayout root=new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(14),dp(8),dp(14),dp(7));
+        root.setPadding(dp(landscape?8:14),dp(landscape?3:8),dp(landscape?8:14),dp(landscape?3:7));
         root.setBackgroundColor(BG);
 
         LinearLayout hero=new LinearLayout(this);
         hero.setOrientation(LinearLayout.VERTICAL);
-        hero.setPadding(dp(11),dp(8),dp(11),dp(8));
+        hero.setPadding(dp(landscape?7:11),dp(landscape?4:8),dp(landscape?7:11),dp(landscape?4:8));
         hero.setBackground(gradient(Color.rgb(239,251,255),Color.rgb(225,243,252),20));
         if(Build.VERSION.SDK_INT>=21)hero.setElevation(dp(1));
 
@@ -181,6 +235,7 @@ public class SopMainActivity extends Activity {
         title.setLetterSpacing(0.01f);
         TextView subtitle=text("Елизаветинская больница · локальные документы",10.2f,MUTED,false);
         subtitle.setPadding(0,dp(1),0,0);
+        if(landscape) subtitle.setVisibility(View.GONE);
         heading.addView(title);
         heading.addView(subtitle);
         header.addView(heading,new LinearLayout.LayoutParams(0,-2,1));
@@ -197,6 +252,7 @@ public class SopMainActivity extends Activity {
         status.setLineSpacing(0,0.98f);
         status.setPadding(dp(1),dp(6),dp(1),dp(1));
         hero.addView(status);
+        if(landscape) status.setVisibility(View.GONE);
 
         source=text("",10.3f,BLUE_DARK,true);
         source.setPadding(dp(8),dp(5),dp(8),dp(5));
@@ -206,9 +262,10 @@ public class SopMainActivity extends Activity {
         LinearLayout.LayoutParams sourceLp=new LinearLayout.LayoutParams(-1,-2);
         sourceLp.setMargins(0,dp(2),0,0);
         hero.addView(source,sourceLp);
+        if(landscape) source.setVisibility(View.GONE);
 
         LinearLayout.LayoutParams heroLp=new LinearLayout.LayoutParams(-1,-2);
-        heroLp.setMargins(0,0,0,dp(6));
+        heroLp.setMargins(0,0,0,dp(landscape?3:6));
         root.addView(hero,heroLp);
 
         LinearLayout updates=new LinearLayout(this);
@@ -254,6 +311,8 @@ public class SopMainActivity extends Activity {
         LinearLayout.LayoutParams updatesLp=new LinearLayout.LayoutParams(-1,dp(82));
         updatesLp.setMargins(0,0,0,dp(8));
         root.addView(updates,updatesLp);
+        // In landscape, keep the document area large enough for reading lists.
+        if(landscape) updates.setVisibility(View.GONE);
 
         LinearLayout searchBox=new LinearLayout(this);
         searchBox.setOrientation(LinearLayout.HORIZONTAL);
@@ -264,7 +323,7 @@ public class SopMainActivity extends Activity {
 
         TextView searchIcon=text("⌕",19,BLUE,false);
         searchIcon.setGravity(Gravity.CENTER);
-        searchBox.addView(searchIcon,new LinearLayout.LayoutParams(dp(26),dp(44)));
+        searchBox.addView(searchIcon,new LinearLayout.LayoutParams(dp(26),dp(landscape?36:44)));
 
         search=new EditText(this);
         search.setHint("Поиск по названию, разделу и ключевому слову");
@@ -274,8 +333,8 @@ public class SopMainActivity extends Activity {
         search.setSingleLine(true);
         search.setPadding(dp(2),0,dp(2),0);
         search.setBackgroundColor(Color.TRANSPARENT);
-        searchBox.addView(search,new LinearLayout.LayoutParams(0,dp(44),1));
-        root.addView(searchBox,new LinearLayout.LayoutParams(-1,dp(46)));
+        searchBox.addView(search,new LinearLayout.LayoutParams(0,dp(landscape?36:44),1));
+        root.addView(searchBox,new LinearLayout.LayoutParams(-1,dp(landscape?38:46)));
 
         HorizontalScrollView personnelScroll=new HorizontalScrollView(this);
         personnelScroll.setHorizontalScrollBarEnabled(false);
@@ -298,27 +357,27 @@ public class SopMainActivity extends Activity {
             personnelRow.addView(chip);
         }
         personnelScroll.addView(personnelRow,new HorizontalScrollView.LayoutParams(-2,dp(39)));
-        root.addView(personnelScroll,new LinearLayout.LayoutParams(-1,dp(42)));
+        root.addView(personnelScroll,new LinearLayout.LayoutParams(-1,dp(landscape?38:42)));
 
         contentHost=new FrameLayout(this);
         LinearLayout.LayoutParams contentLp=new LinearLayout.LayoutParams(-1,0,1);
-        contentLp.setMargins(0,dp(6),0,dp(7));
+        contentLp.setMargins(0,dp(landscape?2:6),0,dp(landscape?2:7));
         root.addView(contentHost,contentLp);
 
         bottomNav=new LinearLayout(this);
         bottomNav.setOrientation(LinearLayout.HORIZONTAL);
         bottomNav.setGravity(Gravity.CENTER);
-        bottomNav.setPadding(dp(4),dp(4),dp(4),dp(4));
+        bottomNav.setPadding(dp(landscape?2:4),dp(landscape?2:4),dp(landscape?2:4),dp(landscape?2:4));
         bottomNav.setBackground(rounded(CARD,LINE,18));
         if(Build.VERSION.SDK_INT>=21)bottomNav.setElevation(dp(2));
 
         navAll=navButton("Все");
         navGroups=navButton("Разделы");
         navHistory=navButton("История");
-        bottomNav.addView(navAll,new LinearLayout.LayoutParams(0,dp(43),1));
-        bottomNav.addView(navGroups,new LinearLayout.LayoutParams(0,dp(43),1));
-        bottomNav.addView(navHistory,new LinearLayout.LayoutParams(0,dp(43),1));
-        root.addView(bottomNav,new LinearLayout.LayoutParams(-1,dp(51)));
+        bottomNav.addView(navAll,new LinearLayout.LayoutParams(0,dp(landscape?36:43),1));
+        bottomNav.addView(navGroups,new LinearLayout.LayoutParams(0,dp(landscape?36:43),1));
+        bottomNav.addView(navHistory,new LinearLayout.LayoutParams(0,dp(landscape?36:43),1));
+        root.addView(bottomNav,new LinearLayout.LayoutParams(-1,dp(landscape?40:51)));
 
         setContentView(root);
 
